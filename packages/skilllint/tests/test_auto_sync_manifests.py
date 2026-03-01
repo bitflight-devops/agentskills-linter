@@ -39,7 +39,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Module import -- script has a hyphen in the filename so we use importlib
 # ---------------------------------------------------------------------------
-_SCRIPT_PATH = Path(__file__).parent.parent / "scripts" / "auto_sync_manifests.py"
+_SCRIPT_PATH = Path(__file__).parent.parent / "auto_sync_manifests.py"
 _spec = importlib.util.spec_from_file_location("auto_sync_manifests", _SCRIPT_PATH)
 if _spec and _spec.loader:
     auto_sync = importlib.util.module_from_spec(_spec)
