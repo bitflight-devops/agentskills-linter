@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
 
 # ---------------------------------------------------------------------------
-# Module import -- script has a hyphen in the filename so we use importlib
+# Module import -- load the auto_sync_manifests.py hook script by path via importlib
 # ---------------------------------------------------------------------------
 _SCRIPT_PATH = Path(__file__).parent.parent / "auto_sync_manifests.py"
 _spec = importlib.util.spec_from_file_location("auto_sync_manifests", _SCRIPT_PATH)
