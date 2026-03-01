@@ -111,3 +111,8 @@ extend-select = ["I", "UP", "B", "RUF"]
 
 [tool.ruff.lint.isort]
 required-imports = ["from __future__ import annotations"]
+
+[tool.ruff.lint.per-file-ignores]
+# plugin_validator.py has intentional UTF-8 reconfigure block before some imports
+# and a sys.path.insert for sibling module resolution — both predate the package layout.
+"packages/skilllint/plugin_validator.py" = ["E402"]
