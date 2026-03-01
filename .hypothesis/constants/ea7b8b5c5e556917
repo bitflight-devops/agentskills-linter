@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/markdown_it/rules_block/reference.py
+# hypothesis_version: 6.151.9
+
+[':', '[', '\\', ']', 'definition', 'duplicate_refs', 'href', 'id', 'inline_definitions', 'label', 'map', 'reference', 'references', 'title', 'url']

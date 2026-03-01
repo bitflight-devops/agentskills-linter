@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/markdown_it/rules_inline/link.py
+# hypothesis_version: 6.151.9
+
+['(', ')', '[', 'a', 'href', 'label', 'link_close', 'link_open', 'references', 'store_labels', 'title']

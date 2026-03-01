@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/mdurl/_parse.py
+# hypothesis_version: 6.151.9
+
+[127, 255, '"', '#', '%', "'", '.', '/', '//', ':', ':[0-9]*$', ';', '<', '>', '?', '@', 'MutableURL', '[', '\\', ']', '^', '^([a-z0-9.+-]+:)', '^//[^@/]+@[^@/]+', '`', 'file', 'file:', 'ftp', 'ftp:', 'gopher', 'gopher:', 'http', 'http:', 'https', 'https:', 'javascript', 'javascript:', 'x', '{', '|', '}']

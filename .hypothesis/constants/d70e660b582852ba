@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/markdown_it/utils.py
+# hypothesis_version: 6.151.9
+
+['.', 'breaks', 'highlight', 'html', 'langPrefix', 'linkify', 'maxNesting', 'quotes', 'typographer', 'utf-8', 'xhtmlOut']

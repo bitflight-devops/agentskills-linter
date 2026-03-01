@@ -1,0 +1,4 @@
+# file: /home/runner/work/agentskills-linter/agentskills-linter/packages/skilllint/frontmatter_core.py
+# hypothesis_version: 6.151.9
+
+[1024, ', ', '---', '\\n---\\s*\\n', 'acceptEdits', 'agent', 'allow', 'allowed-tools', 'allowed_tools', 'argument-hint', 'before', 'bypassPermissions', 'command', 'default', 'description', 'disallowedTools', 'dontAsk', 'fork', 'haiku', 'inherit', 'local', 'name', 'opus', 'plan', 'project', 'skill', 'skills', 'sonnet', 'tools', 'user', 'user-invocable', 'worktree']

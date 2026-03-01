@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/markdown_it/common/normalize_url.py
+# hypothesis_version: 6.151.9
+
+['%', 'http:', 'https:', 'mailto:']

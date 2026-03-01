@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/markdown_it/presets/default.py
+# hypothesis_version: 6.151.9
+
+[100, 'block', 'breaks', 'components', 'core', 'highlight', 'html', 'inline', 'langPrefix', 'language-', 'linkify', 'maxNesting', 'options', 'quotes', 'typographer', 'xhtmlOut', '“”‘’']

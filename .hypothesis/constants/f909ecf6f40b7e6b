@@ -1,0 +1,4 @@
+# file: /home/runner/work/agentskills-linter/agentskills-linter/packages/skilllint/auto_sync_manifests.py
+# hypothesis_version: 6.151.9
+
+['\n---', '---', '--cached', '--config', '--dry-run', '--name-status', '--reconcile', '--write', '.', './skills/SKILL.md', '.claude-plugin', '.json', '.md', '.prettierrc', '/', '/SKILL.md', '0.0.0', '0.1.0', ':', 'A', 'Adding', 'D', 'DRY RUN', 'M', 'R', 'RECONCILE', 'Removing', 'SKILL.md', 'Would add', 'Would remove', '__main__', 'add', 'added', 'agent', 'agents', 'command', 'commands', 'component_path', 'component_type', 'deleted', 'dict[str, object]', 'dict[str, str]', 'diff', 'git', 'hook', 'hooks', 'list[dict[str, str]]', 'major', 'mcp', 'metadata', 'minor', 'modified', 'name', 'npx', 'other', 'patch', 'plugin', 'plugin.json', 'plugins', 'prettier', 'replace', 'show', 'skill', 'skills', 'skills/', 'source', 'store_true', 'str', 'true', 'user-invocable:', 'utf-8', 'version', 'w', 'yes']

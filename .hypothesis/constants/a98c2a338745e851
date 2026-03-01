@@ -1,0 +1,4 @@
+# file: /usr/lib/python3/dist-packages/markdown_it/rules_inline/html_inline.py
+# hypothesis_version: 6.151.9
+
+[122, '!', '/', '<', '?', 'html', 'html_inline']

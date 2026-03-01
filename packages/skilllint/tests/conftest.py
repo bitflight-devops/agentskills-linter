@@ -9,7 +9,6 @@ Provides reusable test fixtures for:
 
 from __future__ import annotations
 
-import importlib.util
 import os
 import re
 import sys
@@ -23,14 +22,13 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
 
-# Load the plugin_validator module directly from its path using importlib so
-# tests can run without relying on it being installed as a package.
-_VALIDATOR_PATH = Path(__file__).parent.parent / "plugin_validator.py"
-spec = importlib.util.spec_from_file_location("plugin_validator", _VALIDATOR_PATH)
-if spec and spec.loader:
-    plugin_validator = importlib.util.module_from_spec(spec)
-    sys.modules["plugin_validator"] = plugin_validator
-    spec.loader.exec_module(plugin_validator)
+# Import plugin_validator as a package module so that package-relative imports
+# (e.g. from .frontmatter_core import ...) resolve correctly.  Register it
+# under the bare name "plugin_validator" as well so that test files that use
+# `from plugin_validator import ...` continue to work without modification.
+import skilllint.plugin_validator as plugin_validator
+
+sys.modules.setdefault("plugin_validator", plugin_validator)
 
 _ANSI_ESCAPE = re.compile(rb"\x1b\[[0-9;]*[mGKHFJA-Z]")
 
