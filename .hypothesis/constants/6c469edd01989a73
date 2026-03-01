@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/markdown_it/presets/zero.py
-# hypothesis_version: 6.151.9
-
-['balance_pairs', 'block', 'breaks', 'components', 'core', 'fragments_join', 'highlight', 'html', 'inline', 'langPrefix', 'language-', 'linkify', 'maxNesting', 'normalize', 'options', 'paragraph', 'quotes', 'rules', 'rules2', 'text', 'text_join', 'typographer', 'xhtmlOut', '“”‘’']

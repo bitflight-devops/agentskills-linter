@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/mdurl/_encode.py
-# hypothesis_version: 6.151.9
-
-[128, 55296, 56319, 56320, 57343, '%', '%EF%BF%BD', "-_.!~*'()", '0', ";/?:@&=+$,-_.!~*'()#"]

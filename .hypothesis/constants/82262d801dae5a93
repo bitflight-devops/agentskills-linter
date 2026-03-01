@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/markdown_it/rules_block/html_block.py
-# hypothesis_version: 6.151.9
-
-[')(?=(\\s|/?>|$))', '-->', '<', '>', '\\?>', '\\]\\]>', '\\s*$', '^$', '^<!--', '^<![A-Z]', '^<!\\[CDATA\\[', '^</?(', '^<\\?', 'html', 'html_block', '|']

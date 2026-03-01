@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/markdown_it/_punycode.py
-# hypothesis_version: 6.151.9
-
-['.', '@', '[^\\0-\\x7E]', 'punycode', 'xn--']

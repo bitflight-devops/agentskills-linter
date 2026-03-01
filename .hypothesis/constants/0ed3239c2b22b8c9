@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/zstandard/__init__.py
-# hypothesis_version: 6.151.9
-
-['0.22.0', 'CPython', 'Invalid mode: {!r}', 'PathLike', 'PyPy', 'a', 'ab', 'b', 'cext', 'cffi', 'cffi_fallback', 'default', 'r', 'rb', 'read', 'rust', 't', 'w', 'wb', 'write', 'x', 'xb']

@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/markdown_it/rules_block/__init__.py
-# hypothesis_version: 6.151.9
-
-['StateBlock', 'blockquote', 'code', 'fence', 'heading', 'hr', 'html_block', 'lheading', 'list_block', 'paragraph', 'reference', 'table']

@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/markdown_it/rules_core/smartquotes.py
-# hypothesis_version: 6.151.9
-
-['"', "'", '[\'\\"]', 'hardbreak', 'inline', 'level', 'pos', 'single', 'softbreak', 'text', 'token', '’']

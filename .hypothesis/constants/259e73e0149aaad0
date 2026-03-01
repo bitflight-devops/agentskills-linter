@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/markdown_it/presets/commonmark.py
-# hypothesis_version: 6.151.9
-
-['autolink', 'backticks', 'balance_pairs', 'block', 'blockquote', 'breaks', 'code', 'components', 'core', 'emphasis', 'entity', 'escape', 'fence', 'fragments_join', 'heading', 'highlight', 'hr', 'html', 'html_block', 'html_inline', 'image', 'inline', 'langPrefix', 'language-', 'lheading', 'link', 'linkify', 'list', 'maxNesting', 'newline', 'normalize', 'options', 'paragraph', 'quotes', 'reference', 'rules', 'rules2', 'text', 'text_join', 'typographer', 'xhtmlOut', '“”‘’']

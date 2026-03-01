@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/markdown_it/rules_core/__init__.py
-# hypothesis_version: 6.151.9
-
-['StateCore', 'block', 'inline', 'linkify', 'normalize', 'replace', 'smartquotes', 'text_join']

@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/markdown_it/rules_block/table.py
-# hypothesis_version: 6.151.9
-
-['-', ':', '\\', '^:?-+:?$', '^\\||\\|$', 'blockquote', 'center', 'inline', 'left', 'right', 'style', 'table', 'table_close', 'table_open', 'tbody', 'tbody_close', 'tbody_open', 'td', 'td_close', 'td_open', 'text-align:', 'th', 'th_close', 'th_open', 'thead', 'thead_close', 'thead_open', 'tr', 'tr_close', 'tr_open', '|']

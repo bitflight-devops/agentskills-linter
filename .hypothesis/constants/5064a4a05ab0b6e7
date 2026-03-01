@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/markdown_it/rules_inline/__init__.py
-# hypothesis_version: 6.151.9
-
-['StateInline', 'autolink', 'backtick', 'emphasis', 'entity', 'escape', 'fragments_join', 'html_inline', 'image', 'link', 'link_pairs', 'linkify', 'newline', 'strikethrough', 'text']

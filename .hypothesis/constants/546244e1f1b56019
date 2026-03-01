@@ -1,4 +1,0 @@
-# file: /usr/lib/python3/dist-packages/markdown_it/parser_core.py
-# hypothesis_version: 6.151.9
-
-['block', 'inline', 'linkify', 'normalize', 'replacements', 'smartquotes', 'text_join']
