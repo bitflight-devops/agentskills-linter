@@ -35,9 +35,10 @@ dependencies = [
 ]
 
 [project.scripts]
-agentlint = "skilllint.plugin_validator:app"
-skillint = "skilllint.plugin_validator:app"
-skilllint = "skilllint.plugin_validator:app"
+agentlint  = "skilllint.plugin_validator:app"
+pluginlint = "skilllint.plugin_validator:app"
+skillint   = "skilllint.plugin_validator:app"
+skilllint  = "skilllint.plugin_validator:app"
 
 [project.urls]
 Homepage = "https://github.com/bitflight-devops/agentskills-linter"
@@ -72,6 +73,7 @@ include = [
 
 [tool.hatch.build.targets.wheel]
 include = ["packages/skilllint"]
+exclude = ["packages/skilllint/tests"]
 
 [tool.hatch.build.targets.wheel.sources]
 "packages/skilllint" = "skilllint"
