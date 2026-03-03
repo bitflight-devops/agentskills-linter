@@ -7,8 +7,8 @@
 
 ### Packaging and Distribution
 
-- [ ] **PKG-01**: Package is structured as an installable Python package (`packages/skilllint/`) with `pyproject.toml` and hatchling build backend — replacing PEP 723 standalone scripts
-- [ ] **PKG-02**: Package installs via `uv add skilllint` or `pip install skilllint` and is distributable as a `.whl`
+- [x] **PKG-01**: Package is structured as an installable Python package (`packages/skilllint/`) with `pyproject.toml` and hatchling build backend — replacing PEP 723 standalone scripts
+- [x] **PKG-02**: Package installs via `uv add skilllint` or `pip install skilllint` and is distributable as a `.whl`
 - [ ] **PKG-03**: CLI entry points `skilllint`, `agentlint`, `pluginlint`, `skillint` all invoke the same binary
 - [ ] **PKG-04**: Platform schema snapshots (JSON files) are bundled inside the wheel and accessed via `importlib.resources.files()` at runtime
 - [ ] **PKG-05**: PEP 723 → package migration is atomic — pre-commit hook users are not broken; existing `uv run plugin_validator.py` workflow is preserved or explicitly migrated
@@ -114,8 +114,8 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| PKG-01 | Phase 1: Package Structure | Pending |
-| PKG-02 | Phase 1: Package Structure | Pending |
+| PKG-01 | Phase 1: Package Structure | Complete (01-01) |
+| PKG-02 | Phase 1: Package Structure | Complete (01-01) |
 | PKG-03 | Phase 1: Package Structure | Pending |
 | PKG-04 | Phase 1: Package Structure | Pending |
 | PKG-05 | Phase 1: Package Structure | Pending |

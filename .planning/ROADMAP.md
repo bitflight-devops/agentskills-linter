@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — Merge feature/initial-packaging into main; verify 521 tests pass
+- [x] 01-01-PLAN.md — Merge feature/initial-packaging into main; verify 521 tests pass
 - [ ] 01-02-PLAN.md — Add pluginlint entry point, exclude tests from wheel, create bundled schema directory
 - [ ] 01-03-PLAN.md — Add .pre-commit-hooks.yaml, update conftest.py to package imports, document PEP 723 migration
 
@@ -116,7 +116,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5 → 6 → 7
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Package Structure | 0/3 | Planned | - |
+| 1. Package Structure | 1/3 | In progress | - |
 | 2. Platform Adapters | 0/TBD | Not started | - |
 | 3. Fix Mode, Config, and Validator Correctness | 0/TBD | Not started | - |
 | 4. LSP Server | 0/TBD | Not started | - |
