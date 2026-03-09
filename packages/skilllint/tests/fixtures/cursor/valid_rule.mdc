@@ -1,0 +1,9 @@
+---
+description: Enforce TypeScript strict mode in all source files.
+globs:
+  - "*.ts"
+  - "*.tsx"
+alwaysApply: false
+---
+
+Always enable strict mode in TypeScript configuration files.

@@ -1,0 +1,5 @@
+prefix_rule(
+    pattern = "src/",
+    decision = "allow",
+    justification = "All source files in src/ are owned by the core team and are safe to read and modify.",
+)

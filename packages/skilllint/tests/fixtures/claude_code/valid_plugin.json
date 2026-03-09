@@ -1,0 +1,6 @@
+{
+  "name": "my-plugin",
+  "description": "A minimal valid Claude Code plugin for testing.",
+  "version": "1.0.0",
+  "schema_version": "v1"
+}
