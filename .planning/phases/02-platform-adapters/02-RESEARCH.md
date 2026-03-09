@@ -480,6 +480,69 @@ Confidence: HIGH for field names — verified via developers.openai.com/codex/ru
 - `pkg_resources.iter_entry_points()`: deprecated, use `importlib.metadata.entry_points()`
 - `setup.py entry_points={}`: use `pyproject.toml [project.entry-points."group"]` instead
 
+## Validation Architecture
+
+### Test Framework
+| Property | Value |
+|----------|-------|
+| Framework | pytest (existing, 529 tests passing at end of Phase 1) |
+| Config file | `packages/skilllint/pyproject.toml` (`[tool.pytest.ini_options]`) |
+| Quick run command | `cd packages/skilllint && uv run pytest tests/test_adapters.py tests/test_as_series.py -x` |
+| Full suite command | `cd packages/skilllint && uv run pytest` |
+
+### Phase Requirements to Test Map
+
+| Req ID | Behavior | Test Type | Automated Command | File Exists? |
+|--------|----------|-----------|-------------------|-------------|
+| ADPT-01 | `PlatformAdapter` Protocol is defined; all three bundled adapters satisfy it without error | unit | `uv run pytest tests/test_adapters.py::test_protocol_conformance -x` | Wave 0 |
+| ADPT-01 | `isinstance(adapter, PlatformAdapter)` returns `True` for each bundled adapter | unit | `uv run pytest tests/test_adapters.py::test_runtime_checkable -x` | Wave 0 |
+| ADPT-02 | `load_adapters()` discovers all three adapters via entry_points after `uv pip install -e .` | integration | `uv run pytest tests/test_adapters.py::test_entry_points_discovery -x` | Wave 0 |
+| ADPT-02 | A mock third-party adapter installed as a separate dist is discovered without core changes | integration | `uv run pytest tests/test_adapters.py::test_third_party_adapter_discovery -x` | Wave 0 |
+| ADPT-03 | `skilllint --platform claude-code <file>` validates plugin.json, SKILL.md, agents/*.md, commands/*.md, hooks.json | integration | `uv run pytest tests/test_adapters.py::test_claude_code_adapter_validates_all_file_types -x` | Wave 0 |
+| ADPT-03 | Claude Code adapter `path_patterns()` matches `.claude/**/*.md`, `plugin.json`, `hooks.json`, `agents/**/*.md`, `commands/**/*.md` | unit | `uv run pytest tests/test_adapters.py::test_claude_code_path_patterns -x` | Wave 0 |
+| ADPT-03 | AS-series rules fire on SKILL.md validated through Claude Code adapter | unit | `uv run pytest tests/test_as_series.py -x` | Wave 0 |
+| ADPT-04 | `skilllint --platform cursor <file.mdc>` validates `.mdc` frontmatter fields (description, globs, alwaysApply) | integration | `uv run pytest tests/test_adapters.py::test_cursor_adapter_mdc_validation -x` | Wave 0 |
+| ADPT-04 | Cursor adapter rejects `.mdc` with unknown frontmatter fields | unit | `uv run pytest tests/test_adapters.py::test_cursor_mdc_unknown_fields -x` | Wave 0 |
+| ADPT-04 | Cursor adapter validates SKILL.md using AS-series | unit | `uv run pytest tests/test_adapters.py::test_cursor_skill_md_uses_as_series -x` | Wave 0 |
+| ADPT-05 | `skilllint --platform codex <AGENTS.md>` checks presence and non-empty content | unit | `uv run pytest tests/test_adapters.py::test_codex_agents_md_validation -x` | Wave 0 |
+| ADPT-05 | `skilllint --platform codex <file.rules>` validates known `prefix_rule()` fields; reports unknown fields | unit | `uv run pytest tests/test_adapters.py::test_codex_rules_field_validation -x` | Wave 0 |
+| ADPT-05 | Codex adapter path patterns match `.agents/skills/**/*.md`, `AGENTS.md`, `**/*.rules`, `.codex/**` | unit | `uv run pytest tests/test_adapters.py::test_codex_path_patterns -x` | Wave 0 |
+
+### Success Criterion Coverage
+
+**SC1 — Protocol defined + adapters implement:**
+- `tests/test_adapters.py::test_protocol_conformance` — instantiates each bundled adapter, asserts `isinstance(adapter, PlatformAdapter)` is `True`
+- `tests/test_adapters.py::test_runtime_checkable` — verifies `@runtime_checkable` enables isinstance without inheritance
+- Fixture: three minimal adapter instances (no I/O), protocol module importable
+
+**SC2 — entry_points discovery:**
+- `tests/test_adapters.py::test_entry_points_discovery` — calls `load_adapters()` in an installed editable package, asserts all three adapter IDs present
+- `tests/test_adapters.py::test_third_party_adapter_discovery` — uses `importlib.metadata` dist mocking (or a minimal in-tree test dist) to simulate a fourth adapter installed by a separate package; verifies it appears in `load_adapters()` without modifying core
+- Fixture: `conftest.py` ensures package is installed (`uv pip install -e .` or via pytest-dev fixture)
+
+**SC3 — claude-code platform validation:**
+- `tests/test_adapters.py::test_claude_code_adapter_validates_all_file_types` — runs `validate_file()` against fixture files for each of: `plugin.json`, `SKILL.md`, `agents/foo.md`, `commands/bar.md`, `hooks.json`; asserts no false positives on valid files; asserts expected violations on invalid files
+- `tests/test_as_series.py` — full AS-series rule coverage (AS001–AS006) against SKILL.md fixtures; existing `test_name_format_validator.py` and `test_description_validator.py` tests extend naturally here
+- Fixtures: `tests/fixtures/claude_code/` directory with valid and invalid examples of each file type
+
+**SC4 — cursor + codex platform validation:**
+- `tests/test_adapters.py::test_cursor_adapter_mdc_validation` — validates `.mdc` files with correct/incorrect frontmatter; asserts `description` required, `alwaysApply` must be boolean, unknown fields rejected
+- `tests/test_adapters.py::test_codex_rules_field_validation` — validates `.rules` files for `prefix_rule()` field names; unknown fields produce violations; `decision` values validated against `{"allow", "prompt", "forbidden"}`
+- `tests/test_adapters.py::test_codex_agents_md_validation` — empty `AGENTS.md` produces violation; non-empty passes
+- Fixtures: `tests/fixtures/cursor/` and `tests/fixtures/codex/` directories with valid and invalid examples
+
+### Sampling Rate
+- **Per task commit:** `cd packages/skilllint && uv run pytest tests/test_adapters.py tests/test_as_series.py -x`
+- **Per wave merge:** `cd packages/skilllint && uv run pytest`
+- **Phase gate:** Full suite green (including pre-existing 529 tests) before `/gsd:verify-work`
+
+### Wave 0 Gaps
+- [ ] `packages/skilllint/tests/test_adapters.py` — covers ADPT-01, ADPT-02, ADPT-03, ADPT-04, ADPT-05
+- [ ] `packages/skilllint/tests/test_as_series.py` — covers AS001–AS006 cross-platform rules
+- [ ] `packages/skilllint/tests/fixtures/claude_code/` — valid/invalid plugin.json, SKILL.md, agents/*.md, commands/*.md, hooks.json
+- [ ] `packages/skilllint/tests/fixtures/cursor/` — valid/invalid .mdc files, SKILL.md
+- [ ] `packages/skilllint/tests/fixtures/codex/` — valid/invalid AGENTS.md, .rules files, SKILL.md
+
 ## Open Questions
 
 1. **Cursor SKILL.md loading from `.claude/skills/` — confirmed or community convention?**
@@ -490,7 +553,7 @@ Confidence: HIGH for field names — verified via developers.openai.com/codex/ru
 2. **GitHub Copilot CLI adapter — v1 or v2 scope?**
    - What we know: Copilot loads from `.github/skills/` and `.claude/skills/` (project), `~/.copilot/skills/` and `~/.claude/skills/` (user); uses identical agentskills.io SKILL.md format; AS-series fully applies
    - What's unclear: CONTEXT.md does not lock the Copilot adapter into Phase 2 or defer it explicitly
-   - Recommendation: Planner should treat as out of scope for Phase 2 unless the user explicitly adds it. The adapter would be trivial (path patterns + AS-series only) but REQUIREMENTS.md lists only ADPT-01 through ADPT-05.
+   - Recommendation: Treat as out of scope for Phase 2. REQUIREMENTS.md lists only ADPT-01 through ADPT-05. The adapter would be trivial but is not a stated deliverable.
 
 3. **Starlark `.rules` parsing depth**
    - What we know: Format is explicitly experimental per OpenAI docs; `prefix_rule()` fields are `pattern`, `decision`, `justification`, `match`, `not_match`
@@ -530,6 +593,7 @@ Confidence: HIGH for field names — verified via developers.openai.com/codex/ru
 - Codex `.rules` fields: HIGH — verified via official OpenAI docs
 - AS-series rule derivation: HIGH — derived directly from agentskills.io spec
 - Pitfalls: HIGH — all grounded in verified technical facts
+- Validation Architecture: HIGH — test file locations match existing project conventions in `packages/skilllint/tests/`
 
 **Research date:** 2026-03-09
 **Valid until:** 2026-06-09 (stable Python stdlib patterns); `.rules` Starlark format flagged as experimental — re-verify before implementation
