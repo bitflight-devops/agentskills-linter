@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "skilllint/schemas/cursor/v1.json",
+  "title": "Cursor Platform Schema v1",
+  "description": "Bundled schema snapshot for Cursor platform files (.mdc rules, SKILL.md). Accessed via importlib.resources.files() at runtime.",
+  "version": "1.0.0",
+  "platform": "cursor",
+  "file_types": {
+    "mdc": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Cursor MDC Rule Frontmatter",
+      "type": "object",
+      "required": ["description"],
+      "properties": {
+        "description": { "type": "string", "minLength": 1 },
+        "globs": { "oneOf": [{"type": "string"}, {"type": "array", "items": {"type": "string"}}] },
+        "alwaysApply": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "skill_md": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Cursor SKILL.md Frontmatter (agentskills.io)",
+      "type": "object",
+      "required": ["name", "description"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "description": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "license": { "type": "string" },
+        "metadata": { "type": "object" }
+      },
+      "additionalProperties": true
+    }
+  }
+}
