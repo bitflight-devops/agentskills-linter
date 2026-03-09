@@ -34,6 +34,11 @@ dependencies = [
     "typer>=0.21.0",
 ]
 
+[project.entry-points."skilllint.adapters"]
+claude_code = "skilllint.adapters.claude_code:ClaudeCodeAdapter"
+cursor     = "skilllint.adapters.cursor:CursorAdapter"
+codex      = "skilllint.adapters.codex:CodexAdapter"
+
 [project.scripts]
 agentlint  = "skilllint.plugin_validator:app"
 pluginlint = "skilllint.plugin_validator:app"
