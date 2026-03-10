@@ -97,16 +97,7 @@ DOC_SITE_PLATFORMS: list[DocSitePlatform] = [
     DocSitePlatform(
         "cursor",
         [
-            DocPage("https://cursor.com/docs/context/rules.md", "rules.md"),
-            DocPage("https://cursor.com/docs/context/ignore.md", "ignore.md"),
-            DocPage(
-                "https://cursor.com/docs/context/model-context-protocol.md",
-                "model-context-protocol.md",
-            ),
-            DocPage(
-                "https://cursor.com/docs/context/global-rules.md",
-                "global-rules.md",
-            ),
+            DocPage("https://cursor.com/docs/context/rules", "rules.md"),
         ],
     ),
     DocSitePlatform(
@@ -117,7 +108,7 @@ DOC_SITE_PLATFORMS: list[DocSitePlatform] = [
                 "about-copilot-cli.md",
             ),
             DocPage(
-                "https://docs.github.com/api/article/body?pathname=/en/copilot/concepts/agents/copilot-cli/using-copilot-cli",
+                "https://docs.github.com/api/article/body?pathname=/en/copilot/how-tos/use-copilot-agents/use-copilot-cli",
                 "using-copilot-cli.md",
             ),
         ],
