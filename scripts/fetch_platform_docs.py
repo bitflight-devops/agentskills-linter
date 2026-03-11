@@ -16,11 +16,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, final
+from typing import Annotated, TypedDict, final
 
 import httpx
 import typer
@@ -40,7 +41,49 @@ err_console = Console(stderr=True)
 
 
 # ---------------------------------------------------------------------------
-# Drift detection data model
+# Drift detection data model — TypedDicts for serialized forms
+# ---------------------------------------------------------------------------
+
+
+class HttpFileDriftDict(TypedDict):
+    """Serialized form of HttpFileDriftResult."""
+
+    filename: str
+    before_hash: str
+    after_hash: str
+    before_content: str
+    after_content: str
+
+
+class HttpDriftDict(TypedDict):
+    """Serialized form of HttpDriftResult."""
+
+    type: str
+    provider: str
+    files: list[HttpFileDriftDict]
+    changelog: str | None
+
+
+class GitDriftDict(TypedDict):
+    """Serialized form of GitDriftResult."""
+
+    type: str
+    provider: str
+    before_sha: str
+    after_sha: str
+    diff: str
+    changelog: str
+
+
+class DriftReportDict(TypedDict):
+    """Serialized form of DriftReport."""
+
+    fetch_time: str
+    changed: list[GitDriftDict | HttpDriftDict]
+
+
+# ---------------------------------------------------------------------------
+# Drift detection data model — dataclasses
 # ---------------------------------------------------------------------------
 
 
@@ -54,19 +97,19 @@ class HttpFileDriftResult:
     before_content: str
     after_content: str
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> HttpFileDriftDict:
         """Serialize to a JSON-compatible dictionary.
 
         Returns:
             Dictionary with all fields.
         """
-        return {
-            "filename": self.filename,
-            "before_hash": self.before_hash,
-            "after_hash": self.after_hash,
-            "before_content": self.before_content,
-            "after_content": self.after_content,
-        }
+        return HttpFileDriftDict(
+            filename=self.filename,
+            before_hash=self.before_hash,
+            after_hash=self.after_hash,
+            before_content=self.before_content,
+            after_content=self.after_content,
+        )
 
 
 @dataclass
@@ -77,7 +120,7 @@ class HttpDriftResult:
     files: list[HttpFileDriftResult] = field(default_factory=list)
     changelog: str | None = None
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> HttpDriftDict:
         """Serialize to a JSON-compatible dictionary.
 
         Includes ``"type": "http"`` to distinguish from git results.
@@ -85,12 +128,9 @@ class HttpDriftResult:
         Returns:
             Dictionary with all fields plus a ``type`` discriminator.
         """
-        return {
-            "type": "http",
-            "provider": self.provider,
-            "files": [f.to_dict() for f in self.files],
-            "changelog": self.changelog,
-        }
+        return HttpDriftDict(
+            type="http", provider=self.provider, files=[f.to_dict() for f in self.files], changelog=self.changelog
+        )
 
 
 @dataclass
@@ -103,7 +143,7 @@ class GitDriftResult:
     diff: str = ""
     changelog: str = ""
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> GitDriftDict:
         """Serialize to a JSON-compatible dictionary.
 
         Includes ``"type": "git"`` to distinguish from HTTP results.
@@ -111,14 +151,14 @@ class GitDriftResult:
         Returns:
             Dictionary with all fields plus a ``type`` discriminator.
         """
-        return {
-            "type": "git",
-            "provider": self.provider,
-            "before_sha": self.before_sha,
-            "after_sha": self.after_sha,
-            "diff": self.diff,
-            "changelog": self.changelog,
-        }
+        return GitDriftDict(
+            type="git",
+            provider=self.provider,
+            before_sha=self.before_sha,
+            after_sha=self.after_sha,
+            diff=self.diff,
+            changelog=self.changelog,
+        )
 
 
 @dataclass
@@ -128,7 +168,7 @@ class DriftReport:
     fetch_time: str
     changed: list[GitDriftResult | HttpDriftResult] = field(default_factory=list)
 
-    def to_dict(self) -> dict[str, object]:
+    def to_dict(self) -> DriftReportDict:
         """Serialize to a JSON-compatible dictionary.
 
         Calls ``to_dict()`` on each item in ``changed``.
@@ -136,10 +176,7 @@ class DriftReport:
         Returns:
             Dictionary with ``fetch_time`` and serialized ``changed`` list.
         """
-        return {
-            "fetch_time": self.fetch_time,
-            "changed": [item.to_dict() for item in self.changed],
-        }
+        return DriftReportDict(fetch_time=self.fetch_time, changed=[item.to_dict() for item in self.changed])
 
 
 # ---------------------------------------------------------------------------
@@ -188,10 +225,7 @@ def _write_drift_report(report: DriftReport) -> None:
         report: The drift report to persist.
     """
     DRIFT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _ = DRIFT_FILE.write_text(
-        json.dumps(report.to_dict(), indent=2) + "\n",
-        encoding="utf-8",
-    )
+    _ = DRIFT_FILE.write_text(json.dumps(report.to_dict(), indent=2) + "\n", encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -227,12 +261,7 @@ class DocSitePlatform:
 
     __slots__ = ("name", "pages", "releases_url")
 
-    def __init__(
-        self,
-        name: str,
-        pages: list[DocPage],
-        releases_url: str | None = None,
-    ) -> None:
+    def __init__(self, name: str, pages: list[DocPage], releases_url: str | None = None) -> None:
         self.name = name
         self.pages = pages
         self.releases_url = releases_url
@@ -250,9 +279,7 @@ GIT_PLATFORMS: list[GitPlatform] = [
 DOC_SITE_PLATFORMS: list[DocSitePlatform] = [
     DocSitePlatform(
         "cursor",
-        [
-            DocPage("https://cursor.com/docs/context/rules", "rules.md"),
-        ],
+        [DocPage("https://cursor.com/docs/context/rules", "rules.md")],
         releases_url="https://www.cursor.com/changelog",
     ),
     DocSitePlatform(
@@ -276,9 +303,7 @@ DOC_SITE_PLATFORMS: list[DocSitePlatform] = [
 # ---------------------------------------------------------------------------
 
 
-def _run_git(
-    args: list[str], *, cwd: Path | None = None
-) -> subprocess.CompletedProcess[str]:
+def _run_git(args: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
     """Run a git command and return the result.
 
     Args:
@@ -291,13 +316,11 @@ def _run_git(
     Raises:
         subprocess.CalledProcessError: If git exits non-zero.
     """
-    return subprocess.run(
-        ["git", *args],
-        cwd=cwd,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
+    git_bin = shutil.which("git")
+    if git_bin is None:
+        msg = "git executable not found on PATH"
+        raise FileNotFoundError(msg)
+    return subprocess.run([git_bin, *args], cwd=cwd, capture_output=True, text=True, check=True)
 
 
 def _git_head_sha(repo_dir: Path) -> str | None:
@@ -319,9 +342,7 @@ def _git_head_sha(repo_dir: Path) -> str | None:
     return result.stdout.strip() or None
 
 
-def clone_or_update_repo(
-    platform: GitPlatform, *, dry_run: bool
-) -> GitDriftResult | None:
+def clone_or_update_repo(platform: GitPlatform, *, dry_run: bool) -> GitDriftResult | None:
     """Clone a repo on first run, or pull updates on subsequent runs.
 
     Captures the HEAD SHA before and after the git operation. When both
@@ -340,9 +361,7 @@ def clone_or_update_repo(
 
     if dry_run:
         action = "pull" if (dest / ".git").is_dir() else "clone"
-        console.print(
-            f"  [dim]:fast-forward_button: dry-run: would git {action}[/dim] {platform.name}"
-        )
+        console.print(f"  [dim]:fast-forward_button: dry-run: would git {action}[/dim] {platform.name}")
         return None
 
     before_sha = _git_head_sha(dest)
@@ -350,34 +369,20 @@ def clone_or_update_repo(
     VENDOR_DIR.mkdir(parents=True, exist_ok=True)
 
     if (dest / ".git").is_dir():
-        console.print(
-            f"  :fast-forward_button: Updating [cyan]{platform.name}[/cyan] (git pull)"
-        )
+        console.print(f"  :fast-forward_button: Updating [cyan]{platform.name}[/cyan] (git pull)")
         try:
             _ = _run_git(["pull", "--ff-only", "--quiet"], cwd=dest)
         except subprocess.CalledProcessError:
-            console.print(
-                "    [yellow]:warning: pull failed, trying fetch+reset[/yellow]"
-            )
+            console.print("    [yellow]:warning: pull failed, trying fetch+reset[/yellow]")
             _ = _run_git(["fetch", "origin", "--quiet"], cwd=dest)
             try:
-                result = _run_git(
-                    ["symbolic-ref", "refs/remotes/origin/HEAD"],
-                    cwd=dest,
-                )
-                default_branch = result.stdout.strip().removeprefix(
-                    "refs/remotes/origin/"
-                )
+                result = _run_git(["symbolic-ref", "refs/remotes/origin/HEAD"], cwd=dest)
+                default_branch = result.stdout.strip().removeprefix("refs/remotes/origin/")
             except subprocess.CalledProcessError:
                 default_branch = "main"
-            _ = _run_git(
-                ["reset", "--hard", f"origin/{default_branch}", "--quiet"],
-                cwd=dest,
-            )
+            _ = _run_git(["reset", "--hard", f"origin/{default_branch}", "--quiet"], cwd=dest)
     else:
-        console.print(
-            f"  :inbox_tray: Cloning [cyan]{platform.name}[/cyan] from {platform.url}"
-        )
+        console.print(f"  :inbox_tray: Cloning [cyan]{platform.name}[/cyan] from {platform.url}")
         _ = _run_git(["clone", "--quiet", "--depth", "1", platform.url, str(dest)])
 
     after_sha = _git_head_sha(dest)
@@ -392,36 +397,19 @@ def clone_or_update_repo(
 
     # Capture doc-relevant diff and changelog between the two SHAs
     try:
-        diff_result = _run_git(
-            [
-                "diff",
-                f"{before_sha}..{after_sha}",
-                "--",
-                "*.md",
-                "docs/",
-                "CLAUDE.md",
-            ],
-            cwd=dest,
-        )
+        diff_result = _run_git(["diff", f"{before_sha}..{after_sha}", "--", "*.md", "docs/", "CLAUDE.md"], cwd=dest)
         diff_output = diff_result.stdout
     except subprocess.CalledProcessError:
         diff_output = ""
 
     try:
-        log_result = _run_git(
-            ["log", "--oneline", f"{before_sha}..{after_sha}"],
-            cwd=dest,
-        )
+        log_result = _run_git(["log", "--oneline", f"{before_sha}..{after_sha}"], cwd=dest)
         log_output = log_result.stdout.strip()
     except subprocess.CalledProcessError:
         log_output = ""
 
     return GitDriftResult(
-        provider=platform.name,
-        before_sha=before_sha,
-        after_sha=after_sha,
-        diff=diff_output,
-        changelog=log_output,
+        provider=platform.name, before_sha=before_sha, after_sha=after_sha, diff=diff_output, changelog=log_output
     )
 
 
@@ -430,9 +418,7 @@ def clone_or_update_repo(
 # ---------------------------------------------------------------------------
 
 
-def fetch_doc_site(
-    platform: DocSitePlatform, *, dry_run: bool
-) -> HttpDriftResult | None:
+def fetch_doc_site(platform: DocSitePlatform, *, dry_run: bool) -> HttpDriftResult | None:
     """Fetch markdown pages from a documentation website.
 
     Compares fetched content against existing files to detect drift.
@@ -461,15 +447,11 @@ def fetch_doc_site(
 
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
         for page in platform.pages:
-            console.print(
-                f"  :globe_with_meridians: Fetching [cyan]{platform.name}[/cyan]/{page.filename}"
-            )
+            console.print(f"  :globe_with_meridians: Fetching [cyan]{platform.name}[/cyan]/{page.filename}")
             try:
                 # Snapshot existing content before fetch
                 existing_content = _read_text_or_none(dest / page.filename)
-                before_hash = (
-                    _sha256(existing_content) if existing_content is not None else None
-                )
+                before_hash = _sha256(existing_content) if existing_content is not None else None
 
                 response = client.get(page.url)
                 _ = response.raise_for_status()
@@ -481,7 +463,8 @@ def fetch_doc_site(
 
                 # Detect drift: only when there was a previous file and hashes differ
                 if before_hash is not None and before_hash != after_hash:
-                    assert existing_content is not None
+                    if existing_content is None:
+                        continue
                     changed_files.append(
                         HttpFileDriftResult(
                             filename=page.filename,
@@ -492,9 +475,7 @@ def fetch_doc_site(
                         )
                     )
             except httpx.HTTPError as exc:
-                err_console.print(
-                    f"    [yellow]:warning: Failed to fetch {page.url}: {exc}[/yellow]"
-                )
+                err_console.print(f"    [yellow]:warning: Failed to fetch {page.url}: {exc}[/yellow]")
 
     if not changed_files:
         return None
@@ -512,11 +493,7 @@ def fetch_doc_site(
                 f"    [yellow]:warning: Failed to fetch changelog {platform.releases_url}: {exc}[/yellow]"
             )
 
-    return HttpDriftResult(
-        provider=platform.name,
-        files=changed_files,
-        changelog=changelog,
-    )
+    return HttpDriftResult(provider=platform.name, files=changed_files, changelog=changelog)
 
 
 # ---------------------------------------------------------------------------
@@ -562,11 +539,7 @@ def fetch(
         )
 
     console.print(
-        Panel(
-            f"Vendor dir: {VENDOR_DIR}",
-            title=":open_file_folder: Platform Documentation Fetch",
-            border_style="blue",
-        )
+        Panel(f"Vendor dir: {VENDOR_DIR}", title=":open_file_folder: Platform Documentation Fetch", border_style="blue")
     )
 
     # Phase A: Clone/update git repos
@@ -593,10 +566,7 @@ def fetch(
     if dry_run:
         console.print(":white_check_mark: [bold green]Dry run complete.[/bold green]")
     elif changed_results:
-        report = DriftReport(
-            fetch_time=datetime.now(UTC).isoformat(),
-            changed=changed_results,
-        )
+        report = DriftReport(fetch_time=datetime.now(UTC).isoformat(), changed=changed_results)
         _write_drift_report(report)
 
         provider_names = ", ".join(r.provider for r in changed_results)
@@ -609,9 +579,7 @@ def fetch(
         )
         raise typer.Exit(code=2)
     else:
-        console.print(
-            f":white_check_mark: [bold green]Done. Vendor dir: {VENDOR_DIR}[/bold green]"
-        )
+        console.print(f":white_check_mark: [bold green]Done. Vendor dir: {VENDOR_DIR}[/bold green]")
 
 
 if __name__ == "__main__":

@@ -24,14 +24,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from hypothesis import given, settings
-from hypothesis import strategies as st
+from hypothesis import given, settings, strategies as st
 
-from skilllint.plugin_validator import (
-    TOKEN_ERROR_THRESHOLD,
-    TOKEN_WARNING_THRESHOLD,
-    ComplexityValidator,
-)
+from skilllint.plugin_validator import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, ComplexityValidator
 
 
 def generate_exact_token_content(target_tokens: int) -> str:
@@ -143,9 +138,7 @@ description: Test skill for determinism
 
     @given(st.text(min_size=50, max_size=500), st.text(min_size=10, max_size=100))
     @settings(deadline=None)
-    def test_frontmatter_changes_dont_affect_body_token_count(
-        self, body: str, frontmatter_desc: str
-    ) -> None:
+    def test_frontmatter_changes_dont_affect_body_token_count(self, body: str, frontmatter_desc: str) -> None:
         """Test frontmatter changes don't affect body token count.
 
         Tests: Frontmatter exclusion from token counting
@@ -196,15 +189,9 @@ hooks: session-start
             result2 = validator.validate(skill2_path)
 
             # Both should have same validation result (warnings/errors based on body only)
-            assert result1.passed == result2.passed, (
-                "Frontmatter differences affected validation result"
-            )
-            assert len(result1.errors) == len(result2.errors), (
-                "Frontmatter differences affected error count"
-            )
-            assert len(result1.warnings) == len(result2.warnings), (
-                "Frontmatter differences affected warning count"
-            )
+            assert result1.passed == result2.passed, "Frontmatter differences affected validation result"
+            assert len(result1.errors) == len(result2.errors), "Frontmatter differences affected error count"
+            assert len(result1.warnings) == len(result2.warnings), "Frontmatter differences affected warning count"
 
 
 class TestThresholdBoundaries:
@@ -362,12 +349,8 @@ description: Test skill well below thresholds
 
         # Should pass with no warnings or errors
         assert result.passed is True, "Should pass well below thresholds"
-        assert len(result.warnings) == 0, (
-            "Should have no warnings below TOKEN_WARNING_THRESHOLD"
-        )
-        assert len(result.errors) == 0, (
-            "Should have no errors below TOKEN_WARNING_THRESHOLD"
-        )
+        assert len(result.warnings) == 0, "Should have no warnings below TOKEN_WARNING_THRESHOLD"
+        assert len(result.errors) == 0, "Should have no errors below TOKEN_WARNING_THRESHOLD"
 
 
 class TestEncodingConsistency:
@@ -490,15 +473,11 @@ Just a few sentences to verify frontmatter exclusion works correctly.
         result = validator.validate(skill_md)
 
         # Should pass because body is small (frontmatter excluded)
-        assert result.passed is True, (
-            "Should pass with small body despite large frontmatter"
-        )
+        assert result.passed is True, "Should pass with small body despite large frontmatter"
         assert len(result.warnings) == 0, "Should have no warnings (body is small)"
         assert len(result.errors) == 0, "Should have no errors (body is small)"
 
-    def test_small_frontmatter_large_body_triggers_warning(
-        self, tmp_path: Path
-    ) -> None:
+    def test_small_frontmatter_large_body_triggers_warning(self, tmp_path: Path) -> None:
         """Test small frontmatter with large body triggers warning.
 
         Tests: Body token counting is accurate
@@ -512,13 +491,9 @@ Just a few sentences to verify frontmatter exclusion works correctly.
         enc = tiktoken.get_encoding("cl100k_base")
 
         # Generate large body content (>TOKEN_WARNING_THRESHOLD tokens)
-        large_body = (
-            "This is a test sentence for the body. " * 400
-        )  # ~8 tokens * 400 = 3200 tokens
+        large_body = "This is a test sentence for the body. " * 400  # ~8 tokens * 400 = 3200 tokens
         # Add more to reach >TOKEN_WARNING_THRESHOLD
-        large_body += (
-            "Additional content to reach threshold. " * 150
-        )  # ~6 tokens * 150 = 900 more
+        large_body += "Additional content to reach threshold. " * 150  # ~6 tokens * 150 = 900 more
 
         tokens_in_body = len(enc.encode(large_body))
         assert tokens_in_body > TOKEN_WARNING_THRESHOLD, (
@@ -537,9 +512,7 @@ description: "Short"
 
         # Should have warning because body is large
         assert result.passed is True, "Should pass (warnings don't fail)"
-        assert any(issue.code == "SK006" for issue in result.warnings), (
-            "Should have warning SK006 for large body"
-        )
+        assert any(issue.code == "SK006" for issue in result.warnings), "Should have warning SK006 for large body"
 
 
 class TestKnownSampleVerification:
@@ -602,9 +575,7 @@ Activate this skill when you need guidance on skill creation.
         # Verify known token count
         expected_tokens = len(enc.encode(sample_text))
         # This sample should be well under TOKEN_WARNING_THRESHOLD
-        assert expected_tokens < 100, (
-            f"Test assumption: sample should be <100 tokens, got {expected_tokens}"
-        )
+        assert expected_tokens < 100, f"Test assumption: sample should be <100 tokens, got {expected_tokens}"
 
         skill_md = tmp_path / "SKILL.md"
         skill_md.write_text(f"""---

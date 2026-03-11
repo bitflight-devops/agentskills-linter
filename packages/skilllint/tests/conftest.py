@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import os
 import re
-from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import pytest
@@ -19,6 +18,7 @@ from typer.testing import CliRunner, Result
 
 if TYPE_CHECKING:
     from collections.abc import Generator
+    from pathlib import Path
 
 _ANSI_ESCAPE = re.compile(rb"\x1b\[[0-9;]*[mGKHFJA-Z]")
 

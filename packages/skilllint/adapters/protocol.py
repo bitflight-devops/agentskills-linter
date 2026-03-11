@@ -1,5 +1,4 @@
-"""
-PlatformAdapter Protocol definition.
+"""PlatformAdapter Protocol definition.
 
 Defines the @runtime_checkable Protocol that all platform adapters must satisfy.
 Any object implementing the four methods (id, path_patterns, applicable_rules,
@@ -8,8 +7,10 @@ validate) passes isinstance(obj, PlatformAdapter) without inheritance.
 
 from __future__ import annotations
 
-import pathlib
-from typing import Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
+
+if TYPE_CHECKING:
+    import pathlib
 
 
 @runtime_checkable

@@ -176,9 +176,7 @@ class TestMarkdownTokenCounter:
         Why: Some markdown files (like CLAUDE.md in projects) may have frontmatter
         """
         md_file = tmp_path / "CLAUDE.md"
-        md_file.write_text(
-            "---\ntitle: Test\nversion: 1.0\n---\n\n# Content\n\nBody text here.\n"
-        )
+        md_file.write_text("---\ntitle: Test\nversion: 1.0\n---\n\n# Content\n\nBody text here.\n")
 
         counter = plugin_validator.MarkdownTokenCounter()
         result = counter.validate(md_file)
@@ -270,9 +268,7 @@ class TestMarkdownTokenCounter:
 class TestTokensOnlyCLIFlag:
     """Test --tokens-only CLI flag behavior."""
 
-    def test_tokens_only_outputs_integer(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_tokens_only_outputs_integer(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify --tokens-only outputs just an integer.
 
         Tests: --tokens-only produces clean integer output
@@ -282,9 +278,7 @@ class TestTokensOnlyCLIFlag:
         md_file = tmp_path / "test.md"
         md_file.write_text("# Hello\n\nSome content for token counting.\n")
 
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--tokens-only", str(md_file)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", str(md_file)])
 
         assert result.exit_code == 0
         # Output should be a single integer (possibly with trailing newline)
@@ -292,9 +286,7 @@ class TestTokensOnlyCLIFlag:
         assert output.isdigit(), f"Expected integer output, got: {output!r}"
         assert int(output) > 0
 
-    def test_tokens_only_exit_code_0(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_tokens_only_exit_code_0(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify --tokens-only exits with code 0 on success.
 
         Tests: Exit code 0 for successful token counting
@@ -304,30 +296,22 @@ class TestTokensOnlyCLIFlag:
         md_file = tmp_path / "test.md"
         md_file.write_text("Content.\n")
 
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--tokens-only", str(md_file)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", str(md_file)])
 
         assert result.exit_code == 0
 
-    def test_tokens_only_exit_code_2_missing_file(
-        self, cli_runner: CliRunner, no_color_env: None
-    ) -> None:
+    def test_tokens_only_exit_code_2_missing_file(self, cli_runner: CliRunner, no_color_env: None) -> None:
         """Verify --tokens-only exits with code 2 for missing files.
 
         Tests: Exit code 2 for nonexistent file
         How: Run CLI with --tokens-only on nonexistent path
         Why: Scripts need to detect errors
         """
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--tokens-only", "/nonexistent/file.md"]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", "/nonexistent/file.md"])
 
         assert result.exit_code == 2
 
-    def test_tokens_only_no_rich_formatting(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_tokens_only_no_rich_formatting(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify --tokens-only produces no Rich formatting.
 
         Tests: Output contains no ANSI escape codes or Rich markup
@@ -337,9 +321,7 @@ class TestTokensOnlyCLIFlag:
         md_file = tmp_path / "test.md"
         md_file.write_text("# Test\n\nBody content.\n")
 
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--tokens-only", str(md_file)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", str(md_file)])
 
         assert "\x1b[" not in result.stdout  # No ANSI escape codes
         assert "Validation" not in result.stdout  # No summary panel
@@ -355,18 +337,14 @@ class TestTokensOnlyCLIFlag:
         Why: Users may want token counts for any markdown file
         """
         skill_file = sample_skill_dir / "SKILL.md"
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--tokens-only", str(skill_file)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", str(skill_file)])
 
         assert result.exit_code == 0
         output = result.stdout.strip()
         assert output.isdigit()
         assert int(output) > 0
 
-    def test_tokens_only_multiple_files(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_tokens_only_multiple_files(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify --tokens-only handles multiple files (one count per line).
 
         Tests: Multiple files produce one integer per line
@@ -378,9 +356,7 @@ class TestTokensOnlyCLIFlag:
         file_a.write_text("Short.\n")
         file_b.write_text("Also short content.\n")
 
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--tokens-only", str(file_a), str(file_b)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", str(file_a), str(file_b)])
 
         assert result.exit_code == 0
         lines = result.stdout.strip().split("\n")
@@ -403,9 +379,7 @@ class TestTokensOnlyCLIFlag:
 class TestCLIMarkdownValidation:
     """Test CLI integration for general markdown file validation."""
 
-    def test_claude_md_validation_passes(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_claude_md_validation_passes(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify CLAUDE.md files pass validation (no skill-specific checks).
 
         Tests: CLAUDE.md validation runs token counting only
@@ -419,9 +393,7 @@ class TestCLIMarkdownValidation:
 
         assert result.exit_code == 0
 
-    def test_reference_md_validation_passes(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_reference_md_validation_passes(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify reference .md files pass validation.
 
         Tests: Reference docs validate with token counting
@@ -437,9 +409,7 @@ class TestCLIMarkdownValidation:
 
         assert result.exit_code == 0
 
-    def test_readme_md_validation_passes(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_readme_md_validation_passes(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify README.md files pass validation.
 
         Tests: Generic markdown files validate correctly
@@ -465,16 +435,12 @@ class TestCLIMarkdownValidation:
         claude_md = tmp_path / "CLAUDE.md"
         claude_md.write_text("# Instructions\n\nContent for counting.\n")
 
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--verbose", "--no-color", str(claude_md)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--verbose", "--no-color", str(claude_md)])
 
         assert result.exit_code == 0
         assert "tokens" in result.stdout.lower()
 
-    def test_markdown_file_no_skill_validators(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_markdown_file_no_skill_validators(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify markdown files don't run skill-specific validators.
 
         Tests: No description/trigger/complexity validators on generic markdown
@@ -484,9 +450,7 @@ class TestCLIMarkdownValidation:
         claude_md = tmp_path / "CLAUDE.md"
         claude_md.write_text("# No frontmatter here\n\nJust content.\n")
 
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--verbose", "--no-color", str(claude_md)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--verbose", "--no-color", str(claude_md)])
 
         assert result.exit_code == 0
         # Should NOT contain skill-specific validator names

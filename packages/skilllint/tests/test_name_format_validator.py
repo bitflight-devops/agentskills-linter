@@ -9,11 +9,14 @@ Tests:
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from skilllint.plugin_validator import NameFormatValidator
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestNameFormatValidatorBasic:
@@ -181,9 +184,7 @@ class TestInvalidNamesHyphens:
             ("test--", "test--"),  # Multiple trailing hyphens
         ],
     )
-    def test_hyphen_placement_detection(
-        self, tmp_path: Path, invalid_name: str, yaml_repr: str
-    ) -> None:
+    def test_hyphen_placement_detection(self, tmp_path: Path, invalid_name: str, yaml_repr: str) -> None:
         """Test error when name has invalid hyphen placement (SK003).
 
         Tests: Names with leading/trailing/consecutive hyphens

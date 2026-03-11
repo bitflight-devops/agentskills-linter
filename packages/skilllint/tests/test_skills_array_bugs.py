@@ -51,9 +51,7 @@ from pathlib import Path
 
 _SCRIPT_DIR = Path(__file__).parent.parent
 
-_ASM_SPEC = importlib.util.spec_from_file_location(
-    "auto_sync_manifests", _SCRIPT_DIR / "auto_sync_manifests.py"
-)
+_ASM_SPEC = importlib.util.spec_from_file_location("auto_sync_manifests", _SCRIPT_DIR / "auto_sync_manifests.py")
 if _ASM_SPEC and _ASM_SPEC.loader:
     auto_sync = importlib.util.module_from_spec(_ASM_SPEC)
     sys.modules["auto_sync_manifests"] = auto_sync
@@ -103,10 +101,7 @@ def _make_standard_plugin(tmp_path: Path, skills: list[str]) -> tuple[Path, Path
     plugin_json_dir = plugin_root / ".claude-plugin"
     plugin_json_dir.mkdir(parents=True)
     plugin_json_path = plugin_json_dir / "plugin.json"
-    plugin_json_path.write_text(
-        json.dumps({"name": "demo-plugin", "version": "1.0.0"}, indent=2),
-        encoding="utf-8",
-    )
+    plugin_json_path.write_text(json.dumps({"name": "demo-plugin", "version": "1.0.0"}, indent=2), encoding="utf-8")
 
     return plugin_root, plugin_json_path
 
@@ -126,9 +121,7 @@ class TestReconcileOnePluginDoesNotAddSkillsArrayForStandardPaths:
     drift.
     """
 
-    def test_reconcile_leaves_plugin_json_unchanged_when_all_skills_at_standard_path(
-        self, tmp_path: Path
-    ) -> None:
+    def test_reconcile_leaves_plugin_json_unchanged_when_all_skills_at_standard_path(self, tmp_path: Path) -> None:
         """_reconcile_one_plugin must not add a skills array for standard-path skills.
 
         Tests: _reconcile_one_plugin in auto_sync_manifests.py
@@ -143,14 +136,10 @@ class TestReconcileOnePluginDoesNotAddSkillsArrayForStandardPaths:
             creates noise.  The reconcile pass must not treat their absence as drift.
         """
         # Arrange
-        _plugin_root, plugin_json_path = _make_standard_plugin(
-            tmp_path, skills=["my-skill", "other-skill"]
-        )
+        _plugin_root, plugin_json_path = _make_standard_plugin(tmp_path, skills=["my-skill", "other-skill"])
         plugins_root = tmp_path / "plugins"
         original_json = json.loads(plugin_json_path.read_text(encoding="utf-8"))
-        assert "skills" not in original_json, (
-            "Precondition: plugin.json must start without skills array"
-        )
+        assert "skills" not in original_json, "Precondition: plugin.json must start without skills array"
 
         # Act
         auto_sync._reconcile_one_plugin("demo-plugin", plugins_root, dry_run=False)
@@ -162,9 +151,7 @@ class TestReconcileOnePluginDoesNotAddSkillsArrayForStandardPaths:
             "Standard-path skills are auto-discovered and must not be explicitly registered."
         )
 
-    def test_reconcile_reports_no_drift_for_plugin_with_no_skills_array(
-        self, tmp_path: Path
-    ) -> None:
+    def test_reconcile_reports_no_drift_for_plugin_with_no_skills_array(self, tmp_path: Path) -> None:
         """_reconcile_one_plugin must return False when all skills are at standard paths.
 
         Tests: _reconcile_one_plugin return value
@@ -177,15 +164,11 @@ class TestReconcileOnePluginDoesNotAddSkillsArrayForStandardPaths:
             cause false CI failures and trigger unnecessary version bumps.
         """
         # Arrange
-        _plugin_root, _plugin_json_path = _make_standard_plugin(
-            tmp_path, skills=["alpha-skill"]
-        )
+        _plugin_root, _plugin_json_path = _make_standard_plugin(tmp_path, skills=["alpha-skill"])
         plugins_root = tmp_path / "plugins"
 
         # Act
-        has_drift = auto_sync._reconcile_one_plugin(
-            "demo-plugin", plugins_root, dry_run=True
-        )
+        has_drift = auto_sync._reconcile_one_plugin("demo-plugin", plugins_root, dry_run=True)
 
         # Assert
         assert has_drift is False, (
@@ -210,9 +193,7 @@ class TestReconcileDoesNotAddCommandsArrayForInvocableStandardPathSkills:
     ``commands`` array written.
     """
 
-    def test_reconcile_leaves_no_commands_array_for_standard_path_user_invocable_skills(
-        self, tmp_path: Path
-    ) -> None:
+    def test_reconcile_leaves_no_commands_array_for_standard_path_user_invocable_skills(self, tmp_path: Path) -> None:
         """_reconcile_one_plugin must not add commands array for auto-discovered skills.
 
         Tests: _reconcile_one_plugin via _discover_invocable_skills in auto_sync_manifests.py
@@ -228,14 +209,10 @@ class TestReconcileDoesNotAddCommandsArrayForInvocableStandardPathSkills:
             registrations that serve no purpose and pollute plugin.json.
         """
         # Arrange
-        _plugin_root, plugin_json_path = _make_standard_plugin(
-            tmp_path, skills=["invocable-skill"]
-        )
+        _plugin_root, plugin_json_path = _make_standard_plugin(tmp_path, skills=["invocable-skill"])
         plugins_root = tmp_path / "plugins"
         original_json = json.loads(plugin_json_path.read_text(encoding="utf-8"))
-        assert "commands" not in original_json, (
-            "Precondition: plugin.json must start without commands array"
-        )
+        assert "commands" not in original_json, "Precondition: plugin.json must start without commands array"
 
         # Act
         auto_sync._reconcile_one_plugin("demo-plugin", plugins_root, dry_run=False)
@@ -248,9 +225,7 @@ class TestReconcileDoesNotAddCommandsArrayForInvocableStandardPathSkills:
             "auto-discovered and must not be explicitly registered in commands."
         )
 
-    def test_discover_invocable_skills_result_not_used_to_populate_empty_commands_array(
-        self, tmp_path: Path
-    ) -> None:
+    def test_discover_invocable_skills_result_not_used_to_populate_empty_commands_array(self, tmp_path: Path) -> None:
         """Standard-path invocable skills must not cause commands drift to be detected.
 
         Tests: _reconcile_component_array call for 'commands' in _reconcile_one_plugin
@@ -265,15 +240,11 @@ class TestReconcileDoesNotAddCommandsArrayForInvocableStandardPathSkills:
             unnecessarily.
         """
         # Arrange
-        _plugin_root, _plugin_json_path = _make_standard_plugin(
-            tmp_path, skills=["cmd-skill"]
-        )
+        _plugin_root, _plugin_json_path = _make_standard_plugin(tmp_path, skills=["cmd-skill"])
         plugins_root = tmp_path / "plugins"
 
         # Act — dry_run so we only check the return value, not file mutation
-        has_drift = auto_sync._reconcile_one_plugin(
-            "demo-plugin", plugins_root, dry_run=True
-        )
+        has_drift = auto_sync._reconcile_one_plugin("demo-plugin", plugins_root, dry_run=True)
 
         # Assert
         assert has_drift is False, (
@@ -299,9 +270,7 @@ class TestUpdateComponentArraysDoesNotCreateSkillsArrayForStandardPaths:
     the skill lives under the auto-discovered ./skills/ path.
     """
 
-    def test_update_component_arrays_does_not_create_skills_key_for_standard_path_skill(
-        self, tmp_path: Path
-    ) -> None:
+    def test_update_component_arrays_does_not_create_skills_key_for_standard_path_skill(self, tmp_path: Path) -> None:
         """_update_component_arrays must not create a skills array for ./skills/* paths.
 
         Tests: _update_component_arrays in auto_sync_manifests.py
@@ -324,9 +293,7 @@ class TestUpdateComponentArraysDoesNotCreateSkillsArrayForStandardPaths:
         # The component_path as produced by the pre-commit detection code is
         # relative to the plugin root without leading './'.
         changes: dict[str, list[dict[str, str]]] = {
-            "added": [
-                {"component_type": "skill", "component_path": "skills/new-skill"}
-            ],
+            "added": [{"component_type": "skill", "component_path": "skills/new-skill"}],
             "deleted": [],
             "modified": [],
         }
@@ -342,9 +309,7 @@ class TestUpdateComponentArraysDoesNotCreateSkillsArrayForStandardPaths:
             "for them.  The skills key must remain absent from plugin.json."
         )
 
-    def test_update_component_arrays_does_not_modify_absent_skills_key_for_standard_path(
-        self, tmp_path: Path
-    ) -> None:
+    def test_update_component_arrays_does_not_modify_absent_skills_key_for_standard_path(self, tmp_path: Path) -> None:
         """Adding multiple standard-path skills must not create the skills array.
 
         Tests: _update_component_arrays in auto_sync_manifests.py
@@ -399,9 +364,7 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
     adding unnecessary explicit registrations.
     """
 
-    def _make_plugin_with_standard_skills(
-        self, tmp_path: Path, skill_names: list[str]
-    ) -> Path:
+    def _make_plugin_with_standard_skills(self, tmp_path: Path, skill_names: list[str]) -> Path:
         """Create a plugin with standard-path skills and no skills array in plugin.json.
 
         Args:
@@ -419,23 +382,19 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
             skill_dir = plugin_root / "skills" / skill_name
             skill_dir.mkdir(parents=True)
             (skill_dir / "SKILL.md").write_text(
-                f"---\nname: {skill_name}\ndescription: {skill_name}\n---\n\n# {skill_name}\n",
-                encoding="utf-8",
+                f"---\nname: {skill_name}\ndescription: {skill_name}\n---\n\n# {skill_name}\n", encoding="utf-8"
             )
 
         # plugin.json with no skills field — the correct state
         claude_plugin = plugin_root / ".claude-plugin"
         claude_plugin.mkdir(parents=True)
         (claude_plugin / "plugin.json").write_text(
-            json.dumps({"name": "test-plugin", "version": "1.0.0"}, indent=2),
-            encoding="utf-8",
+            json.dumps({"name": "test-plugin", "version": "1.0.0"}, indent=2), encoding="utf-8"
         )
 
         return plugin_root
 
-    def test_no_pr001_warning_for_skill_under_standard_skills_directory(
-        self, tmp_path: Path
-    ) -> None:
+    def test_no_pr001_warning_for_skill_under_standard_skills_directory(self, tmp_path: Path) -> None:
         """PluginRegistrationValidator must not emit PR001 for auto-discovered skills.
 
         Tests: PluginRegistrationValidator.validate in plugin_validator.py (PR001)
@@ -453,9 +412,7 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
             making the fix applied in commit 04ee75f non-durable.
         """
         # Arrange
-        plugin_root = self._make_plugin_with_standard_skills(
-            tmp_path, ["my-feature-skill"]
-        )
+        plugin_root = self._make_plugin_with_standard_skills(tmp_path, ["my-feature-skill"])
         skill_md_path = plugin_root / "skills" / "my-feature-skill" / "SKILL.md"
         assert skill_md_path.exists(), "Precondition: SKILL.md must exist"
 
@@ -466,9 +423,7 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
 
         # Assert — no warning that says "Add ... to the skills array"
         add_to_skills_suggestions = [
-            issue
-            for issue in result.warnings
-            if "skills array" in (issue.suggestion or "").lower()
+            issue for issue in result.warnings if "skills array" in (issue.suggestion or "").lower()
         ]
         assert add_to_skills_suggestions == [], (
             "Bug 4: PluginRegistrationValidator emitted a PR001 warning suggesting "
@@ -478,9 +433,7 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
             "be flagged as unregistered."
         )
 
-    def test_no_pr001_warning_for_multiple_standard_path_skills(
-        self, tmp_path: Path
-    ) -> None:
+    def test_no_pr001_warning_for_multiple_standard_path_skills(self, tmp_path: Path) -> None:
         """PR001 must not fire for any skill at a standard path, regardless of count.
 
         Tests: PluginRegistrationValidator.validate for multiple skills
@@ -495,9 +448,7 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
             of them, not just the first one.
         """
         # Arrange
-        plugin_root = self._make_plugin_with_standard_skills(
-            tmp_path, ["skill-one", "skill-two", "skill-three"]
-        )
+        plugin_root = self._make_plugin_with_standard_skills(tmp_path, ["skill-one", "skill-two", "skill-three"])
 
         validator = PluginRegistrationValidator()
 
@@ -506,9 +457,7 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
 
         # Assert
         add_to_skills_suggestions = [
-            issue
-            for issue in result.warnings
-            if "skills array" in (issue.suggestion or "").lower()
+            issue for issue in result.warnings if "skills array" in (issue.suggestion or "").lower()
         ]
         assert add_to_skills_suggestions == [], (
             "Bug 4: PluginRegistrationValidator emitted PR001 for "
@@ -519,9 +468,7 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
             "registration warning."
         )
 
-    def test_pr001_warning_still_fires_for_non_standard_path_skills(
-        self, tmp_path: Path
-    ) -> None:
+    def test_pr001_warning_still_fires_for_non_standard_path_skills(self, tmp_path: Path) -> None:
         """PR001 must still fire when a skill lives outside the auto-discovered path.
 
         Tests: PluginRegistrationValidator.validate negative case
@@ -542,8 +489,7 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
         custom_skill_dir = plugin_root / "custom-skills" / "special-skill"
         custom_skill_dir.mkdir(parents=True)
         (custom_skill_dir / "SKILL.md").write_text(
-            "---\nname: special-skill\ndescription: special skill\n---\n\n# Special\n",
-            encoding="utf-8",
+            "---\nname: special-skill\ndescription: special skill\n---\n\n# Special\n", encoding="utf-8"
         )
 
         claude_plugin = plugin_root / ".claude-plugin"
@@ -552,14 +498,7 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
         # validator can find the skill at all; without this the validator won't
         # know about custom-skills/ and won't fire.
         (claude_plugin / "plugin.json").write_text(
-            json.dumps(
-                {
-                    "name": "nonstandard-plugin",
-                    "version": "1.0.0",
-                    "skills": "./custom-skills/",
-                },
-                indent=2,
-            ),
+            json.dumps({"name": "nonstandard-plugin", "version": "1.0.0", "skills": "./custom-skills/"}, indent=2),
             encoding="utf-8",
         )
 
@@ -606,9 +545,7 @@ class TestReconcileModeASkipsSkillsReconciliation:
             the plugin into Mode B and override auto-discovery.
         """
         # Arrange
-        _plugin_root, plugin_json_path = _make_standard_plugin(
-            tmp_path, skills=["skill-a", "skill-b"]
-        )
+        _plugin_root, plugin_json_path = _make_standard_plugin(tmp_path, skills=["skill-a", "skill-b"])
         plugins_root = tmp_path / "plugins"
         assert "skills" not in json.loads(plugin_json_path.read_text(encoding="utf-8"))
 
@@ -635,15 +572,11 @@ class TestReconcileModeASkipsSkillsReconciliation:
             cause false CI failures and unnecessary version bumps.
         """
         # Arrange
-        _plugin_root, _plugin_json_path = _make_standard_plugin(
-            tmp_path, skills=["alpha"]
-        )
+        _plugin_root, _plugin_json_path = _make_standard_plugin(tmp_path, skills=["alpha"])
         plugins_root = tmp_path / "plugins"
 
         # Act
-        has_drift = auto_sync._reconcile_one_plugin(
-            "demo-plugin", plugins_root, dry_run=True
-        )
+        has_drift = auto_sync._reconcile_one_plugin("demo-plugin", plugins_root, dry_run=True)
 
         # Assert
         assert has_drift is False, (
@@ -666,13 +599,9 @@ class TestReconcileModeASkipsSkillsReconciliation:
             creates duplicate registrations.
         """
         # Arrange
-        _plugin_root, plugin_json_path = _make_standard_plugin(
-            tmp_path, skills=["invocable-skill"]
-        )
+        _plugin_root, plugin_json_path = _make_standard_plugin(tmp_path, skills=["invocable-skill"])
         plugins_root = tmp_path / "plugins"
-        assert "commands" not in json.loads(
-            plugin_json_path.read_text(encoding="utf-8")
-        )
+        assert "commands" not in json.loads(plugin_json_path.read_text(encoding="utf-8"))
 
         # Act
         auto_sync._reconcile_one_plugin("demo-plugin", plugins_root, dry_run=False)
@@ -690,9 +619,7 @@ class TestReconcileModeASkipsSkillsReconciliation:
 # ---------------------------------------------------------------------------
 
 
-def _make_mode_b_plugin(
-    tmp_path: Path, registered_skills: list[str], disk_skills: list[str]
-) -> tuple[Path, Path]:
+def _make_mode_b_plugin(tmp_path: Path, registered_skills: list[str], disk_skills: list[str]) -> tuple[Path, Path]:
     """Create a Mode B plugin with an explicit skills array in plugin.json.
 
     Args:
@@ -719,11 +646,7 @@ def _make_mode_b_plugin(
     plugin_json_dir = plugin_root / ".claude-plugin"
     plugin_json_dir.mkdir(parents=True)
     plugin_json_path = plugin_json_dir / "plugin.json"
-    manifest = {
-        "name": "mode-b-plugin",
-        "version": "1.0.0",
-        "skills": [f"./skills/{s}" for s in registered_skills],
-    }
+    manifest = {"name": "mode-b-plugin", "version": "1.0.0", "skills": [f"./skills/{s}" for s in registered_skills]}
     plugin_json_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
     return plugin_root, plugin_json_path
@@ -813,9 +736,7 @@ class TestReconcileModeBOnlyRemovesDeletedSkills:
             "registered and exists on disk.  It must be preserved."
         )
 
-    def test_reconcile_mode_b_no_drift_when_no_stale_entries(
-        self, tmp_path: Path
-    ) -> None:
+    def test_reconcile_mode_b_no_drift_when_no_stale_entries(self, tmp_path: Path) -> None:
         """Mode B: reconcile reports no drift when all registered skills still exist.
 
         Tests: _reconcile_one_plugin return value when no stale entries
@@ -837,9 +758,7 @@ class TestReconcileModeBOnlyRemovesDeletedSkills:
         plugins_root = tmp_path / "plugins"
 
         # Act
-        has_drift = auto_sync._reconcile_one_plugin(
-            "mode-b-plugin", plugins_root, dry_run=True
-        )
+        has_drift = auto_sync._reconcile_one_plugin("mode-b-plugin", plugins_root, dry_run=True)
 
         # Assert
         assert has_drift is False, (
@@ -860,9 +779,7 @@ class TestSK009ManualSkillSelectionInfo:
     meaning new skills added to disk will not be auto-loaded.
     """
 
-    def _make_plugin_with_explicit_skills(
-        self, tmp_path: Path, skills: list[str]
-    ) -> Path:
+    def _make_plugin_with_explicit_skills(self, tmp_path: Path, skills: list[str]) -> Path:
         """Create a plugin with an explicit skills array in plugin.json.
 
         Args:
@@ -879,26 +796,17 @@ class TestSK009ManualSkillSelectionInfo:
             skill_dir = plugin_root / "skills" / skill_name
             skill_dir.mkdir(parents=True)
             (skill_dir / "SKILL.md").write_text(
-                f"---\nname: {skill_name}\ndescription: {skill_name}\n---\n\n# {skill_name}\n",
-                encoding="utf-8",
+                f"---\nname: {skill_name}\ndescription: {skill_name}\n---\n\n# {skill_name}\n", encoding="utf-8"
             )
 
         claude_plugin = plugin_root / ".claude-plugin"
         claude_plugin.mkdir(parents=True)
-        manifest = {
-            "name": "explicit-plugin",
-            "version": "1.0.0",
-            "skills": [f"./skills/{s}" for s in skills],
-        }
-        (claude_plugin / "plugin.json").write_text(
-            json.dumps(manifest, indent=2), encoding="utf-8"
-        )
+        manifest = {"name": "explicit-plugin", "version": "1.0.0", "skills": [f"./skills/{s}" for s in skills]}
+        (claude_plugin / "plugin.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
         return plugin_root
 
-    def test_sk009_fires_for_plugin_with_explicit_skills_field(
-        self, tmp_path: Path
-    ) -> None:
+    def test_sk009_fires_for_plugin_with_explicit_skills_field(self, tmp_path: Path) -> None:
         """SK009 must fire as INFO when plugin.json has an explicit 'skills' field.
 
         Tests: PluginRegistrationValidator.validate SK009 rule
@@ -911,9 +819,7 @@ class TestSK009ManualSkillSelectionInfo:
             selection mode so they know to add new skills manually.
         """
         # Arrange
-        plugin_root = self._make_plugin_with_explicit_skills(
-            tmp_path, skills=["my-skill"]
-        )
+        plugin_root = self._make_plugin_with_explicit_skills(tmp_path, skills=["my-skill"])
         validator = PluginRegistrationValidator()
 
         # Act
@@ -925,16 +831,12 @@ class TestSK009ManualSkillSelectionInfo:
             f"Expected exactly one SK009 info issue, got {len(sk009_issues)}. "
             "SK009 must fire when plugin.json has an explicit 'skills' field."
         )
-        assert sk009_issues[0].severity == "info", (
-            f"SK009 must have severity 'info', got '{sk009_issues[0].severity}'."
-        )
+        assert sk009_issues[0].severity == "info", f"SK009 must have severity 'info', got '{sk009_issues[0].severity}'."
         assert "manual skill selection" in sk009_issues[0].message.lower(), (
             f"SK009 message should mention manual skill selection. Got: '{sk009_issues[0].message}'"
         )
 
-    def test_sk009_does_not_fire_for_plugin_without_skills_field(
-        self, tmp_path: Path
-    ) -> None:
+    def test_sk009_does_not_fire_for_plugin_without_skills_field(self, tmp_path: Path) -> None:
         """SK009 must NOT fire when plugin.json has no 'skills' field (Mode A).
 
         Tests: PluginRegistrationValidator.validate SK009 negative case
@@ -947,9 +849,7 @@ class TestSK009ManualSkillSelectionInfo:
             only informational for plugins that have opted into manual selection.
         """
         # Arrange
-        plugin_root, _plugin_json_path = _make_standard_plugin(
-            tmp_path, skills=["auto-skill"]
-        )
+        plugin_root, _plugin_json_path = _make_standard_plugin(tmp_path, skills=["auto-skill"])
         validator = PluginRegistrationValidator()
 
         # Act
@@ -977,15 +877,11 @@ class TestSK009ManualSkillSelectionInfo:
             the informational reminder.
         """
         # Arrange
-        plugin_root = self._make_plugin_with_explicit_skills(
-            tmp_path, skills=["my-skill"]
-        )
+        plugin_root = self._make_plugin_with_explicit_skills(tmp_path, skills=["my-skill"])
 
         # Write validator.json suppressing SK009 at the plugin root level
         validator_json_path = plugin_root / ".claude-plugin" / "validator.json"
-        validator_json_path.write_text(
-            json.dumps({"ignore": {".": ["SK009"]}}), encoding="utf-8"
-        )
+        validator_json_path.write_text(json.dumps({"ignore": {".": ["SK009"]}}), encoding="utf-8")
 
         validator = PluginRegistrationValidator()
 
@@ -994,13 +890,9 @@ class TestSK009ManualSkillSelectionInfo:
 
         # Apply suppression filter (mirrors what validate_path does at the top level)
         plugin_root_found = _find_plugin_root(plugin_root)
-        assert plugin_root_found is not None, (
-            "Plugin root must be found for suppression test"
-        )
+        assert plugin_root_found is not None, "Plugin root must be found for suppression test"
         ignore_config = _load_ignore_config(plugin_root_found)
-        filtered = _filter_result_by_ignore(
-            result, plugin_root, plugin_root_found, ignore_config
-        )
+        filtered = _filter_result_by_ignore(result, plugin_root, plugin_root_found, ignore_config)
 
         # Assert
         sk009_issues = [i for i in filtered.info if str(i.code) == "SK009"]
@@ -1008,9 +900,7 @@ class TestSK009ManualSkillSelectionInfo:
             f"SK009 was not suppressed by validator.json. Got {len(sk009_issues)} SK009 issue(s) after filtering."
         )
 
-    def test_sk009_message_enumerates_unlisted_disk_skills(
-        self, tmp_path: Path
-    ) -> None:
+    def test_sk009_message_enumerates_unlisted_disk_skills(self, tmp_path: Path) -> None:
         """SK009 message must list disk skills absent from the explicit skills array.
 
         Tests: PluginRegistrationValidator.validate SK009 unlisted-skills message
@@ -1031,21 +921,14 @@ class TestSK009ManualSkillSelectionInfo:
             skill_dir = plugin_root / "skills" / skill_name
             skill_dir.mkdir(parents=True)
             (skill_dir / "SKILL.md").write_text(
-                f"---\nname: {skill_name}\ndescription: {skill_name}\n---\n\n# {skill_name}\n",
-                encoding="utf-8",
+                f"---\nname: {skill_name}\ndescription: {skill_name}\n---\n\n# {skill_name}\n", encoding="utf-8"
             )
 
         claude_plugin = plugin_root / ".claude-plugin"
         claude_plugin.mkdir(parents=True)
         # Only list one of the two skills in the explicit array.
-        manifest = {
-            "name": "mixed-plugin",
-            "version": "1.0.0",
-            "skills": ["./skills/listed-skill"],
-        }
-        (claude_plugin / "plugin.json").write_text(
-            json.dumps(manifest, indent=2), encoding="utf-8"
-        )
+        manifest = {"name": "mixed-plugin", "version": "1.0.0", "skills": ["./skills/listed-skill"]}
+        (claude_plugin / "plugin.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
 
         validator = PluginRegistrationValidator()
 
@@ -1054,9 +937,7 @@ class TestSK009ManualSkillSelectionInfo:
 
         # Assert
         sk009_issues = [i for i in result.info if str(i.code) == "SK009"]
-        assert len(sk009_issues) == 1, (
-            f"Expected exactly one SK009 issue, got {len(sk009_issues)}."
-        )
+        assert len(sk009_issues) == 1, f"Expected exactly one SK009 issue, got {len(sk009_issues)}."
         message = sk009_issues[0].message
         assert "./skills/unlisted-skill" in message, (
             f"SK009 message must name the unlisted skill './skills/unlisted-skill'. Got: '{message}'"
@@ -1065,9 +946,7 @@ class TestSK009ManualSkillSelectionInfo:
             "SK009 message must not mention the already-listed skill outside of the unlisted path."
         )
 
-    def test_sk009_message_confirms_all_registered_when_no_unlisted_skills(
-        self, tmp_path: Path
-    ) -> None:
+    def test_sk009_message_confirms_all_registered_when_no_unlisted_skills(self, tmp_path: Path) -> None:
         """SK009 message must confirm full registration when all disk skills are listed.
 
         Tests: PluginRegistrationValidator.validate SK009 all-registered message
@@ -1080,9 +959,7 @@ class TestSK009ManualSkillSelectionInfo:
             the message should confirm that state rather than warn about missing entries.
         """
         # Arrange — reuse helper: one skill, listed in the explicit array.
-        plugin_root = self._make_plugin_with_explicit_skills(
-            tmp_path, skills=["complete-skill"]
-        )
+        plugin_root = self._make_plugin_with_explicit_skills(tmp_path, skills=["complete-skill"])
         validator = PluginRegistrationValidator()
 
         # Act
@@ -1090,9 +967,7 @@ class TestSK009ManualSkillSelectionInfo:
 
         # Assert
         sk009_issues = [i for i in result.info if str(i.code) == "SK009"]
-        assert len(sk009_issues) == 1, (
-            f"Expected exactly one SK009 issue, got {len(sk009_issues)}."
-        )
+        assert len(sk009_issues) == 1, f"Expected exactly one SK009 issue, got {len(sk009_issues)}."
         message = sk009_issues[0].message
         assert "all skills/ are explicitly registered" in message, (
             f"SK009 message must confirm all skills are registered. Got: '{message}'"

@@ -17,12 +17,14 @@ const path = require('node:path');
 
 let input = '';
 process.stdin.setEncoding('utf8');
-process.stdin.on('data', (chunk) => { input += chunk; });
+process.stdin.on('data', (chunk) => {
+  input += chunk;
+});
 process.stdin.on('end', () => {
   // Parse stdin — exit cleanly on bad input (hook must never crash)
-  let data = {};
+  let _data = {};
   try {
-    data = JSON.parse(input);
+    _data = JSON.parse(input);
   } catch {
     process.stdout.write(JSON.stringify({}));
     process.exit(0);
@@ -80,7 +82,9 @@ function runDriftCheck() {
 
   if (exitCode !== 0) {
     // Non-zero, non-2: log to stderr (shown in verbose mode), stay silent to Claude
-    process.stderr.write(`vendor-drift-check: fetch_platform_docs.py exited with code ${exitCode}\n`);
+    process.stderr.write(
+      `vendor-drift-check: fetch_platform_docs.py exited with code ${exitCode}\n`,
+    );
   }
 
   process.stdout.write(JSON.stringify({}));

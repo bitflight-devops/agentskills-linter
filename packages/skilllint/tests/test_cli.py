@@ -61,18 +61,13 @@ class TestCLICommandParsing:
         """
         result = cli_runner.invoke(plugin_validator.app, ["--help"])
 
-        assert (
-            "plugin-validator" in result.stdout
-            or "Validate Claude Code" in result.stdout
-        )
+        assert "plugin-validator" in result.stdout or "Validate Claude Code" in result.stdout
 
 
 class TestExitCodes:
     """Test CLI exit codes for different scenarios."""
 
-    def test_exit_0_on_valid_file(
-        self, cli_runner: CliRunner, sample_skill_dir: Path, no_color_env: None
-    ) -> None:
+    def test_exit_0_on_valid_file(self, cli_runner: CliRunner, sample_skill_dir: Path, no_color_env: None) -> None:
         """Verify exit code 0 when validation passes.
 
         Tests: Successful validation returns exit code 0
@@ -82,13 +77,9 @@ class TestExitCodes:
         skill_file = sample_skill_dir / "SKILL.md"
         result = cli_runner.invoke(plugin_validator.app, [str(skill_file)])
 
-        assert result.exit_code == 0, (
-            f"Expected exit 0, got {result.exit_code}. Output: {result.stdout}"
-        )
+        assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}. Output: {result.stdout}"
 
-    def test_exit_1_on_validation_errors(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_exit_1_on_validation_errors(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify exit code 1 when validation finds errors.
 
         Tests: Validation errors return exit code 1
@@ -109,22 +100,16 @@ description: Test skill with invalid name format
 
         result = cli_runner.invoke(plugin_validator.app, [str(skill_file)])
 
-        assert result.exit_code == 1, (
-            f"Expected exit 1 for validation error, got {result.exit_code}"
-        )
+        assert result.exit_code == 1, f"Expected exit 1 for validation error, got {result.exit_code}"
 
-    def test_exit_2_on_missing_path(
-        self, cli_runner: CliRunner, no_color_env: None
-    ) -> None:
+    def test_exit_2_on_missing_path(self, cli_runner: CliRunner, no_color_env: None) -> None:
         """Verify exit code 2 for non-existent path.
 
         Tests: Missing file returns exit code 2 (usage error)
         How: Invoke with path that doesn't exist
         Why: Usage errors should be distinguished from validation failures
         """
-        result = cli_runner.invoke(
-            plugin_validator.app, ["/nonexistent/path/to/file.md"]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["/nonexistent/path/to/file.md"])
 
         assert result.exit_code == 2
         assert "does not exist" in result.stdout or "does not exist" in result.stderr
@@ -139,9 +124,7 @@ description: Test skill with invalid name format
         Why: Prevents ambiguous behavior
         """
         skill_file = sample_skill_dir / "SKILL.md"
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--check", "--fix", str(skill_file)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--check", "--fix", str(skill_file)])
 
         assert result.exit_code == 2
         assert "Cannot use both" in result.stdout or "Cannot use both" in result.stderr
@@ -150,9 +133,7 @@ description: Test skill with invalid name format
 class TestCheckFlag:
     """Test --check flag behavior (validate only, no fixes)."""
 
-    def test_check_validates_without_fixing(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_check_validates_without_fixing(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify --check mode reports errors but doesn't modify files.
 
         Tests: --check mode is read-only
@@ -223,9 +204,7 @@ tools: Read, Write
         # Exit code should be 0 after successful fix
         assert result.exit_code == 0
 
-    def test_fix_reports_applied_fixes(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_fix_reports_applied_fixes(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify --fix mode reports which fixes were applied.
 
         Tests: --fix mode outputs list of applied fixes
@@ -251,9 +230,7 @@ tools: Read, Write
         # The key is that --fix flag is accepted and runs without error
         assert result.exit_code == 0
 
-    def test_fix_revalidates_after_fixing(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_fix_revalidates_after_fixing(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify --fix mode re-validates after applying fixes.
 
         Tests: --fix mode runs validation after fixing
@@ -320,9 +297,7 @@ class TestVerboseFlag:
 class TestNoColorFlag:
     """Test --no-color flag behavior (disable Rich colors)."""
 
-    def test_no_color_disables_ansi_codes(
-        self, cli_runner: CliRunner, sample_skill_dir: Path
-    ) -> None:
+    def test_no_color_disables_ansi_codes(self, cli_runner: CliRunner, sample_skill_dir: Path) -> None:
         """Verify --no-color mode produces plain text output.
 
         Tests: --no-color mode disables ANSI escape codes
@@ -330,9 +305,7 @@ class TestNoColorFlag:
         Why: CI environments and non-TTY contexts need plain text
         """
         skill_file = sample_skill_dir / "SKILL.md"
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--no-color", str(skill_file)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", str(skill_file)])
 
         # ANSI codes start with \x1b[
         # Note: Rich may still use some formatting in non-TTY contexts
@@ -363,9 +336,7 @@ class TestNoColorFlag:
 class TestPathArguments:
     """Test path argument handling."""
 
-    def test_accepts_file_path(
-        self, cli_runner: CliRunner, sample_skill_dir: Path, no_color_env: None
-    ) -> None:
+    def test_accepts_file_path(self, cli_runner: CliRunner, sample_skill_dir: Path, no_color_env: None) -> None:
         """Verify CLI accepts file path as argument.
 
         Tests: File path argument works
@@ -377,9 +348,7 @@ class TestPathArguments:
 
         assert result.exit_code == 0
 
-    def test_accepts_directory_path(
-        self, cli_runner: CliRunner, sample_plugin_dir: Path, no_color_env: None
-    ) -> None:
+    def test_accepts_directory_path(self, cli_runner: CliRunner, sample_plugin_dir: Path, no_color_env: None) -> None:
         """Verify CLI accepts directory path as argument.
 
         Tests: Directory path argument works
@@ -391,9 +360,7 @@ class TestPathArguments:
         # Should validate entire plugin directory
         assert result.exit_code == 0
 
-    def test_relative_path_handling(
-        self, cli_runner: CliRunner, sample_skill_dir: Path, no_color_env: None
-    ) -> None:
+    def test_relative_path_handling(self, cli_runner: CliRunner, sample_skill_dir: Path, no_color_env: None) -> None:
         """Verify CLI handles relative paths correctly.
 
         Tests: Relative paths resolve correctly
@@ -417,9 +384,7 @@ class TestPathArguments:
 class TestErrorMessages:
     """Test error message clarity and actionability."""
 
-    def test_error_shows_file_and_line(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_error_shows_file_and_line(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify error messages include file path and line numbers.
 
         Tests: Error output format includes file:line references
@@ -441,14 +406,9 @@ description: Test skill
         result = cli_runner.invoke(plugin_validator.app, [str(skill_file)])
 
         # Should show file path in error
-        assert (
-            str(skill_file.name) in result.stdout
-            or str(skill_file.name) in result.stderr
-        )
+        assert str(skill_file.name) in result.stdout or str(skill_file.name) in result.stderr
 
-    def test_error_includes_error_code(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_error_includes_error_code(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify error messages include error codes.
 
         Tests: Error output includes error codes (e.g., SK001, FM001)
@@ -472,9 +432,7 @@ description: Test skill
         # Should include error code like SK001, SK002, etc.
         import re
 
-        assert re.search(r"[A-Z]{2}\d{3}", result.stdout) or re.search(
-            r"[A-Z]{2}\d{3}", result.stderr
-        )
+        assert re.search(r"[A-Z]{2}\d{3}", result.stdout) or re.search(r"[A-Z]{2}\d{3}", result.stderr)
 
 
 class TestWorkflowIntegration:
@@ -493,9 +451,7 @@ class TestWorkflowIntegration:
 
         assert result.exit_code == 0
 
-    def test_skill_file_validation(
-        self, cli_runner: CliRunner, sample_skill_dir: Path, no_color_env: None
-    ) -> None:
+    def test_skill_file_validation(self, cli_runner: CliRunner, sample_skill_dir: Path, no_color_env: None) -> None:
         """Verify CLI validates individual skill files.
 
         Tests: Skill file validation workflow
@@ -507,9 +463,7 @@ class TestWorkflowIntegration:
 
         assert result.exit_code == 0
 
-    def test_agent_file_validation(
-        self, cli_runner: CliRunner, sample_agent_dir: Path, no_color_env: None
-    ) -> None:
+    def test_agent_file_validation(self, cli_runner: CliRunner, sample_agent_dir: Path, no_color_env: None) -> None:
         """Verify CLI validates agent files.
 
         Tests: Agent file validation workflow
@@ -531,9 +485,7 @@ class TestWorkflowIntegration:
         Why: Common CI workflow pattern
         """
         skill_file = sample_skill_dir / "SKILL.md"
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--check", "--no-color", str(skill_file)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--check", "--no-color", str(skill_file)])
 
         assert result.exit_code == 0
         assert "\x1b[" not in result.stdout  # No ANSI codes
@@ -552,18 +504,12 @@ class TestFileGroupedReporting:
         Why: Previous bug counted each validator as a separate file
         """
         skill_file = sample_skill_dir / "SKILL.md"
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--no-color", "--show-summary", str(skill_file)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", "--show-summary", str(skill_file)])
 
         assert result.exit_code == 0
-        assert "Total files: 1" in result.stdout, (
-            f"Expected 'Total files: 1' but got: {result.stdout}"
-        )
+        assert "Total files: 1" in result.stdout, f"Expected 'Total files: 1' but got: {result.stdout}"
 
-    def test_two_files_shows_total_files_2(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_two_files_shows_total_files_2(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify validating 2 files reports 'Total files: 2'.
 
         Tests: Summary counts unique file paths across multiple arguments
@@ -584,19 +530,12 @@ class TestFileGroupedReporting:
 
         skill_a = tmp_path / "skill-a" / "SKILL.md"
         skill_b = tmp_path / "skill-b" / "SKILL.md"
-        result = cli_runner.invoke(
-            plugin_validator.app,
-            ["--no-color", "--show-summary", str(skill_a), str(skill_b)],
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", "--show-summary", str(skill_a), str(skill_b)])
 
         assert result.exit_code == 0
-        assert "Total files: 2" in result.stdout, (
-            f"Expected 'Total files: 2' but got: {result.stdout}"
-        )
+        assert "Total files: 2" in result.stdout, f"Expected 'Total files: 2' but got: {result.stdout}"
 
-    def test_validator_names_in_verbose_output(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_validator_names_in_verbose_output(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """Verify validator class names appear in per-file output sections.
 
         Tests: Each validator result is labeled with the validator class name
@@ -611,17 +550,11 @@ class TestFileGroupedReporting:
             "---\nname: Bad-Name\ndescription: Test skill for checking validator names in output\n---\n\n# Test Skill\n"
         )
 
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--no-color", str(skill_file)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", str(skill_file)])
 
         # Should contain validator class names in output
-        assert "NameFormatValidator" in result.stdout, (
-            f"Expected 'NameFormatValidator' in output: {result.stdout}"
-        )
-        assert "FrontmatterValidator" in result.stdout, (
-            f"Expected 'FrontmatterValidator' in output: {result.stdout}"
-        )
+        assert "NameFormatValidator" in result.stdout, f"Expected 'NameFormatValidator' in output: {result.stdout}"
+        assert "FrontmatterValidator" in result.stdout, f"Expected 'FrontmatterValidator' in output: {result.stdout}"
 
     def test_file_passes_only_when_all_validators_pass(
         self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
@@ -640,18 +573,12 @@ class TestFileGroupedReporting:
             "---\nname: Bad-Name\ndescription: Test skill for partial failure counting\n---\n\n# Test Skill\n"
         )
 
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--no-color", "--show-summary", str(skill_file)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", "--show-summary", str(skill_file)])
 
         # Should show failure
         assert result.exit_code == 1
-        assert "Failed: 1" in result.stdout, (
-            f"Expected 'Failed: 1' but got: {result.stdout}"
-        )
-        assert "Total files: 1" in result.stdout, (
-            f"Expected 'Total files: 1' but got: {result.stdout}"
-        )
+        assert "Failed: 1" in result.stdout, f"Expected 'Failed: 1' but got: {result.stdout}"
+        assert "Total files: 1" in result.stdout, f"Expected 'Total files: 1' but got: {result.stdout}"
 
 
 # ---------------------------------------------------------------------------
@@ -664,9 +591,7 @@ _FIXTURES = Path(__file__).parent / "fixtures"
 class TestPlatformFlag:
     """Test --platform flag dispatches to the correct adapter."""
 
-    def test_platform_claude_code_valid_exits_0(
-        self, cli_runner: CliRunner, no_color_env: None
-    ) -> None:
+    def test_platform_claude_code_valid_exits_0(self, cli_runner: CliRunner, no_color_env: None) -> None:
         """--platform claude-code with a valid plugin.json exits 0.
 
         Tests: ClaudeCodeAdapter dispatch with valid file
@@ -674,19 +599,13 @@ class TestPlatformFlag:
         Why: Valid platform files must produce exit 0
         """
         fixture = _FIXTURES / "claude_code" / "valid_plugin.json"
-        result = cli_runner.invoke(
-            plugin_validator.app,
-            ["--no-color", "--platform", "claude-code", str(fixture)],
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", "--platform", "claude-code", str(fixture)])
 
         assert result.exit_code == 0, (
-            f"Expected exit 0 for valid plugin.json, got {result.exit_code}. "
-            f"Output: {result.stdout}"
+            f"Expected exit 0 for valid plugin.json, got {result.exit_code}. Output: {result.stdout}"
         )
 
-    def test_platform_claude_code_invalid_exits_1(
-        self, cli_runner: CliRunner, no_color_env: None
-    ) -> None:
+    def test_platform_claude_code_invalid_exits_1(self, cli_runner: CliRunner, no_color_env: None) -> None:
         """--platform claude-code with an invalid plugin.json exits 1 with violations.
 
         Tests: ClaudeCodeAdapter dispatch with invalid file
@@ -694,19 +613,13 @@ class TestPlatformFlag:
         Why: Invalid platform files must produce exit 1
         """
         fixture = _FIXTURES / "claude_code" / "invalid_plugin.json"
-        result = cli_runner.invoke(
-            plugin_validator.app,
-            ["--no-color", "--platform", "claude-code", str(fixture)],
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", "--platform", "claude-code", str(fixture)])
 
         assert result.exit_code == 1, (
-            f"Expected exit 1 for invalid plugin.json, got {result.exit_code}. "
-            f"Output: {result.stdout}"
+            f"Expected exit 1 for invalid plugin.json, got {result.exit_code}. Output: {result.stdout}"
         )
 
-    def test_platform_cursor_valid_exits_0(
-        self, cli_runner: CliRunner, no_color_env: None
-    ) -> None:
+    def test_platform_cursor_valid_exits_0(self, cli_runner: CliRunner, no_color_env: None) -> None:
         """--platform cursor with a valid .mdc file exits 0.
 
         Tests: CursorAdapter dispatch with valid file
@@ -714,13 +627,10 @@ class TestPlatformFlag:
         Why: Valid .mdc files must produce exit 0
         """
         fixture = _FIXTURES / "cursor" / "valid_rule.mdc"
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--no-color", "--platform", "cursor", str(fixture)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", "--platform", "cursor", str(fixture)])
 
         assert result.exit_code == 0, (
-            f"Expected exit 0 for valid_rule.mdc, got {result.exit_code}. "
-            f"Output: {result.stdout}"
+            f"Expected exit 0 for valid_rule.mdc, got {result.exit_code}. Output: {result.stdout}"
         )
 
     def test_platform_cursor_invalid_exits_1_mentions_additional_property(
@@ -733,17 +643,12 @@ class TestPlatformFlag:
         Why: Unknown frontmatter fields violate additionalProperties: false
         """
         fixture = _FIXTURES / "cursor" / "invalid_rule.mdc"
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--no-color", "--platform", "cursor", str(fixture)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", "--platform", "cursor", str(fixture)])
 
         assert result.exit_code == 1, (
-            f"Expected exit 1 for invalid_rule.mdc, got {result.exit_code}. "
-            f"Output: {result.stdout}"
+            f"Expected exit 1 for invalid_rule.mdc, got {result.exit_code}. Output: {result.stdout}"
         )
-        assert "type" in result.stdout.lower(), (
-            f"Expected 'type' (the unknown field) in output, got: {result.stdout}"
-        )
+        assert "type" in result.stdout.lower(), f"Expected 'type' (the unknown field) in output, got: {result.stdout}"
 
     def test_platform_codex_empty_agents_exits_1_mentions_empty(
         self, cli_runner: CliRunner, no_color_env: None
@@ -755,21 +660,14 @@ class TestPlatformFlag:
         Why: Empty AGENTS.md must be detected and reported
         """
         fixture = _FIXTURES / "codex" / "empty_agents.md"
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--no-color", "--platform", "codex", str(fixture)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", "--platform", "codex", str(fixture)])
 
         assert result.exit_code == 1, (
-            f"Expected exit 1 for empty_agents.md, got {result.exit_code}. "
-            f"Output: {result.stdout}"
+            f"Expected exit 1 for empty_agents.md, got {result.exit_code}. Output: {result.stdout}"
         )
-        assert "empty" in result.stdout.lower(), (
-            f"Expected 'empty' in output, got: {result.stdout}"
-        )
+        assert "empty" in result.stdout.lower(), f"Expected 'empty' in output, got: {result.stdout}"
 
-    def test_platform_codex_valid_agents_exits_0(
-        self, cli_runner: CliRunner, no_color_env: None
-    ) -> None:
+    def test_platform_codex_valid_agents_exits_0(self, cli_runner: CliRunner, no_color_env: None) -> None:
         """--platform codex with a non-empty AGENTS.md exits 0.
 
         Tests: CodexAdapter dispatch with valid agents file
@@ -777,13 +675,10 @@ class TestPlatformFlag:
         Why: Non-empty AGENTS.md must pass validation
         """
         fixture = _FIXTURES / "codex" / "valid_agents.md"
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--no-color", "--platform", "codex", str(fixture)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", "--platform", "codex", str(fixture)])
 
         assert result.exit_code == 0, (
-            f"Expected exit 0 for valid_agents.md, got {result.exit_code}. "
-            f"Output: {result.stdout}"
+            f"Expected exit 0 for valid_agents.md, got {result.exit_code}. Output: {result.stdout}"
         )
 
     def test_platform_codex_invalid_rules_exits_1_mentions_owner(
@@ -796,21 +691,14 @@ class TestPlatformFlag:
         Why: Unknown fields in prefix_rule() must be reported
         """
         fixture = _FIXTURES / "codex" / "invalid_rules.rules"
-        result = cli_runner.invoke(
-            plugin_validator.app, ["--no-color", "--platform", "codex", str(fixture)]
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["--no-color", "--platform", "codex", str(fixture)])
 
         assert result.exit_code == 1, (
-            f"Expected exit 1 for invalid_rules.rules, got {result.exit_code}. "
-            f"Output: {result.stdout}"
+            f"Expected exit 1 for invalid_rules.rules, got {result.exit_code}. Output: {result.stdout}"
         )
-        assert "owner" in result.stdout.lower(), (
-            f"Expected 'owner' in output, got: {result.stdout}"
-        )
+        assert "owner" in result.stdout.lower(), f"Expected 'owner' in output, got: {result.stdout}"
 
-    def test_platform_unknown_value_exits_2(
-        self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None
-    ) -> None:
+    def test_platform_unknown_value_exits_2(self, cli_runner: CliRunner, tmp_path: Path, no_color_env: None) -> None:
         """--platform with unknown value exits 2.
 
         Tests: Invalid platform name produces usage error
@@ -821,11 +709,9 @@ class TestPlatformFlag:
         dummy_file.write_text("content")
 
         result = cli_runner.invoke(
-            plugin_validator.app,
-            ["--no-color", "--platform", "unknown-platform", str(dummy_file)],
+            plugin_validator.app, ["--no-color", "--platform", "unknown-platform", str(dummy_file)]
         )
 
         assert result.exit_code == 2, (
-            f"Expected exit 2 for unknown platform, got {result.exit_code}. "
-            f"Output: {result.stdout}"
+            f"Expected exit 2 for unknown platform, got {result.exit_code}. Output: {result.stdout}"
         )

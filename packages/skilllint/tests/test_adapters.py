@@ -33,9 +33,9 @@ CODEX_FIXTURES = FIXTURES / "codex"
 def test_protocol_defined():
     """PlatformAdapter is importable as a typing.Protocol."""
 
-    assert hasattr(PlatformAdapter, "__protocol_attrs__") or isinstance(
-        PlatformAdapter, type
-    ), "PlatformAdapter must be a Protocol class"
+    assert hasattr(PlatformAdapter, "__protocol_attrs__") or isinstance(PlatformAdapter, type), (
+        "PlatformAdapter must be a Protocol class"
+    )
 
 
 def test_runtime_checkable():
@@ -92,10 +92,7 @@ def test_third_party_adapter_discovery(mocker):
     mock_ep = mocker.MagicMock()
     mock_ep.load.return_value = FourthAdapter
 
-    mocker.patch(
-        "skilllint.adapters.importlib.metadata.entry_points",
-        return_value=[mock_ep],
-    )
+    mocker.patch("skilllint.adapters.importlib.metadata.entry_points", return_value=[mock_ep])
 
     adapters = load_adapters()
     adapter_ids = {a.id() for a in adapters}
@@ -159,18 +156,14 @@ def test_codex_agents_md_validation():
 
     # non-empty file should pass
     valid_violations = adapter.validate(CODEX_FIXTURES / "valid_agents.md")
-    assert valid_violations == [], (
-        f"Expected no violations for valid AGENTS.md, got: {valid_violations}"
-    )
+    assert valid_violations == [], f"Expected no violations for valid AGENTS.md, got: {valid_violations}"
 
 
 def test_codex_rules_field_validation():
     """prefix_rule() with unknown field 'owner' produces a violation."""
     adapter = CodexAdapter()
     violations = adapter.validate(CODEX_FIXTURES / "invalid_rules.rules")
-    assert len(violations) > 0, (
-        f"Expected violation for unknown field 'owner' in .rules, got: {violations}"
-    )
+    assert len(violations) > 0, f"Expected violation for unknown field 'owner' in .rules, got: {violations}"
 
 
 def test_codex_path_patterns():

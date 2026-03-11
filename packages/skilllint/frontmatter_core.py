@@ -162,28 +162,32 @@ class AgentFrontmatter(BaseModel):
 
     Source: .claude/skills/agent-creator/references/agent-schema.md
 
-    Note: Field names use camelCase to match the official agent schema.
-    Ruff N815 warnings suppressed for these fields as they match external spec.
+    Field names use snake_case with camelCase aliases to match the official
+    Claude Code agent schema (disallowedTools, permissionMode, maxTurns,
+    mcpServers).  populate_by_name=True allows both Python attribute access
+    via snake_case and YAML deserialization via camelCase aliases.
     """
 
-    model_config = ConfigDict(extra="allow")
+    model_config = ConfigDict(extra="allow", populate_by_name=True)
 
     name: str = Field(max_length=64, pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")
     description: str
     tools: str | None = None
-    disallowedTools: str | None = None
+    disallowed_tools: str | None = Field(None, alias="disallowedTools")
     model: Literal["sonnet", "opus", "haiku", "inherit"] | None = None
-    permissionMode: Literal["default", "acceptEdits", "dontAsk", "bypassPermissions", "plan"] | None = None
-    maxTurns: int | None = None
+    permission_mode: Literal["default", "acceptEdits", "dontAsk", "bypassPermissions", "plan"] | None = Field(
+        None, alias="permissionMode"
+    )
+    max_turns: int | None = Field(None, alias="maxTurns")
     skills: str | None = None
-    mcpServers: list[Any] | dict[str, Any] | None = None
+    mcp_servers: list[Any] | dict[str, Any] | None = Field(None, alias="mcpServers")
     hooks: dict[str, Any] | None = None
     memory: Literal["user", "project", "local"] | None = None
     background: bool | None = None
     isolation: Literal["worktree"] | None = None
     color: str | None = None
 
-    @field_validator("skills", "tools", "disallowedTools", mode="before")
+    @field_validator("skills", "tools", "disallowed_tools", mode="before")
     @classmethod
     def normalize_comma_separated(cls, v: object) -> str | None:
         """Convert YAML arrays to comma-separated strings.

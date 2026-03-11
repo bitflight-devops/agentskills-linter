@@ -16,23 +16,22 @@ Tests:
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 from unittest.mock import patch
 
 import pytest
 
 from skilllint.plugin_validator import PluginRegistrationValidator
 
+if TYPE_CHECKING:
+    from pathlib import Path
+
 # ---------------------------------------------------------------------------
 # Helper factory functions
 # ---------------------------------------------------------------------------
 
 
-def _make_plugin(
-    tmp_path: Path,
-    plugin_name: str = "test-plugin",
-    plugin_json_content: str | None = None,
-) -> Path:
+def _make_plugin(tmp_path: Path, plugin_name: str = "test-plugin", plugin_json_content: str | None = None) -> Path:
     """Create a plugin directory with .claude-plugin/plugin.json.
 
     Args:
@@ -52,12 +51,7 @@ def _make_plugin(
     if plugin_json_content is not None:
         (claude_plugin / "plugin.json").write_text(plugin_json_content)
     else:
-        default_config = {
-            "name": plugin_name,
-            "skills": [],
-            "agents": [],
-            "commands": [],
-        }
+        default_config = {"name": plugin_name, "skills": [], "agents": [], "commands": []}
         (claude_plugin / "plugin.json").write_text(json.dumps(default_config, indent=2))
 
     return plugin_dir
@@ -93,9 +87,7 @@ def _add_agent(plugin_dir: Path, agent_name: str) -> Path:
     agents_dir = plugin_dir / "agents"
     agents_dir.mkdir(exist_ok=True)
     agent_md = agents_dir / f"{agent_name}.md"
-    agent_md.write_text(
-        f"---\nname: {agent_name}\ndescription: Test agent\n---\n\n# {agent_name}\n"
-    )
+    agent_md.write_text(f"---\nname: {agent_name}\ndescription: Test agent\n---\n\n# {agent_name}\n")
     return agent_md
 
 
@@ -112,9 +104,7 @@ def _add_command(plugin_dir: Path, command_name: str) -> Path:
     commands_dir = plugin_dir / "commands"
     commands_dir.mkdir(exist_ok=True)
     command_md = commands_dir / f"{command_name}.md"
-    command_md.write_text(
-        f"---\ndescription: {command_name} command\n---\n\n# {command_name}\n"
-    )
+    command_md.write_text(f"---\ndescription: {command_name} command\n---\n\n# {command_name}\n")
     return command_md
 
 
@@ -143,9 +133,7 @@ class TestNoPluginJson:
         assert result.passed is True
         assert len(result.errors) == 0
 
-    def test_claude_plugin_dir_exists_but_no_plugin_json_passes(
-        self, tmp_path: Path
-    ) -> None:
+    def test_claude_plugin_dir_exists_but_no_plugin_json_passes(self, tmp_path: Path) -> None:
         """Test validation passes when .claude-plugin/ exists but plugin.json absent.
 
         Tests: plugin.json presence check
@@ -194,9 +182,7 @@ class TestInvalidJson:
         How: Write invalid JSON to plugin.json, validate
         Why: Malformed JSON prevents capability discovery and must be flagged
         """
-        plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content='{"name": "test", INVALID}'
-        )
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content='{"name": "test", INVALID}')
 
         validator = PluginRegistrationValidator()
         result = validator.validate(plugin_dir)
@@ -228,9 +214,7 @@ class TestInvalidJson:
         How: Write invalid JSON, validate, check suggestion
         Why: Actionable suggestions help users fix validation errors
         """
-        plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content="{not valid json at all"
-        )
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content="{not valid json at all")
 
         validator = PluginRegistrationValidator()
         result = validator.validate(plugin_dir)
@@ -284,9 +268,7 @@ class TestUnregisteredSkill:
         pr001_warnings = [w for w in result.warnings if w.code == "PR001"]
         assert len(pr001_warnings) >= 1
 
-    def test_unregistered_skill_warning_mentions_skill_name(
-        self, tmp_path: Path
-    ) -> None:
+    def test_unregistered_skill_warning_mentions_skill_name(self, tmp_path: Path) -> None:
         """Test PR001 warning message references the unregistered skill name.
 
         Tests: PR001 warning message content
@@ -311,10 +293,7 @@ class TestUnregisteredSkill:
         Why: Registered capabilities should not generate PR001 warnings
         """
         plugin_dir = _make_plugin(
-            tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "skills": ["./skills/my-skill/"]}
-            ),
+            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "skills": ["./skills/my-skill/"]})
         )
         _add_skill(plugin_dir, "my-skill")
 
@@ -361,9 +340,7 @@ class TestUnregisteredAgent:
         pr001_warnings = [w for w in result.warnings if w.code == "PR001"]
         assert len(pr001_warnings) >= 1
 
-    def test_unregistered_agent_warning_mentions_agent_name(
-        self, tmp_path: Path
-    ) -> None:
+    def test_unregistered_agent_warning_mentions_agent_name(self, tmp_path: Path) -> None:
         """Test PR001 warning message references the unregistered agent name.
 
         Tests: PR001 warning message for agent
@@ -388,10 +365,7 @@ class TestUnregisteredAgent:
         Why: Registered agents should not generate PR001 warnings
         """
         plugin_dir = _make_plugin(
-            tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "agents": ["./agents/my-agent.md"]}
-            ),
+            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "agents": ["./agents/my-agent.md"]})
         )
         _add_agent(plugin_dir, "my-agent")
 
@@ -429,10 +403,7 @@ class TestUnregisteredCommand:
         Why: Registered commands should not generate PR001 warnings
         """
         plugin_dir = _make_plugin(
-            tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "commands": ["./commands/my-command.md"]}
-            ),
+            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "commands": ["./commands/my-command.md"]})
         )
         _add_command(plugin_dir, "my-command")
 
@@ -474,10 +445,7 @@ class TestMissingRegisteredFile:
         Why: Registered paths that do not exist are broken configurations (PR002)
         """
         plugin_dir = _make_plugin(
-            tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "skills": ["./skills/phantom-skill/"]}
-            ),
+            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "skills": ["./skills/phantom-skill/"]})
         )
         # Do NOT create the skills/phantom-skill/SKILL.md
 
@@ -496,10 +464,7 @@ class TestMissingRegisteredFile:
         Why: Registered agent paths that do not exist are broken configurations (PR002)
         """
         plugin_dir = _make_plugin(
-            tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "agents": ["./agents/phantom-agent.md"]}
-            ),
+            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "agents": ["./agents/phantom-agent.md"]})
         )
         # Do NOT create agents/phantom-agent.md
 
@@ -510,9 +475,7 @@ class TestMissingRegisteredFile:
         pr002_errors = [e for e in result.errors if e.code == "PR002"]
         assert len(pr002_errors) >= 1
 
-    def test_registered_command_not_on_disk_produces_pr002(
-        self, tmp_path: Path
-    ) -> None:
+    def test_registered_command_not_on_disk_produces_pr002(self, tmp_path: Path) -> None:
         """Test PR002 error when registered command .md does not exist on disk.
 
         Tests: Missing registered command detection (PR002)
@@ -520,10 +483,7 @@ class TestMissingRegisteredFile:
         Why: Registered command paths that do not exist are broken (PR002)
         """
         plugin_dir = _make_plugin(
-            tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "commands": ["./commands/phantom-cmd.md"]}
-            ),
+            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "commands": ["./commands/phantom-cmd.md"]})
         )
         # Do NOT create commands/phantom-cmd.md
 
@@ -542,10 +502,7 @@ class TestMissingRegisteredFile:
         Why: Actionable suggestions help users remove or create the referenced path
         """
         plugin_dir = _make_plugin(
-            tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "skills": ["./skills/ghost-skill/"]}
-            ),
+            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "skills": ["./skills/ghost-skill/"]})
         )
 
         validator = PluginRegistrationValidator()
@@ -568,14 +525,12 @@ class TestFullyRegistered:
         """
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps(
-                {
-                    "name": "test-plugin",
-                    "skills": ["./skills/my-skill/"],
-                    "agents": ["./agents/my-agent.md"],
-                    "commands": ["./commands/my-cmd.md"],
-                }
-            ),
+            plugin_json_content=json.dumps({
+                "name": "test-plugin",
+                "skills": ["./skills/my-skill/"],
+                "agents": ["./agents/my-agent.md"],
+                "commands": ["./commands/my-cmd.md"],
+            }),
         )
         _add_skill(plugin_dir, "my-skill")
         _add_agent(plugin_dir, "my-agent")
@@ -597,10 +552,7 @@ class TestFullyRegistered:
         Why: validate() must handle file inputs by traversing up to plugin root
         """
         plugin_dir = _make_plugin(
-            tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "skills": ["./skills/my-skill/"]}
-            ),
+            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "skills": ["./skills/my-skill/"]})
         )
         skill_md = _add_skill(plugin_dir, "my-skill")
 
@@ -612,9 +564,7 @@ class TestFullyRegistered:
         pr001_warnings = [w for w in result.warnings if w.code == "PR001"]
         assert len(pr001_warnings) == 0
 
-    def test_mixed_registered_and_unregistered_separates_correctly(
-        self, tmp_path: Path
-    ) -> None:
+    def test_mixed_registered_and_unregistered_separates_correctly(self, tmp_path: Path) -> None:
         """Test only the unregistered skill generates PR001, registered one does not.
 
         Tests: Partial registration -- mix of registered and unregistered
@@ -622,10 +572,7 @@ class TestFullyRegistered:
         Why: Each skill must be evaluated independently
         """
         plugin_dir = _make_plugin(
-            tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "skills": ["./skills/alpha-skill/"]}
-            ),
+            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "skills": ["./skills/alpha-skill/"]})
         )
         _add_skill(plugin_dir, "alpha-skill")
         _add_skill(plugin_dir, "beta-skill")
@@ -653,9 +600,7 @@ class TestEmptyPlugin:
         """
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "skills": [], "agents": [], "commands": []}
-            ),
+            plugin_json_content=json.dumps({"name": "test-plugin", "skills": [], "agents": [], "commands": []}),
         )
         # No skills/, agents/, or commands/ directories created
 
@@ -674,9 +619,7 @@ class TestEmptyPlugin:
         How: Write plugin.json with only name field, no capability arrays, validate
         Why: Capability arrays are optional; their absence should not cause errors
         """
-        plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"})
-        )
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
         # No directories created
 
         validator = PluginRegistrationValidator()
@@ -685,10 +628,7 @@ class TestEmptyPlugin:
         assert result.passed is True
         assert len(result.errors) == 0
 
-    @pytest.mark.parametrize(
-        ("capability_type", "file_name"),
-        [("agents", "CLAUDE.md"), ("agents", "README.md")],
-    )
+    @pytest.mark.parametrize(("capability_type", "file_name"), [("agents", "CLAUDE.md"), ("agents", "README.md")])
     def test_excluded_filenames_not_flagged_as_unregistered(
         self, tmp_path: Path, capability_type: str, file_name: str
     ) -> None:
@@ -741,9 +681,7 @@ class TestMissingMetadata:
         How: plugin.json omits repository; git_metadata has repository; validate
         Why: Validator should inform user that repository can be populated from git
         """
-        plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"})
-        )
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
         # git_metadata has repository; plugin_config does not
         metadata = {"repository": _FULL_GIT_METADATA["repository"]}
 
@@ -762,9 +700,7 @@ class TestMissingMetadata:
         How: plugin.json omits homepage; git_metadata has homepage; validate
         Why: Validator should surface all populatable metadata fields
         """
-        plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"})
-        )
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
         metadata = {"homepage": _FULL_GIT_METADATA["homepage"]}
 
         with patch(_GIT_METADATA_MODULE, return_value=metadata):
@@ -782,9 +718,7 @@ class TestMissingMetadata:
         How: plugin.json omits author; git_metadata has author; validate
         Why: Validator should surface author as a populatable metadata field
         """
-        plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"})
-        )
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
         metadata = {"author": _FULL_GIT_METADATA["author"]}
 
         with patch(_GIT_METADATA_MODULE, return_value=metadata):
@@ -804,14 +738,12 @@ class TestMissingMetadata:
         """
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps(
-                {
-                    "name": "test-plugin",
-                    "repository": "https://github.com/example/my-plugin",
-                    "homepage": "https://github.com/example/my-plugin/tree/main",
-                    "author": {"name": "Test Author"},
-                }
-            ),
+            plugin_json_content=json.dumps({
+                "name": "test-plugin",
+                "repository": "https://github.com/example/my-plugin",
+                "homepage": "https://github.com/example/my-plugin/tree/main",
+                "author": {"name": "Test Author"},
+            }),
         )
 
         with patch(_GIT_METADATA_MODULE, return_value=_FULL_GIT_METADATA):
@@ -828,9 +760,7 @@ class TestMissingMetadata:
         How: _generate_plugin_metadata returns {}; validate
         Why: No git context means no metadata suggestion can be made
         """
-        plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"})
-        )
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
 
         with patch(_GIT_METADATA_MODULE, return_value={}):
             validator = PluginRegistrationValidator()
@@ -846,9 +776,7 @@ class TestMissingMetadata:
         How: Trigger PR003 for repository field, check suggestion contains JSON
         Why: Suggestion must be actionable -- user should be able to copy-paste
         """
-        plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"})
-        )
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
         metadata = {"repository": "https://github.com/example/my-plugin"}
 
         with patch(_GIT_METADATA_MODULE, return_value=metadata):
@@ -858,10 +786,7 @@ class TestMissingMetadata:
         pr003_info = [i for i in result.info if i.code == "PR003"]
         assert len(pr003_info) >= 1
         # Suggestion should be a JSON snippet the user can paste into plugin.json
-        assert all(
-            i.suggestion is not None and "repository" in i.suggestion
-            for i in pr003_info
-        )
+        assert all(i.suggestion is not None and "repository" in i.suggestion for i in pr003_info)
 
 
 class TestRepositoryMismatch:
@@ -872,9 +797,7 @@ class TestRepositoryMismatch:
     Source: plugin_validator.py lines 2821-2838.
     """
 
-    def test_pr004_emitted_when_repository_url_mismatches_git_remote(
-        self, tmp_path: Path
-    ) -> None:
+    def test_pr004_emitted_when_repository_url_mismatches_git_remote(self, tmp_path: Path) -> None:
         """Test PR004 warning when plugin.json repository differs from git remote.
 
         Tests: PR004 warning for repository URL mismatch
@@ -883,12 +806,10 @@ class TestRepositoryMismatch:
         """
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps(
-                {
-                    "name": "test-plugin",
-                    "repository": "https://github.com/old-org/my-plugin",
-                }
-            ),
+            plugin_json_content=json.dumps({
+                "name": "test-plugin",
+                "repository": "https://github.com/old-org/my-plugin",
+            }),
         )
         metadata = {"repository": "https://github.com/example/my-plugin"}
 
@@ -909,10 +830,7 @@ class TestRepositoryMismatch:
         plugin_url = "https://github.com/old-org/my-plugin"
         git_url = "https://github.com/example/my-plugin"
         plugin_dir = _make_plugin(
-            tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "repository": plugin_url}
-            ),
+            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "repository": plugin_url})
         )
         metadata = {"repository": git_url}
 
@@ -935,12 +853,10 @@ class TestRepositoryMismatch:
         git_url = "https://github.com/example/my-plugin"
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps(
-                {
-                    "name": "test-plugin",
-                    "repository": "https://github.com/old-org/my-plugin",
-                }
-            ),
+            plugin_json_content=json.dumps({
+                "name": "test-plugin",
+                "repository": "https://github.com/old-org/my-plugin",
+            }),
         )
         metadata = {"repository": git_url}
 
@@ -950,9 +866,7 @@ class TestRepositoryMismatch:
 
         pr004_warnings = [w for w in result.warnings if w.code == "PR004"]
         assert len(pr004_warnings) >= 1
-        assert all(
-            w.suggestion is not None and git_url in w.suggestion for w in pr004_warnings
-        )
+        assert all(w.suggestion is not None and git_url in w.suggestion for w in pr004_warnings)
 
     def test_no_pr004_when_repository_matches_git_remote(self, tmp_path: Path) -> None:
         """Test no PR004 warning when plugin.json repository matches git remote.
@@ -963,10 +877,7 @@ class TestRepositoryMismatch:
         """
         matching_url = "https://github.com/example/my-plugin"
         plugin_dir = _make_plugin(
-            tmp_path,
-            plugin_json_content=json.dumps(
-                {"name": "test-plugin", "repository": matching_url}
-            ),
+            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "repository": matching_url})
         )
         metadata = {"repository": matching_url}
 
@@ -984,9 +895,7 @@ class TestRepositoryMismatch:
         How: plugin.json omits repository; git_metadata has repository; validate
         Why: Mismatch check requires both sides to be present; absence triggers PR003
         """
-        plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"})
-        )
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
         metadata = {"repository": "https://github.com/example/my-plugin"}
 
         with patch(_GIT_METADATA_MODULE, return_value=metadata):
@@ -1005,12 +914,10 @@ class TestRepositoryMismatch:
         """
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps(
-                {
-                    "name": "test-plugin",
-                    "repository": "https://github.com/example/my-plugin",
-                }
-            ),
+            plugin_json_content=json.dumps({
+                "name": "test-plugin",
+                "repository": "https://github.com/example/my-plugin",
+            }),
         )
         # git_metadata has author but no repository
         metadata = {"author": {"name": "Test Author"}}

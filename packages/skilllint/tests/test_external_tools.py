@@ -13,12 +13,7 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from skilllint.plugin_validator import (
-    CLAUDE_TIMEOUT,
-    get_staged_files,
-    is_claude_available,
-    validate_with_claude,
-)
+from skilllint.plugin_validator import CLAUDE_TIMEOUT, get_staged_files, is_claude_available, validate_with_claude
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -67,9 +62,7 @@ def test_is_claude_available_when_not_installed(mocker: MockerFixture) -> None:
 # ============================================================================
 
 
-def test_validate_with_claude_when_not_available(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_when_not_available(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude skips gracefully when claude not available.
 
     Tests: Graceful degradation when claude CLI missing
@@ -88,9 +81,7 @@ def test_validate_with_claude_when_not_available(
     assert "skipped" in output.lower()
 
 
-def test_validate_with_claude_when_not_plugin_directory(
-    mocker: MockerFixture, tmp_path: Path
-) -> None:
+def test_validate_with_claude_when_not_plugin_directory(mocker: MockerFixture, tmp_path: Path) -> None:
     """Test validate_with_claude skips when directory is not a plugin.
 
     Tests: Validation skips non-plugin directories
@@ -109,9 +100,7 @@ def test_validate_with_claude_when_not_plugin_directory(
     assert "skipped" in output.lower()
 
 
-def test_validate_with_claude_success(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_success(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude returns success when validation passes.
 
     Tests: Successful claude plugin validation
@@ -121,9 +110,7 @@ def test_validate_with_claude_success(
     # Arrange: Mock claude available and successful validation
     mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/local/bin/claude")
     mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(
-        returncode=0, stdout="Plugin validation passed", stderr=""
-    )
+    mock_run.return_value = mocker.Mock(returncode=0, stdout="Plugin validation passed", stderr="")
 
     # Act: Validate plugin
     success, output = validate_with_claude(sample_plugin_dir)
@@ -141,9 +128,7 @@ def test_validate_with_claude_success(
     assert call_args[3] == str(sample_plugin_dir)
 
 
-def test_validate_with_claude_failure(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_failure(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude returns failure when validation fails.
 
     Tests: Failed claude plugin validation
@@ -153,9 +138,7 @@ def test_validate_with_claude_failure(
     # Arrange: Mock claude available but validation fails
     mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/local/bin/claude")
     mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(
-        returncode=1, stdout="Validation output", stderr="Error: Invalid plugin.json"
-    )
+    mock_run.return_value = mocker.Mock(returncode=1, stdout="Validation output", stderr="Error: Invalid plugin.json")
 
     # Act: Validate plugin
     success, output = validate_with_claude(sample_plugin_dir)
@@ -166,9 +149,7 @@ def test_validate_with_claude_failure(
     assert "Validation output" in output
 
 
-def test_validate_with_claude_timeout(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_timeout(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude handles timeout gracefully.
 
     Tests: Timeout handling for claude CLI
@@ -178,9 +159,7 @@ def test_validate_with_claude_timeout(
     # Arrange: Mock claude available but times out
     mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/local/bin/claude")
     mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.side_effect = subprocess.TimeoutExpired(
-        cmd=["claude", "plugin", "validate"], timeout=CLAUDE_TIMEOUT
-    )
+    mock_run.side_effect = subprocess.TimeoutExpired(cmd=["claude", "plugin", "validate"], timeout=CLAUDE_TIMEOUT)
 
     # Act: Validate plugin
     success, output = validate_with_claude(sample_plugin_dir)
@@ -191,9 +170,7 @@ def test_validate_with_claude_timeout(
     assert str(CLAUDE_TIMEOUT) in output
 
 
-def test_validate_with_claude_file_not_found(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_file_not_found(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude handles FileNotFoundError gracefully.
 
     Tests: Handling when claude executable not found despite shutil.which
@@ -214,9 +191,7 @@ def test_validate_with_claude_file_not_found(
     assert "skipped" in output.lower()
 
 
-def test_validate_with_claude_os_error(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_os_error(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude handles OSError gracefully.
 
     Tests: Handling general subprocess errors (permission denied, etc.)
@@ -242,9 +217,7 @@ def test_validate_with_claude_os_error(
 # ============================================================================
 
 
-def test_validate_with_claude_no_shell_true(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_no_shell_true(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude never uses shell=True.
 
     Tests: Subprocess security - no shell injection risk
@@ -266,9 +239,7 @@ def test_validate_with_claude_no_shell_true(
     assert "shell" not in call_kwargs or call_kwargs["shell"] is False
 
 
-def test_validate_with_claude_uses_list_arguments(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_uses_list_arguments(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude passes command as list, not string.
 
     Tests: Subprocess security - list arguments prevent shell injection
@@ -290,9 +261,7 @@ def test_validate_with_claude_uses_list_arguments(
     assert len(call_args) == 4  # [claude_path, "plugin", "validate", plugin_dir]
 
 
-def test_validate_with_claude_uses_full_path(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_uses_full_path(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude uses full path from shutil.which.
 
     Tests: Subprocess security - uses full command path
@@ -314,9 +283,7 @@ def test_validate_with_claude_uses_full_path(
     assert call_args[0] == claude_path
 
 
-def test_validate_with_claude_sets_timeout(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_sets_timeout(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude sets timeout parameter.
 
     Tests: Subprocess timeout configuration
@@ -370,9 +337,7 @@ def test_get_staged_files_when_not_git_repo(mocker: MockerFixture) -> None:
     # Arrange: Mock git available but not in repo
     mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
     mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(
-        returncode=128, stdout="", stderr="Not a git repository"
-    )
+    mock_run.return_value = mocker.Mock(returncode=128, stdout="", stderr="Not a git repository")
 
     # Act: Get staged files
     result = get_staged_files()
@@ -392,9 +357,7 @@ def test_get_staged_files_with_staged_files(mocker: MockerFixture) -> None:
     mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
     mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
     mock_run.return_value = mocker.Mock(
-        returncode=0,
-        stdout="plugins/plugin-creator/SKILL.md\nplugins/test/agent.md\n",
-        stderr="",
+        returncode=0, stdout="plugins/plugin-creator/SKILL.md\nplugins/test/agent.md\n", stderr=""
     )
 
     # Act: Get staged files
@@ -436,9 +399,7 @@ def test_get_staged_files_timeout(mocker: MockerFixture) -> None:
     # Arrange: Mock git available but times out
     mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
     mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.side_effect = subprocess.TimeoutExpired(
-        cmd=["git", "diff", "--cached", "--name-only"], timeout=10
-    )
+    mock_run.side_effect = subprocess.TimeoutExpired(cmd=["git", "diff", "--cached", "--name-only"], timeout=10)
 
     # Act: Get staged files
     result = get_staged_files()
@@ -584,9 +545,7 @@ def test_get_staged_files_filters_empty_lines(mocker: MockerFixture) -> None:
     mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
     mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
     mock_run.return_value = mocker.Mock(
-        returncode=0,
-        stdout="\nplugins/test/file1.md\n\n\nplugins/test/file2.md\n\n",
-        stderr="",
+        returncode=0, stdout="\nplugins/test/file1.md\n\n\nplugins/test/file2.md\n\n", stderr=""
     )
 
     # Act: Get staged files
@@ -603,9 +562,7 @@ def test_get_staged_files_filters_empty_lines(mocker: MockerFixture) -> None:
 # ============================================================================
 
 
-def test_validate_with_claude_maps_zero_exit_to_success(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_maps_zero_exit_to_success(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude maps exit code 0 to success=True.
 
     Tests: Exit code mapping for success
@@ -624,9 +581,7 @@ def test_validate_with_claude_maps_zero_exit_to_success(
     assert success is True
 
 
-def test_validate_with_claude_maps_nonzero_exit_to_failure(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_maps_nonzero_exit_to_failure(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude maps non-zero exit code to success=False.
 
     Tests: Exit code mapping for failure
@@ -645,9 +600,7 @@ def test_validate_with_claude_maps_nonzero_exit_to_failure(
     assert success is False
 
 
-def test_validate_with_claude_includes_stdout_on_success(
-    mocker: MockerFixture, sample_plugin_dir: Path
-) -> None:
+def test_validate_with_claude_includes_stdout_on_success(mocker: MockerFixture, sample_plugin_dir: Path) -> None:
     """Test validate_with_claude includes stdout in output on success.
 
     Tests: Output content on success
@@ -657,9 +610,7 @@ def test_validate_with_claude_includes_stdout_on_success(
     # Arrange: Mock claude success with stdout
     mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/local/bin/claude")
     mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(
-        returncode=0, stdout="Validation passed successfully", stderr=""
-    )
+    mock_run.return_value = mocker.Mock(returncode=0, stdout="Validation passed successfully", stderr="")
 
     # Act: Validate plugin
     _, output = validate_with_claude(sample_plugin_dir)

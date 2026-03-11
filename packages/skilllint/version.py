@@ -12,14 +12,20 @@ Based on <https://github.com/maresb/hatch-vcs-footgun-example>.
 from __future__ import annotations
 
 import pathlib
+from importlib.metadata import version as _metadata_version
+
+try:
+    from hatchling.metadata.core import ProjectMetadata
+    from hatchling.plugin.manager import PluginManager
+    from hatchling.utils.fs import locate_file
+
+    _HAS_HATCHLING = True
+except ImportError:
+    _HAS_HATCHLING = False
 
 
 def _get_hatch_version() -> str | None:
-    try:
-        from hatchling.metadata.core import ProjectMetadata
-        from hatchling.plugin.manager import PluginManager
-        from hatchling.utils.fs import locate_file
-    except ImportError:
+    if not _HAS_HATCHLING:
         return None
 
     pyproject_toml = locate_file(__file__, "pyproject.toml")
@@ -31,9 +37,7 @@ def _get_hatch_version() -> str | None:
 
 
 def _get_importlib_metadata_version() -> str:
-    from importlib.metadata import version
-
-    return version(__package__ or __name__)
+    return _metadata_version(__package__ or __name__)
 
 
 __version__ = _get_hatch_version() or _get_importlib_metadata_version()

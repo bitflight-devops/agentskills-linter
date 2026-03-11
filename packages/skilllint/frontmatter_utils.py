@@ -15,11 +15,12 @@ Public API:
 
 from __future__ import annotations
 
+import re
 from io import StringIO
-from typing import TYPE_CHECKING, TypeAlias, TypedDict, Unpack
+from typing import TYPE_CHECKING, TypeAlias
 
-import frontmatter
-from frontmatter.default_handlers import YAMLHandler
+from frontmatter import Post, dump, dumps, load, loads
+from frontmatter.default_handlers import BaseHandler
 from ruamel.yaml import YAML
 
 if TYPE_CHECKING:
@@ -29,20 +30,23 @@ if TYPE_CHECKING:
 FrontmatterValue: TypeAlias = dict[str, "FrontmatterValue"] | list["FrontmatterValue"] | str | int | float | bool | None
 
 
-class _YAMLHandlerKwargs(TypedDict, total=False):
-    """Kwargs for YAMLHandler API compatibility. Base class may pass Loader; we ignore all."""
-
-    Loader: type
-
-
-class RuamelYAMLHandler(YAMLHandler):
+class RuamelYAMLHandler(BaseHandler):
     """Frontmatter handler using ruamel.yaml in round-trip mode.
+
+    Subclasses BaseHandler directly (not YAMLHandler) to avoid an upstream
+    LSP conflict: YAMLHandler.load adds **kwargs that BaseHandler.load
+    does not declare, making it impossible for a subclass to satisfy both
+    signatures simultaneously under strict type checking.
 
     Overrides the default pyyaml-based handler so that:
     - Values without special YAML characters stay unquoted.
     - Values requiring quotes (colon-space) get single-quoted.
     - Unnecessary quotes from the source are stripped on round-trip.
     """
+
+    FM_BOUNDARY = re.compile(r"^-{3,}\s*$", re.MULTILINE)
+    START_DELIMITER = "---"
+    END_DELIMITER = "---"
 
     def __init__(self) -> None:
         """Initialize handler with ruamel.yaml round-trip instance."""
@@ -59,24 +63,23 @@ class RuamelYAMLHandler(YAMLHandler):
         """Round-trip YAML instance for load/dump. Public for plugin_validator._dump_yaml."""
         return self._yaml
 
-    def load(self, fm: str, **kwargs: Unpack[_YAMLHandlerKwargs]) -> FrontmatterValue:
+    def load(self, fm: str) -> dict[str, FrontmatterValue]:
         """Parse YAML frontmatter string using ruamel.yaml round-trip loader.
 
         Args:
             fm: Raw YAML frontmatter string (without delimiters).
-            **kwargs: Ignored (present for API compatibility).
 
         Returns:
             Parsed YAML data as a CommentedMap or None for empty input.
         """
         return self._yaml.load(fm)
 
-    def export(self, metadata: dict[str, FrontmatterValue], **kwargs: Unpack[_YAMLHandlerKwargs]) -> str:
+    def export(self, metadata: dict[str, object], **kwargs: object) -> str:
         """Serialize metadata dict to YAML string using ruamel.yaml.
 
         Args:
             metadata: Frontmatter metadata dictionary.
-            **kwargs: Ignored (present for API compatibility).
+            **kwargs: Accepted for API compatibility with BaseHandler; not used.
 
         Returns:
             YAML-formatted string without trailing newline.
@@ -89,7 +92,7 @@ class RuamelYAMLHandler(YAMLHandler):
 _handler = RuamelYAMLHandler()
 
 
-def load_frontmatter(path: str | Path) -> frontmatter.Post:
+def load_frontmatter(path: str | Path) -> Post:
     """Load frontmatter from a file path.
 
     Args:
@@ -98,10 +101,10 @@ def load_frontmatter(path: str | Path) -> frontmatter.Post:
     Returns:
         A frontmatter.Post with metadata and content attributes.
     """
-    return frontmatter.load(str(path), handler=_handler)
+    return load(str(path), handler=_handler)
 
 
-def loads_frontmatter(text: str) -> frontmatter.Post:
+def loads_frontmatter(text: str) -> Post:
     """Parse frontmatter from a string.
 
     Args:
@@ -110,10 +113,10 @@ def loads_frontmatter(text: str) -> frontmatter.Post:
     Returns:
         A frontmatter.Post with metadata and content attributes.
     """
-    return frontmatter.loads(text, handler=_handler)
+    return loads(text, handler=_handler)
 
 
-def dump_frontmatter(post: frontmatter.Post) -> str:
+def dump_frontmatter(post: Post) -> str:
     """Serialize a Post object to a string.
 
     Args:
@@ -122,17 +125,17 @@ def dump_frontmatter(post: frontmatter.Post) -> str:
     Returns:
         Full markdown string with YAML frontmatter delimiters and body.
     """
-    return frontmatter.dumps(post, handler=_handler)
+    return dumps(post, handler=_handler)
 
 
-def dumps_frontmatter(post: frontmatter.Post, path: str | Path) -> None:
+def dumps_frontmatter(post: Post, path: str | Path) -> None:
     """Write a Post object to a file.
 
     Args:
         post: A frontmatter.Post object.
         path: Destination file path.
     """
-    frontmatter.dump(post, str(path), handler=_handler)
+    dump(post, str(path), handler=_handler)
 
 
 def update_field(path: str | Path, key: str, value: FrontmatterValue) -> None:

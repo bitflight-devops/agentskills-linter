@@ -1,5 +1,4 @@
-"""
-Codex (OpenAI) platform adapter.
+"""Codex (OpenAI) platform adapter.
 
 Data provider and file-type validator for Codex platform files.
 Validates AGENTS.md non-empty and .rules prefix_rule() field names
@@ -9,10 +8,13 @@ No rule-series logic lives here — rule series fire from the core validator.
 
 from __future__ import annotations
 
-import pathlib
 import re
+from typing import TYPE_CHECKING
 
 from skilllint import load_bundled_schema
+
+if TYPE_CHECKING:
+    import pathlib
 
 # Matches: prefix_rule(\n    key = value,\n    ...\n)
 # Captures the body between the outer parentheses.
@@ -25,17 +27,15 @@ class CodexAdapter:
     """Adapter for Codex AGENTS.md and .rules files."""
 
     def id(self) -> str:
+        """Return the adapter ID."""
         return "codex"
 
     def path_patterns(self) -> list[str]:
-        return [
-            ".agents/skills/**/*.md",
-            "AGENTS.md",
-            "**/*.rules",
-            ".codex/**",
-        ]
+        """Return the glob patterns for files this adapter handles."""
+        return [".agents/skills/**/*.md", "AGENTS.md", "**/*.rules", ".codex/**"]
 
     def applicable_rules(self) -> set[str]:
+        """Return the set of rule prefixes applicable to this adapter."""
         return {"AS"}
 
     def get_schema(self, file_type: str) -> dict | None:
@@ -58,6 +58,9 @@ class CodexAdapter:
 
         Returns violation messages for:
         - Fields not in the fields object from the codex v1.json schema
+
+        Returns:
+            List of violation messages.
         """
         schema = self.get_schema("prefix_rule")
         if schema is None:
@@ -71,10 +74,7 @@ class CodexAdapter:
             for field_match in _FIELD_RE.finditer(body):
                 field = field_match.group(1)
                 if field not in known:
-                    violations.append(
-                        f"Unknown field '{field}' in prefix_rule()"
-                        f" (known fields: {sorted(known)})"
-                    )
+                    violations.append(f"Unknown field '{field}' in prefix_rule() (known fields: {sorted(known)})")
 
         return violations
 
@@ -86,29 +86,24 @@ class CodexAdapter:
         """Validate AGENTS.md and .rules files.
 
         Returns violation dicts with keys: code, severity, message.
+
+        Returns:
+            List of violation dicts.
         """
         violations: list[dict] = []
 
         if path.suffix == ".md":
             content = path.read_text(encoding="utf-8")
-            for msg in self.validate_agents_md(content):
-                violations.append(
-                    {
-                        "code": "codex-agents-md-empty",
-                        "severity": "error",
-                        "message": msg,
-                    }
-                )
+            violations.extend(
+                {"code": "codex-agents-md-empty", "severity": "error", "message": msg}
+                for msg in self.validate_agents_md(content)
+            )
 
         elif path.suffix == ".rules":
             content = path.read_text(encoding="utf-8")
-            for msg in self.validate_rules_file(content):
-                violations.append(
-                    {
-                        "code": "codex-rules-unknown-field",
-                        "severity": "error",
-                        "message": msg,
-                    }
-                )
+            violations.extend(
+                {"code": "codex-rules-unknown-field", "severity": "error", "message": msg}
+                for msg in self.validate_rules_file(content)
+            )
 
         return violations

@@ -1,5 +1,4 @@
-"""
-AS-series rule validation for agentskills.io SKILL.md files.
+"""AS-series rule validation for agentskills.io SKILL.md files.
 
 Rules AS001-AS006 fire on any SKILL.md file regardless of which platform
 adapter is active. They enforce cross-platform quality standards.
@@ -17,8 +16,13 @@ Severities:
 
 from __future__ import annotations
 
-import pathlib
 import re
+from typing import TYPE_CHECKING
+
+from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
+
+if TYPE_CHECKING:
+    import pathlib
 
 # ---------------------------------------------------------------------------
 # Rule registry — maps code to human-readable description
@@ -29,13 +33,15 @@ AS_RULES: dict[str, str] = {
     "AS002": "Skill name must match the parent directory name",
     "AS003": "description field must be present and non-empty",
     "AS004": "description must not contain HTML tags (< or >)",
-    "AS005": "SKILL.md body exceeds 500 lines — consider splitting into sub-skills",
+    "AS005": f"SKILL.md body token count exceeds {TOKEN_WARNING_THRESHOLD} tokens — consider splitting into sub-skills",
     "AS006": "No eval_queries.json found — add evaluation queries for quality assurance",
 }
 
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+_MAX_NAME_LENGTH = 64
 
 _NAME_RE = re.compile(r"^[a-z0-9]([a-z0-9-]*[a-z0-9])?$")
 _CONSECUTIVE_HYPHENS_RE = re.compile(r"--")
@@ -94,93 +100,113 @@ def _violation(code: str, severity: str, message: str) -> dict:
 
 
 def _check_as001(name: str | None) -> dict | None:
-    """AS001: name format — lowercase alphanumeric + hyphens, 1-64 chars, no consecutive hyphens."""
+    """AS001: name format — lowercase alphanumeric + hyphens, 1-64 chars, no consecutive hyphens.
+
+    Returns:
+        Violation dict if invalid, None otherwise.
+    """
     if name is None:
         return _violation("AS001", "error", "name field is missing")
 
-    if len(name) == 0 or len(name) > 64:
+    if len(name) == 0 or len(name) > _MAX_NAME_LENGTH:
         return _violation(
-            "AS001",
-            "error",
-            f"name '{name}' must be 1-64 characters long (got {len(name)})",
+            "AS001", "error", f"name '{name}' must be 1-{_MAX_NAME_LENGTH} characters long (got {len(name)})"
         )
 
     if _CONSECUTIVE_HYPHENS_RE.search(name):
-        return _violation(
-            "AS001",
-            "error",
-            f"name '{name}' must not contain consecutive hyphens",
-        )
+        return _violation("AS001", "error", f"name '{name}' must not contain consecutive hyphens")
 
     if not _NAME_RE.match(name):
         return _violation(
             "AS001",
             "error",
-            f"name '{name}' must match ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ "
-            "(lowercase letters, digits, and hyphens only)",
+            f"name '{name}' must match ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ (lowercase letters, digits, and hyphens only)",
         )
 
     return None
 
 
 def _check_as002(name: str | None, path: pathlib.Path) -> dict | None:
-    """AS002: name must equal the parent directory name."""
+    """AS002: name must equal the parent directory name.
+
+    Returns:
+        Violation dict if invalid, None otherwise.
+    """
     if name is None:
         return None  # AS001 already covers missing name
 
     dir_name = path.parent.name
     if name != dir_name:
-        return _violation(
-            "AS002",
-            "error",
-            f"name '{name}' does not match parent directory name '{dir_name}'",
-        )
+        return _violation("AS002", "error", f"name '{name}' does not match parent directory name '{dir_name}'")
 
     return None
 
 
 def _check_as003(description: str | None) -> dict | None:
-    """AS003: description must be present and non-empty."""
-    if description is None or description.strip() == "":
-        return _violation(
-            "AS003",
-            "error",
-            "description field must be present and non-empty",
-        )
+    """AS003: description must be present and non-empty.
+
+    Returns:
+        Violation dict if invalid, None otherwise.
+    """
+    if description is None or not description.strip():
+        return _violation("AS003", "error", "description field must be present and non-empty")
 
     return None
 
 
 def _check_as004(description: str | None) -> dict | None:
-    """AS004: description must not contain HTML tags (< or >)."""
+    """AS004: description must not contain HTML tags (< or >).
+
+    Returns:
+        Violation dict if invalid, None otherwise.
+    """
     if description is None:
         return None  # AS003 already covers missing description
 
     if "<" in description or ">" in description:
-        return _violation(
-            "AS004",
-            "error",
-            "description must not contain HTML tags (< or > characters detected)",
-        )
+        return _violation("AS004", "error", "description must not contain HTML tags (< or > characters detected)")
 
     return None
 
 
 def _check_as005(body_lines: list[str]) -> dict | None:
-    """AS005: body length > 500 lines produces a warning."""
-    if len(body_lines) > 500:
+    """AS005: body token count exceeds TOKEN_WARNING_THRESHOLD or TOKEN_ERROR_THRESHOLD.
+
+    Counts tokens in the body text (frontmatter excluded) using tiktoken
+    cl100k_base encoding. Emits a warning when the count exceeds
+    TOKEN_WARNING_THRESHOLD (4400) and an error when it exceeds
+    TOKEN_ERROR_THRESHOLD (8800), matching the SK006/SK007 semantics in
+    ComplexityValidator.
+
+    Returns:
+        Violation dict if threshold exceeded, None otherwise.
+    """
+    body_text = "\n".join(body_lines)
+    token_count = count_tokens(body_text)
+
+    if token_count > TOKEN_ERROR_THRESHOLD:
+        return _violation(
+            "AS005",
+            "error",
+            f"SKILL.md body is {token_count} tokens — exceeds {TOKEN_ERROR_THRESHOLD} token limit; skill must be split into sub-skills",
+        )
+
+    if token_count > TOKEN_WARNING_THRESHOLD:
         return _violation(
             "AS005",
             "warning",
-            f"SKILL.md body is {len(body_lines)} lines — exceeds 500 line limit; "
-            "consider splitting into sub-skills",
+            f"SKILL.md body is {token_count} tokens — exceeds {TOKEN_WARNING_THRESHOLD} token threshold; consider splitting into sub-skills",
         )
 
     return None
 
 
 def _check_as006(path: pathlib.Path) -> dict | None:
-    """AS006: no eval_queries.json (or *eval*.json / *queries*.json) in skill directory."""
+    """AS006: no eval_queries.json (or *eval*.json / *queries*.json) in skill directory.
+
+    Returns:
+        Violation dict if invalid, None otherwise.
+    """
     parent = path.parent
 
     # Check for eval_queries.json exact name first
@@ -197,8 +223,7 @@ def _check_as006(path: pathlib.Path) -> dict | None:
     return _violation(
         "AS006",
         "info",
-        "No eval_queries.json found in skill directory — add evaluation queries "
-        "to enable automated quality assessment",
+        "No eval_queries.json found in skill directory — add evaluation queries to enable automated quality assessment",
     )
 
 
@@ -225,9 +250,9 @@ def check_skill_md(path: pathlib.Path) -> list[dict]:
     description: str | None = frontmatter.get("description") or None
 
     # Normalise empty strings to None
-    if name is not None and name.strip() == "":
+    if name is not None and not name.strip():
         name = None
-    if description is not None and description.strip() == "":
+    if description is not None and not description.strip():
         description = None
 
     violations: list[dict] = []
@@ -261,22 +286,21 @@ def check_skill_md(path: pathlib.Path) -> list[dict]:
 
 # Alias for plan 02-02 spec compatibility (run_as_series is the plan name,
 # check_skill_md is what the tests actually import).
-def run_as_series(
-    path: pathlib.Path,
-    frontmatter: dict,
-    body_lines: list[str],
-) -> list[dict]:
+def run_as_series(path: pathlib.Path, frontmatter: dict, body_lines: list[str]) -> list[dict]:
     """Run AS-series rules given pre-parsed frontmatter and body lines.
 
     This is a lower-level entry point for callers that have already parsed
     the frontmatter. check_skill_md() is preferred for file-based callers.
+
+    Returns:
+        List of violation dicts, each with keys: code, severity, message.
     """
     name: str | None = frontmatter.get("name") or None
     description: str | None = frontmatter.get("description") or None
 
-    if name is not None and name.strip() == "":
+    if name is not None and not name.strip():
         name = None
-    if description is not None and description.strip() == "":
+    if description is not None and not description.strip():
         description = None
 
     violations: list[dict] = []

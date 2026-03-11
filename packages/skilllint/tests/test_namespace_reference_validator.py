@@ -11,11 +11,14 @@ Tests:
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from skilllint.plugin_validator import NamespaceReferenceValidator
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _make_plugins_root(tmp_path: Path) -> Path:
@@ -46,9 +49,7 @@ def _make_agent(plugin_dir: Path, agent_name: str) -> Path:
     agents_dir = plugin_dir / "agents"
     agents_dir.mkdir(exist_ok=True)
     agent_md = agents_dir / f"{agent_name}.md"
-    agent_md.write_text(
-        f"---\nname: {agent_name}\ndescription: Test agent\n---\n\n# Test\n"
-    )
+    agent_md.write_text(f"---\nname: {agent_name}\ndescription: Test agent\n---\n\n# Test\n")
     return agent_md
 
 
@@ -238,9 +239,7 @@ class TestSkillCommandPattern:
         # Nested skill: skills/category/my-skill/SKILL.md
         nested_dir = target_plugin / "skills" / "category" / "my-skill"
         nested_dir.mkdir(parents=True)
-        (nested_dir / "SKILL.md").write_text(
-            "---\ndescription: Nested skill\n---\n\n# Nested\n"
-        )
+        (nested_dir / "SKILL.md").write_text("---\ndescription: Nested skill\n---\n\n# Nested\n")
 
         body = 'Invoke Skill(command: "target-plugin:my-skill").\n'
         source_skill = _make_skill_md_with_body(plugins_root, "source-plugin", body)
@@ -451,9 +450,7 @@ class TestSlashCommandPattern:
 
         commands_dir = target_plugin / "commands"
         commands_dir.mkdir()
-        (commands_dir / "my-cmd.md").write_text(
-            "---\ndescription: Test command\n---\n\n# Command\n"
-        )
+        (commands_dir / "my-cmd.md").write_text("---\ndescription: Test command\n---\n\n# Command\n")
 
         body = "Run /target-plugin:my-cmd to execute.\n"
         source_skill = _make_skill_md_with_body(plugins_root, "source-plugin", body)
@@ -487,19 +484,9 @@ class TestBuiltinAgentSkip:
     """Test built-in agent names are not reported as broken references."""
 
     @pytest.mark.parametrize(
-        "builtin_name",
-        [
-            "Explore",
-            "general-purpose",
-            "Plan",
-            "Bash",
-            "context-gathering",
-            "code-review",
-        ],
+        "builtin_name", ["Explore", "general-purpose", "Plan", "Bash", "context-gathering", "code-review"]
     )
-    def test_builtin_agents_skipped_in_at_pattern(
-        self, tmp_path: Path, builtin_name: str
-    ) -> None:
+    def test_builtin_agents_skipped_in_at_pattern(self, tmp_path: Path, builtin_name: str) -> None:
         """Test @builtin:name references are skipped without NR001 errors.
 
         Tests: BUILTIN_AGENTS frozenset filtering
@@ -517,13 +504,8 @@ class TestBuiltinAgentSkip:
         nr001_errors = [e for e in result.errors if e.code == "NR001"]
         assert len(nr001_errors) == 0
 
-    @pytest.mark.parametrize(
-        "builtin_name",
-        ["Explore", "general-purpose", "context-gathering", "code-review"],
-    )
-    def test_builtin_agents_skipped_in_task_agent_pattern(
-        self, tmp_path: Path, builtin_name: str
-    ) -> None:
+    @pytest.mark.parametrize("builtin_name", ["Explore", "general-purpose", "context-gathering", "code-review"])
+    def test_builtin_agents_skipped_in_task_agent_pattern(self, tmp_path: Path, builtin_name: str) -> None:
         """Test Task(agent="builtin:name") references are skipped.
 
         Tests: BUILTIN_AGENTS check inside agent ref_type handling
@@ -670,9 +652,7 @@ class TestBrokenReference:
         assert len(nr001_errors) >= 1
         assert all(e.suggestion is not None for e in nr001_errors)
 
-    def test_broken_skill_suggestion_uses_category_placeholder_not_wildcard(
-        self, tmp_path: Path
-    ) -> None:
+    def test_broken_skill_suggestion_uses_category_placeholder_not_wildcard(self, tmp_path: Path) -> None:
         """Test NR001 suggestion for broken skill ref uses {category} not */ wildcard.
 
         Tests: Error message clarity — no glob wildcards in user-facing strings
@@ -694,9 +674,7 @@ class TestBrokenReference:
         # Suggestion must not contain shell glob wildcard (*/)
         for err in nr001_errors:
             if err.suggestion:
-                assert "*/" not in err.suggestion, (
-                    f"Suggestion contains shell glob wildcard '*/': {err.suggestion!r}"
-                )
+                assert "*/" not in err.suggestion, f"Suggestion contains shell glob wildcard '*/': {err.suggestion!r}"
             # Suggestion should use {category} placeholder for nested paths
             if err.suggestion and "or" in err.suggestion:
                 assert "{category}" in err.suggestion, (
@@ -745,9 +723,7 @@ class TestEdgeCases:
         skill_dir.mkdir(parents=True)
         skill_md = skill_dir / "SKILL.md"
         # No frontmatter -- entire content is treated as body
-        skill_md.write_text(
-            'No frontmatter here. Skill(command: "target-plugin:my-skill").\n'
-        )
+        skill_md.write_text('No frontmatter here. Skill(command: "target-plugin:my-skill").\n')
 
         validator = NamespaceReferenceValidator()
         result = validator.validate(skill_md)
@@ -782,9 +758,7 @@ class TestEdgeCases:
         """
         # No plugins/ directory anywhere -- just a bare tmp_path SKILL.md
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text(
-            "---\ndescription: Orphan skill\n---\n\n@some-plugin:some-agent usage here.\n"
-        )
+        skill_md.write_text("---\ndescription: Orphan skill\n---\n\n@some-plugin:some-agent usage here.\n")
 
         validator = NamespaceReferenceValidator()
         result = validator.validate(skill_md)

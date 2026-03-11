@@ -9,15 +9,14 @@ Tests:
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
-from skilllint.plugin_validator import (
-    TOKEN_ERROR_THRESHOLD,
-    TOKEN_WARNING_THRESHOLD,
-    ComplexityValidator,
-)
+from skilllint.plugin_validator import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, ComplexityValidator
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestComplexityValidatorBasic:
@@ -118,9 +117,7 @@ class TestThresholdBoundaries:
         Why: Ensure SK006 warning at warning threshold
         """
         skill_md = tmp_path / "SKILL.md"
-        content = "word " * (
-            TOKEN_WARNING_THRESHOLD + 100
-        )  # tokens above warning threshold
+        content = "word " * (TOKEN_WARNING_THRESHOLD + 100)  # tokens above warning threshold
         skill_md.write_text(f"""---
 description: Test skill
 ---
@@ -145,9 +142,7 @@ description: Test skill
         Why: Ensure SK007 error at error threshold
         """
         skill_md = tmp_path / "SKILL.md"
-        content = "word " * (
-            TOKEN_ERROR_THRESHOLD + 200
-        )  # tokens above error threshold
+        content = "word " * (TOKEN_ERROR_THRESHOLD + 200)  # tokens above error threshold
         skill_md.write_text(f"""---
 description: Test skill
 ---

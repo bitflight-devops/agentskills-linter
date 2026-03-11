@@ -10,11 +10,14 @@ Tests:
 
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from skilllint.plugin_validator import FrontmatterValidator
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestFrontmatterValidatorBasic:
@@ -180,10 +183,7 @@ description: Agent without name field
         result = validator.validate(agent_md)
 
         assert result.passed is False
-        assert any(
-            issue.code == "FM001" and "name" in issue.message.lower()
-            for issue in result.errors
-        )
+        assert any(issue.code == "FM001" and "name" in issue.message.lower() for issue in result.errors)
 
     def test_missing_agent_description_field(self, tmp_path: Path) -> None:
         """Test error when agent missing required description field (FM001).
@@ -205,10 +205,7 @@ name: test-agent
         result = validator.validate(agent_md)
 
         assert result.passed is False
-        assert any(
-            issue.code == "FM001" and "description" in issue.message.lower()
-            for issue in result.errors
-        )
+        assert any(issue.code == "FM001" and "description" in issue.message.lower() for issue in result.errors)
 
     def test_missing_command_description(self, tmp_path: Path) -> None:
         """Test error when command missing required description field (FM001).
@@ -229,10 +226,7 @@ echo "test"
         result = validator.validate(command_md)
 
         assert result.passed is False
-        assert any(
-            issue.code == "FM001" and "description" in issue.message.lower()
-            for issue in result.errors
-        )
+        assert any(issue.code == "FM001" and "description" in issue.message.lower() for issue in result.errors)
 
 
 class TestFrontmatterAutoFix:
@@ -532,9 +526,7 @@ description: Test
         ),
     ],
 )
-def test_parametrized_error_codes(
-    tmp_path: Path, frontmatter: str, expected_error_code: str
-) -> None:
+def test_parametrized_error_codes(tmp_path: Path, frontmatter: str, expected_error_code: str) -> None:
     """Test specific error codes are raised for known violations.
 
     Tests: Multiple frontmatter violations with expected error codes
@@ -610,13 +602,9 @@ description: A test skill with a name field
         content = skill_md.read_text()
         assert "name: my-skill" in content
         # Fix list must not contain a removal message
-        assert not any(
-            "removed" in fix.lower() and "name" in fix.lower() for fix in fixes
-        )
+        assert not any("removed" in fix.lower() and "name" in fix.lower() for fix in fixes)
 
-    def test_name_field_not_added_when_directory_name_invalid(
-        self, tmp_path: Path
-    ) -> None:
+    def test_name_field_not_added_when_directory_name_invalid(self, tmp_path: Path) -> None:
         """Test auto-fix skips adding name when directory name is invalid.
 
         Tests: Skill in directory with non-conforming name (e.g. underscores)
@@ -690,7 +678,4 @@ description: Skill with mismatched name field
         # Mismatch is a warning, not an error — passed should be True
         assert result.passed is True
         all_issues = result.warnings + result.errors
-        assert any(
-            "name" in issue.field.lower() and "actual-dir-name" in issue.message
-            for issue in all_issues
-        )
+        assert any("name" in issue.field.lower() and "actual-dir-name" in issue.message for issue in all_issues)

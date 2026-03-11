@@ -9,11 +9,14 @@ Tests:
 from __future__ import annotations
 
 import json
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from skilllint.plugin_validator import FileType, HookValidator
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class TestDetectFileType:
@@ -106,19 +109,7 @@ class TestHookConfigValidation:
         """
         hooks_json = tmp_path / "hooks.json"
         hooks_json.write_text(
-            json.dumps(
-                {
-                    "hooks": {
-                        "SubagentStop": [
-                            {
-                                "hooks": [
-                                    {"type": "prompt", "prompt": "Check the output"}
-                                ]
-                            }
-                        ]
-                    }
-                }
-            )
+            json.dumps({"hooks": {"SubagentStop": [{"hooks": [{"type": "prompt", "prompt": "Check the output"}]}]}})
         )
 
         validator = HookValidator()
@@ -168,15 +159,7 @@ class TestHookConfigValidation:
         """
         hooks_json = tmp_path / "hooks.json"
         hooks_json.write_text(
-            json.dumps(
-                {
-                    "hooks": {
-                        "InvalidEvent": [
-                            {"hooks": [{"type": "command", "command": "echo hi"}]}
-                        ]
-                    }
-                }
-            )
+            json.dumps({"hooks": {"InvalidEvent": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}})
         )
 
         validator = HookValidator()
@@ -192,26 +175,12 @@ class TestHookConfigValidation:
         How: Write hooks.json with each valid event type, validate each
         Why: Ensure no false positives on valid event types
         """
-        valid_events = [
-            "PreToolUse",
-            "PostToolUse",
-            "Notification",
-            "SubagentStop",
-            "Stop",
-        ]
+        valid_events = ["PreToolUse", "PostToolUse", "Notification", "SubagentStop", "Stop"]
 
         for event in valid_events:
             hooks_json = tmp_path / "hooks.json"
             hooks_json.write_text(
-                json.dumps(
-                    {
-                        "hooks": {
-                            event: [
-                                {"hooks": [{"type": "command", "command": "echo test"}]}
-                            ]
-                        }
-                    }
-                )
+                json.dumps({"hooks": {event: [{"hooks": [{"type": "command", "command": "echo test"}]}]}})
             )
 
             validator = HookValidator()
@@ -227,15 +196,7 @@ class TestHookConfigValidation:
         Why: Each hook entry must specify its type
         """
         hooks_json = tmp_path / "hooks.json"
-        hooks_json.write_text(
-            json.dumps(
-                {
-                    "hooks": {
-                        "PreToolUse": [{"hooks": [{"command": "echo missing type"}]}]
-                    }
-                }
-            )
-        )
+        hooks_json.write_text(json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"command": "echo missing type"}]}]}}))
 
         validator = HookValidator()
         result = validator.validate(hooks_json)
@@ -243,9 +204,7 @@ class TestHookConfigValidation:
         assert result.passed is False
         assert any(e.code == "HK003" for e in result.errors)
 
-    def test_command_hook_missing_command_field_fails_hk003(
-        self, tmp_path: Path
-    ) -> None:
+    def test_command_hook_missing_command_field_fails_hk003(self, tmp_path: Path) -> None:
         """Test command hook without 'command' field triggers HK003 error.
 
         Tests: Command hook field validation
@@ -253,9 +212,7 @@ class TestHookConfigValidation:
         Why: Command hooks must have a command to execute
         """
         hooks_json = tmp_path / "hooks.json"
-        hooks_json.write_text(
-            json.dumps({"hooks": {"Stop": [{"hooks": [{"type": "command"}]}]}})
-        )
+        hooks_json.write_text(json.dumps({"hooks": {"Stop": [{"hooks": [{"type": "command"}]}]}}))
 
         validator = HookValidator()
         result = validator.validate(hooks_json)
@@ -271,9 +228,7 @@ class TestHookConfigValidation:
         Why: Prompt hooks must have a prompt string
         """
         hooks_json = tmp_path / "hooks.json"
-        hooks_json.write_text(
-            json.dumps({"hooks": {"SubagentStop": [{"hooks": [{"type": "prompt"}]}]}})
-        )
+        hooks_json.write_text(json.dumps({"hooks": {"SubagentStop": [{"hooks": [{"type": "prompt"}]}]}}))
 
         validator = HookValidator()
         result = validator.validate(hooks_json)
@@ -311,24 +266,16 @@ class TestHookConfigValidation:
         """
         hooks_json = tmp_path / "hooks.json"
         hooks_json.write_text(
-            json.dumps(
-                {
-                    "hooks": {
-                        "PreToolUse": [
-                            {
-                                "matcher": "Bash",
-                                "hooks": [
-                                    {
-                                        "type": "command",
-                                        "command": "echo checking bash",
-                                        "timeout": 5,
-                                    }
-                                ],
-                            }
-                        ]
-                    }
+            json.dumps({
+                "hooks": {
+                    "PreToolUse": [
+                        {
+                            "matcher": "Bash",
+                            "hooks": [{"type": "command", "command": "echo checking bash", "timeout": 5}],
+                        }
+                    ]
                 }
-            )
+            })
         )
 
         validator = HookValidator()

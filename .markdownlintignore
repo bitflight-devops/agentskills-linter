@@ -1,0 +1,3 @@
+# Ignore archived planning documents
+.planning/
+.gsd/
