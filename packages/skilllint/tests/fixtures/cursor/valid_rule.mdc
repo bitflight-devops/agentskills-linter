@@ -1,0 +1,7 @@
+---
+description: A valid cursor rule for testing the platform adapter dispatch
+---
+
+# Valid Rule
+
+This rule is used when testing the cursor platform adapter.

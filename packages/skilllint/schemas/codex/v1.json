@@ -1,0 +1,125 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "skilllint/schemas/codex/v1.json",
+  "title": "Codex Platform Schema v1",
+  "description": "Bundled schema snapshot for Codex platform files (.rules prefix_rule, host_executable, AGENTS.md, SKILL.md). Accessed via importlib.resources.files() at runtime.",
+  "version": "1.0.0",
+  "platform": "codex",
+  "file_types": {
+    "prefix_rule": {
+      "x-experimental": true,
+      "x-audited": {
+        "date": "2026-03-10",
+        "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
+      },
+      "valid_decisions": ["allow", "prompt", "forbidden"],
+      "fields": {
+        "pattern": {
+          "required": true,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
+          }
+        },
+        "decision": {
+          "required": false,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
+          }
+        },
+        "justification": {
+          "required": false,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
+          }
+        },
+        "match": {
+          "required": false,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
+          }
+        },
+        "not_match": {
+          "required": false,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
+          }
+        }
+      }
+    },
+    "host_executable": {
+      "x-experimental": true,
+      "x-audited": {
+        "date": "2026-03-10",
+        "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
+      },
+      "fields": {
+        "name": {
+          "required": true,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
+          }
+        },
+        "paths": {
+          "required": false,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
+          }
+        }
+      }
+    },
+    "agents_md": {
+      "x-non-empty": true,
+      "x-audited": {
+        "date": "2026-03-10",
+        "source": ".claude/vendor/codex/codex-cli/README.md"
+      },
+      "description": "AGENTS.md must exist and contain non-empty content"
+    },
+    "skill_md": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "required": ["name", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
+          }
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
+          }
+        },
+        "license": {
+          "type": "string",
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

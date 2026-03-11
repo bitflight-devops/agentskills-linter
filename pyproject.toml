@@ -1,0 +1,295 @@
+[project]
+name = "skilllint"
+description = "Static analysis linter for Claude Code plugins, skills, and agents"
+readme = "README.md"
+dynamic = ["version"]
+authors = [{ name = "Jamie Nelson", email = "jamie@bitflight.io" }]
+maintainers = [{ name = "Jamie Nelson", email = "jamie@bitflight.io" }]
+license = { text = "MIT" }
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Quality Assurance",
+]
+keywords = [
+    "claude",
+    "claude-code",
+    "agent",
+    "skill",
+    "plugin",
+    "linter",
+    "static-analysis",
+]
+requires-python = ">=3.11,<3.15"
+dependencies = [
+    "gitpython>=3.1.45",
+    "pydantic>=2.0.0",
+    "python-frontmatter>=1.1.0",
+    "ruamel-yaml>=0.18.0",
+    "tiktoken>=0.8.0",
+    "typer>=0.21.0",
+]
+
+[project.entry-points."skilllint.adapters"]
+claude_code = "skilllint.adapters.claude_code:ClaudeCodeAdapter"
+codex = "skilllint.adapters.codex:CodexAdapter"
+cursor = "skilllint.adapters.cursor:CursorAdapter"
+
+[project.scripts]
+agentlint = "skilllint.plugin_validator:app"
+pluginlint = "skilllint.plugin_validator:app"
+skillint = "skilllint.plugin_validator:app"
+skilllint = "skilllint.plugin_validator:app"
+
+[project.urls]
+Homepage = "https://github.com/bitflight-devops/agentskills-linter"
+Issues = "https://github.com/bitflight-devops/agentskills-linter/issues"
+Repository = "https://github.com/bitflight-devops/agentskills-linter"
+
+[build-system]
+requires = ["hatch-vcs", "hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "basedpyright>=1.37.2",
+    "hatch-vcs>=0.5.0",
+    "hatchling>=1.14.0",
+    "httpx>=0.28.1",
+    "hypothesis>=6.151.9",
+    "prek>=0.2.19",
+    "pytest-cov>=7.0.0",
+    "pytest-mock>=3.14.0",
+    "pytest-xdist>=3.8.0",
+    "pytest>=9.0.2",
+    "rich>=14.3.3",
+    "ruff>=0.14.0",
+]
+
+[tool.hatch.build.targets.sdist]
+include = [
+    "packages/skilllint",
+    "README.md",
+    "LICENSE",
+    "pyproject.toml",
+]
+
+[tool.hatch.build.targets.wheel]
+exclude = ["packages/skilllint/tests"]
+include = ["packages/skilllint"]
+
+[tool.hatch.build.targets.wheel.sources]
+"packages/skilllint" = "skilllint"
+
+[tool.hatch.version]
+source = "vcs"
+
+[tool.git-cliff]
+config = "cliff.toml"
+
+[tool.pytest.ini_options]
+addopts = [
+    "--cov-report=term-missing",
+    "--cov=packages/skilllint",
+    "-v",
+    "-n",
+    "auto",
+]
+python_classes = ["Test*"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+pythonpath = [".", "packages/", "tests/"]
+testpaths = ["**/tests"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if __name__ == .__main__.:",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+fail_under = 60
+show_missing = true
+
+[tool.coverage.run]
+omit = [
+    "**/tests/*",
+]
+
+[tool.ty.environment]
+extra-paths = [
+    ".",
+    "./packages",
+    "./packages/skilllint",
+    "./scripts",
+]
+root = ["./"]
+
+[tool.ty.src]
+include = [".github", "packages", "scripts", "tests"]
+
+[tool.ruff]
+fix = true
+line-length = 120
+src = [".github", "packages", "scripts", "tests"]
+target-version = "py311"
+unsafe-fixes = true
+
+[tool.ruff.format]
+docstring-code-format = true
+line-ending = "lf"
+preview = true
+quote-style = "double"
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint]
+extend-select = [
+    "A",     # see: https://docs.astral.sh/ruff/rules/#flake8-builtins-a
+    "ANN",   # see: https://docs.astral.sh/ruff/rules/#flake8-annotations-ann
+    "ASYNC", # see: https://docs.astral.sh/ruff/rules/#flake8-async-async
+    "B",     # see: https://docs.astral.sh/ruff/rules/#flake8-bugbear-b
+    "BLE",   # see: https://docs.astral.sh/ruff/rules/#flake8-blind-except-ble
+    "C4",    # see: https://docs.astral.sh/ruff/rules/#flake8-comprehensions-c4
+    "C90",   # see: https://docs.astral.sh/ruff/rules/#mccabe-c90
+    "D",     # see: https://docs.astral.sh/ruff/rules/#pydocstyle-d
+    "DOC",   # see: https://docs.astral.sh/ruff/rules/#pydoclint-doc
+    "E",     # see: https://docs.astral.sh/ruff/rules/#error-e
+    "EXE",   # see: https://docs.astral.sh/ruff/rules/#flake8-executable-exe
+    "F",     # see: https://docs.astral.sh/ruff/rules/#pyflakes-f
+    "FA",    # see: https://docs.astral.sh/ruff/rules/#flake8-annotations-fa
+    "FAST",  # see: https://docs.astral.sh/ruff/rules/#fastapi-fast
+    "FLY",   # see: https://docs.astral.sh/ruff/rules/#flynt-fly
+    "FURB",  # see: https://docs.astral.sh/ruff/rules/#refurb-furb
+    "G201",  # see: https://docs.astral.sh/ruff/rules/logging-exc-info/
+    "G202",  # see: https://docs.astral.sh/ruff/rules/logging-redundant-exc-info/
+    "I",     # see: https://docs.astral.sh/ruff/rules/#isort-i
+    "N",     # see: https://docs.astral.sh/ruff/rules/#flake8-quotes-n
+    "PERF",  # see: https://docs.astral.sh/ruff/rules/#perflint-perf
+    "PGH",   # see: https://docs.astral.sh/ruff/rules/#pygrep-hooks-pgh
+    "PIE",   # see: https://docs.astral.sh/ruff/rules/#flake8-pie-pie
+    "PL",    # see: https://docs.astral.sh/ruff/rules/#pyflakes-f
+    "PT",    # see: https://docs.astral.sh/ruff/rules/#flake8-pytest-style-pt
+    "PTH",   # see: https://docs.astral.sh/ruff/rules/#flake8-use-pathlib-pth
+    "PYI",   # see: https://docs.astral.sh/ruff/rules/#flake8-pyi-pyi
+    "Q",     # see: https://docs.astral.sh/ruff/rules/#flake8-quotes-q
+    "RET",   # see: https://docs.astral.sh/ruff/rules/#flake8-return-ret
+    "RSE",   # see: https://docs.astral.sh/ruff/rules/#flake8-raise-rse
+    "RUF",   # see: https://docs.astral.sh/ruff/rules/#ruff-ruf
+    "S",     # see: https://docs.astral.sh/ruff/rules/#flake8-bandit-s
+    "SIM",   # see: https://docs.astral.sh/ruff/rules/#flake8-simplify-sim
+    "SLF",   # see: https://docs.astral.sh/ruff/rules/#flake8-self-slf
+    "SLOT",  # see: https://docs.astral.sh/ruff/rules/#flake8-slots-slot
+    "T10",   # see: https://docs.astral.sh/ruff/rules/#flake8-debugger-t10
+    "T20",   # see: https://docs.astral.sh/ruff/rules/#flake8-typing-t20
+    "TC",    # see: https://docs.astral.sh/ruff/rules/#flake8-type-checking-tc
+    "TRY",   # see: https://docs.astral.sh/ruff/rules/#tryceratops-try
+    "UP",    # see: https://docs.astral.sh/ruff/rules/#pyupgrade-up
+    "W",     # see: https://docs.astral.sh/ruff/rules/#warning-w
+    "YTT",   # see: https://docs.astral.sh/ruff/rules/#flake8-2020-ytt
+]
+ignore = [
+    "COM812",  # Missing trailing comma
+    "COM819",  # Missing trailing comma
+    "D107",    # Missing docstring in __init__
+    "D415",    # First line should end with a period
+    "DOC501",  # Raised exception {id} missing from docstring
+    "DOC502",  # Raised exception is not explicitly raised
+    "E111",    # Indentation is not a multiple of four
+    "E117",    # Over-indented for visual indent
+    "E203",    # whitespace before ':'
+    "E402",    # todo: use noqa per line
+    "E501",    # Line length exceeds maximum limit
+    "E501",    # Line too long ({width} > {limit})
+    "EXE003",  # Shebang should contain python, pytest, or uv run (doesn't handle global arguments)
+    "N815",    # Suppress camelCase in external schema fields (AgentFrontmatter)
+    "PLR0913", # Too many arguments - acceptable for internal APIs
+    "PLR6301", # Method could be function - acceptable for API design
+    "Q000",    # Remove bad quotes
+    "Q001",    # Remove bad quotes
+    "Q002",    # Remove bad quotes
+    "Q003",    # Remove bad quotes
+    "S310",
+    "S404",    # subprocess possibly insecure - still need to use subprocess though
+    "S603",    # subprocess without shell=True
+    "S606",    # os.exec* without shell - intentional for privilege elevation (safer than with shell)
+    "T201",    # print() statements are intentional for CI output visibility
+    "TRY003",  # Exception message should not be too long
+]
+preview = true
+unfixable = ["F401"]
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+force-single-line = false
+force-wrap-aliases = false
+required-imports = ["from __future__ import annotations"]
+split-on-trailing-comma = false
+
+[tool.ruff.lint.mccabe]
+max-complexity = 12
+
+[tool.ruff.lint.per-file-ignores]
+"**/scripts/**" = [
+    "T201", # print() statements are intentional for CI output visibility
+]
+"**/tests/**" = [
+    "ANN",  # Type annotations optional for test fixtures/methods
+    "D",    # Docstring requirements relaxed for tests
+    "DOC",  # Docstring content requirements relaxed
+    "E501", # Line length relaxed for test data
+    "EXE",  # Shebang executable check skipped for PEP723 test files
+    "N",    # camelCase in test names acceptable when testing API fields
+    "PLC",  # Local imports acceptable in test helpers
+    "PLR",  # Testing private methods is valid test pattern
+    "S",    # Security checks not needed in tests
+    "SLF",  # Private name imports acceptable for testing internals
+    "T",    # print() statements are intentional for CI output visibility
+]
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 120
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+exclude = [".*"]
+
+[tool.basedpyright]
+typeCheckingMode = "off"
+
+[tool.semantic_release]
+allow_zero_version = true
+build_command = "uv build"
+major_on_zero = true
+tag_format = "v{version}"
+version_toml = []
+
+[tool.semantic_release.branches.main]
+match = "(main|master)"
+prerelease = false
+
+[tool.semantic_release.commit_parser_options]
+allowed_tags = [
+    "build",
+    "chore",
+    "ci",
+    "docs",
+    "feat",
+    "fix",
+    "perf",
+    "refactor",
+    "style",
+    "test",
+]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf", "refactor"]

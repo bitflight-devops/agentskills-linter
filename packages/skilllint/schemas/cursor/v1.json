@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "skilllint/schemas/cursor/v1.json",
+  "title": "Cursor Platform Schema v1",
+  "description": "Bundled schema snapshot for Cursor platform files (.mdc rules, SKILL.md). Accessed via importlib.resources.files() at runtime.",
+  "version": "1.0.0",
+  "platform": "cursor",
+  "file_types": {
+    "mdc": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Cursor MDC Rule Frontmatter",
+      "type": "object",
+      "x-audited": {
+        "date": "2026-03-10",
+        "source": ".claude/vendor/cursor/rules.md"
+      },
+      "required": [],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".claude/vendor/cursor/rules.md"
+          }
+        },
+        "globs": {
+          "type": "string",
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".claude/vendor/cursor/rules.md"
+          }
+        },
+        "alwaysApply": {
+          "type": "boolean",
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".claude/vendor/cursor/rules.md"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "skill_md": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Cursor SKILL.md Frontmatter (agentskills.io)",
+      "type": "object",
+      "x-audited": {
+        "date": "2026-03-10",
+        "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
+      },
+      "required": ["name", "description"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
+          }
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024,
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
+          }
+        },
+        "license": {
+          "type": "string",
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
+          }
+        },
+        "metadata": {
+          "type": "object",
+          "x-audited": {
+            "date": "2026-03-10",
+            "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
+          }
+        }
+      },
+      "additionalProperties": true
+    }
+  }
+}

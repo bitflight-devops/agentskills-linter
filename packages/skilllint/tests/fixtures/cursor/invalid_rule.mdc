@@ -1,0 +1,7 @@
+---
+type: rule
+---
+
+# Invalid Rule
+
+This .mdc file contains an unknown frontmatter field ("type") which is not part of the documented Cursor .mdc schema (description, globs, alwaysApply).

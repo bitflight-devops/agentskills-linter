@@ -1,0 +1,19 @@
+.worktrees
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+dist/
+*.egg-info/
+.coverage
+.coverage*
+.hypothesis/
+
+# Platform documentation vendor clones (raw git repos, updated in-place)
+# Ignore contents but not the directory itself (so CLAUDE.md can be tracked)
+.claude/vendor/*
+!.claude/vendor/CLAUDE.md
+.claude/worktrees
+.claude/reports/*

@@ -1,0 +1,5 @@
+prefix_rule(
+    pattern = "*.py",
+    decision = "allow",
+    justification = "All Python files are allowed"
+)

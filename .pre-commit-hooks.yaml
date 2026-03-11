@@ -1,0 +1,7 @@
+- id: skilllint
+  name: skilllint
+  description: Validate AI agent plugins, skills, and agents
+  language: python
+  entry: skilllint
+  types_or: [markdown, json, yaml]
+  pass_filenames: true

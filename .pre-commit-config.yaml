@@ -1,0 +1,124 @@
+# prek - Pre-commit Re-engineered in Rust
+# install via: `uv tool install prek`
+# prek is a Rust-based drop-in replacement for pre-commit created by https://github.com/j178/prek
+# Sources:
+# - https://github.com/j178/prek
+# - https://prek.j178.dev/
+# - https://pypi.org/project/prek/
+# - https://hugovk.dev/blog/2025/ready-prek-go/
+# - https://pydevtools.com/blog/prek-pre-commit-but-fast/
+
+default_stages:
+  - commit-msg
+  - pre-commit
+
+repos:
+  - repo: https://github.com/mxr/sync-pre-commit-deps
+    rev: v0.0.3
+    hooks:
+      - id: sync-pre-commit-deps
+
+  # prek now correctly passes commit message file path (issue #1194 fixed)
+  - repo: local
+    hooks:
+      - id: conventional-pre-commit
+        name: Conventional Commit
+        stages: [commit-msg]
+        language: system
+        always_run: true
+        entry: uv run --with conventional-pre-commit conventional-pre-commit --strict --force-scope
+
+  # Standard pre-commit hooks for general file maintenance
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: destroyed-symlinks
+        name: Detect destroyed symlinks
+        description: fails if symlinks were converted to plain files (run after repair-symlinks)
+      - id: trailing-whitespace
+        exclude: (\.(lock|json|toml|ya?ml)$|.gsd/)
+      - id: check-yaml
+        args: [--unsafe] # Allow Python tags in mkdocs.yml
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: ["--maxkb=10000"] # 10MB limit
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  # TOML sorting and formatting
+  - repo: https://github.com/bitflight-devops/pyproject-fmt
+    rev: v1.1.5
+    hooks:
+      - id: pypfmt
+        name: Sort and format pyproject.toml with pypfmt
+        files: ^pyproject\.toml$
+
+  # Python formatting and linting
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.5
+    hooks:
+      - id: ruff
+        name: Lint Python with ruff
+        args: [--fix]
+      - id: ruff-format
+        name: Format Python with ruff
+  # JavaScript/TypeScript formatting and linting with Biome
+  - repo: https://github.com/biomejs/pre-commit
+    rev: "v2.4.6"
+    hooks:
+      - id: biome-check
+        exclude: ^(\.?plan(ning)?/|\.claude/backlog/|\.claude/get-shit-done|\.claude/hooks/gsd-.*)
+
+  - repo: https://github.com/DavidAnson/markdownlint-cli2
+    rev: v0.21.0
+    hooks:
+      - id: markdownlint-cli2
+        exclude: ^(plan/|\.claude/|.planning/)
+
+  # Shell formatting
+  - repo: https://github.com/pecigonzalo/pre-commit-shfmt
+    rev: v2.2.0
+    hooks:
+      - id: shell-fmt-go
+        args:
+          - "--apply-ignore"
+          - -w
+          - -i
+          - "4"
+          - -ci
+
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.11.0.1
+    hooks:
+      - id: shellcheck
+
+  # Local hooks for type checking
+  - repo: local
+    hooks:
+
+      - id: ty
+        name: ty check
+        entry: uv run -q ty check
+        language: system
+        types: [python]
+        pass_filenames: true
+
+      - id: enable-rerere
+        name: Enable git rerere (auto-replay conflict resolutions)
+        entry: bash -c 'git config rerere.enabled true && git config rerere.autoupdate true'
+        language: system
+        stages: [pre-rebase, post-merge]
+        always_run: true
+        pass_filenames: false
+
+
+# Configuration for specific hooks
+default_language_version:
+  python: python3
+
+exclude: ^(\.?plan(ning)?/|\.claude/backlog/|\.claude/get-shit-done|\.claude/hooks/gsd-.*|\.gsd/)
