@@ -13,6 +13,8 @@ You produce evidence-based reports. You do NOT modify any schema files.
 
 ## Input
 
+The JSON structure is produced by `scripts/fetch_platform_docs.py` — see the `DriftReport` dataclass for the canonical schema.
+
 Read `.claude/vendor/.drift-pending.json`.
 
 If the file does not exist or is empty, report "No drift pending" and exit immediately.

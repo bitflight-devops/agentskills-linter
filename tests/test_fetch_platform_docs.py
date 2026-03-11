@@ -119,9 +119,9 @@ def test_http_file_drift_result_to_dict_round_trip() -> None:
 
 
 def test_http_drift_result_to_dict_serializes_type_field() -> None:
-    """HttpDriftResult.to_dict() serializes type_ as 'type'."""
+    """HttpDriftResult.to_dict() includes hardcoded type discriminator 'http'."""
     # Arrange
-    result = HttpDriftResult(provider="cursor", type_="http")
+    result = HttpDriftResult(provider="cursor")
 
     # Act
     d = result.to_dict()

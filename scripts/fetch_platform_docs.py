@@ -52,7 +52,7 @@ class HttpFileDriftResult:
     before_content: str
     after_content: str
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, object]:
         """Serialize to a JSON-compatible dictionary.
 
         Returns:
@@ -72,22 +72,20 @@ class HttpDriftResult:
     """Drift result for an HTTP doc-site platform."""
 
     provider: str
-    type_: str = "http"
     files: list[HttpFileDriftResult] = field(default_factory=list)
     changelog: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         """Serialize to a JSON-compatible dictionary.
 
-        The ``type_`` field is serialized as ``"type"`` to avoid
-        clashing with the Python builtin.
+        Includes ``"type": "http"`` to distinguish from git results.
 
         Returns:
-            Dictionary with all fields.
+            Dictionary with all fields plus a ``type`` discriminator.
         """
         return {
+            "type": "http",
             "provider": self.provider,
-            "type": self.type_,
             "files": [f.to_dict() for f in self.files],
             "changelog": self.changelog,
         }
@@ -103,7 +101,7 @@ class GitDriftResult:
     diff: str = ""
     changelog: str = ""
 
-    def to_dict(self) -> dict[str, str]:
+    def to_dict(self) -> dict[str, object]:
         """Serialize to a JSON-compatible dictionary.
 
         Includes ``"type": "git"`` to distinguish from HTTP results.
