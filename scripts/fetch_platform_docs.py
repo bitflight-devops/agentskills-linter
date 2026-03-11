@@ -203,11 +203,17 @@ class DocPage:
 class DocSitePlatform:
     """A platform whose docs are fetched page-by-page via HTTP."""
 
-    __slots__ = ("name", "pages")
+    __slots__ = ("name", "pages", "releases_url")
 
-    def __init__(self, name: str, pages: list[DocPage]) -> None:
+    def __init__(
+        self,
+        name: str,
+        pages: list[DocPage],
+        releases_url: str | None = None,
+    ) -> None:
         self.name = name
         self.pages = pages
+        self.releases_url = releases_url
 
 
 GIT_PLATFORMS: list[GitPlatform] = [
@@ -225,6 +231,7 @@ DOC_SITE_PLATFORMS: list[DocSitePlatform] = [
         [
             DocPage("https://cursor.com/docs/context/rules", "rules.md"),
         ],
+        releases_url="https://www.cursor.com/changelog",
     ),
     DocSitePlatform(
         "copilot_cli",
@@ -238,6 +245,7 @@ DOC_SITE_PLATFORMS: list[DocSitePlatform] = [
                 "using-copilot-cli.md",
             ),
         ],
+        releases_url="https://github.com/github/copilot-cli/releases",
     ),
 ]
 
@@ -270,12 +278,41 @@ def _run_git(
     )
 
 
-def clone_or_update_repo(platform: GitPlatform, *, dry_run: bool) -> None:
+def _git_head_sha(repo_dir: Path) -> str | None:
+    """Return the HEAD commit SHA for a git repository.
+
+    Args:
+        repo_dir: Path to the git repository root.
+
+    Returns:
+        The 40-character hex SHA, or None if the directory is not a git repo
+        or does not exist.
+    """
+    if not (repo_dir / ".git").is_dir():
+        return None
+    try:
+        result = _run_git(["rev-parse", "HEAD"], cwd=repo_dir)
+    except subprocess.CalledProcessError:
+        return None
+    return result.stdout.strip() or None
+
+
+def clone_or_update_repo(
+    platform: GitPlatform, *, dry_run: bool
+) -> GitDriftResult | None:
     """Clone a repo on first run, or pull updates on subsequent runs.
+
+    Captures the HEAD SHA before and after the git operation. When both
+    SHAs are present and differ, a ``GitDriftResult`` with the diff and
+    changelog between the two commits is returned.
 
     Args:
         platform: The git platform to clone/update.
         dry_run: If True, log what would happen without side effects.
+
+    Returns:
+        A ``GitDriftResult`` when vendor content changed, or ``None`` when
+        there is no change, dry-run mode, or first clone (no *before* SHA).
     """
     dest = VENDOR_DIR / platform.name
 
@@ -284,7 +321,9 @@ def clone_or_update_repo(platform: GitPlatform, *, dry_run: bool) -> None:
         console.print(
             f"  [dim]:fast-forward_button: dry-run: would git {action}[/dim] {platform.name}"
         )
-        return
+        return None
+
+    before_sha = _git_head_sha(dest)
 
     VENDOR_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -319,18 +358,68 @@ def clone_or_update_repo(platform: GitPlatform, *, dry_run: bool) -> None:
         )
         _ = _run_git(["clone", "--quiet", "--depth", "1", platform.url, str(dest)])
 
+    after_sha = _git_head_sha(dest)
+
+    # First clone (no before_sha) or no change — nothing to report
+    if before_sha is None or after_sha is None or before_sha == after_sha:
+        return None
+
+    # Capture doc-relevant diff and changelog between the two SHAs
+    try:
+        diff_result = _run_git(
+            [
+                "diff",
+                f"{before_sha}..{after_sha}",
+                "--",
+                "*.md",
+                "docs/",
+                "CLAUDE.md",
+            ],
+            cwd=dest,
+        )
+        diff_output = diff_result.stdout
+    except subprocess.CalledProcessError:
+        diff_output = ""
+
+    try:
+        log_result = _run_git(
+            ["log", "--oneline", f"{before_sha}..{after_sha}"],
+            cwd=dest,
+        )
+        log_output = log_result.stdout.strip()
+    except subprocess.CalledProcessError:
+        log_output = ""
+
+    return GitDriftResult(
+        provider=platform.name,
+        before_sha=before_sha,
+        after_sha=after_sha,
+        diff=diff_output,
+        changelog=log_output,
+    )
+
 
 # ---------------------------------------------------------------------------
 # HTTP doc fetching
 # ---------------------------------------------------------------------------
 
 
-def fetch_doc_site(platform: DocSitePlatform, *, dry_run: bool) -> None:
+def fetch_doc_site(
+    platform: DocSitePlatform, *, dry_run: bool
+) -> HttpDriftResult | None:
     """Fetch markdown pages from a documentation website.
+
+    Compares fetched content against existing files to detect drift.
+    When changes are detected and a ``releases_url`` is configured,
+    the changelog page is fetched and included in the result.
 
     Args:
         platform: The doc-site platform with page URLs.
         dry_run: If True, log what would happen without side effects.
+
+    Returns:
+        An ``HttpDriftResult`` when at least one page changed, or
+        ``None`` when no changes were detected (or on dry-run / first fetch).
     """
     dest = VENDOR_DIR / platform.name
 
@@ -338,9 +427,11 @@ def fetch_doc_site(platform: DocSitePlatform, *, dry_run: bool) -> None:
         console.print(
             f"  [dim]:fast-forward_button: dry-run: would fetch {len(platform.pages)} pages for[/dim] {platform.name}"
         )
-        return
+        return None
 
     dest.mkdir(parents=True, exist_ok=True)
+
+    changed_files: list[HttpFileDriftResult] = []
 
     with httpx.Client(timeout=30.0, follow_redirects=True) as client:
         for page in platform.pages:
@@ -348,13 +439,57 @@ def fetch_doc_site(platform: DocSitePlatform, *, dry_run: bool) -> None:
                 f"  :globe_with_meridians: Fetching [cyan]{platform.name}[/cyan]/{page.filename}"
             )
             try:
+                # Snapshot existing content before fetch
+                existing_content = _read_text_or_none(dest / page.filename)
+                before_hash = (
+                    _sha256(existing_content) if existing_content is not None else None
+                )
+
                 response = client.get(page.url)
                 _ = response.raise_for_status()
-                _ = (dest / page.filename).write_text(response.text, encoding="utf-8")
+                new_content = response.text
+                after_hash = _sha256(new_content)
+
+                # Write the new content
+                _ = (dest / page.filename).write_text(new_content, encoding="utf-8")
+
+                # Detect drift: only when there was a previous file and hashes differ
+                if before_hash is not None and before_hash != after_hash:
+                    changed_files.append(
+                        HttpFileDriftResult(
+                            filename=page.filename,
+                            before_hash=before_hash,
+                            after_hash=after_hash,
+                            before_content=existing_content,  # type: ignore[arg-type]
+                            after_content=new_content,
+                        )
+                    )
             except httpx.HTTPError as exc:
                 err_console.print(
                     f"    [yellow]:warning: Failed to fetch {page.url}: {exc}[/yellow]"
                 )
+
+    if not changed_files:
+        return None
+
+    # Fetch changelog when changes detected and releases_url is set
+    changelog: str | None = None
+    if platform.releases_url:
+        try:
+            with httpx.Client(timeout=30.0, follow_redirects=True) as client:
+                resp = client.get(platform.releases_url)
+                _ = resp.raise_for_status()
+                changelog = resp.text
+        except httpx.HTTPError as exc:
+            err_console.print(
+                f"    [yellow]:warning: Failed to fetch changelog {platform.releases_url}: {exc}[/yellow]"
+            )
+
+    return HttpDriftResult(
+        provider=platform.name,
+        files=changed_files,
+        changelog=changelog,
+    )
 
 
 # ---------------------------------------------------------------------------
