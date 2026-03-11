@@ -568,6 +568,10 @@ def test_clone_or_update_repo_detects_change_returns_drift_result(
             return subprocess.CompletedProcess(
                 args=args, returncode=0, stdout="", stderr=""
             )
+        if args[0] == "fetch" and "--unshallow" in args:
+            return subprocess.CompletedProcess(
+                args=args, returncode=0, stdout="", stderr=""
+            )
         if args[0] == "diff":
             return subprocess.CompletedProcess(
                 args=args,
@@ -590,6 +594,9 @@ def test_clone_or_update_repo_detects_change_returns_drift_result(
         "scripts.fetch_platform_docs._run_git",
         side_effect=fake_run_git,
     )
+
+    # Create .git/shallow to simulate a shallow clone
+    (dest / ".git" / "shallow").touch()
 
     # Act
     result = clone_or_update_repo(platform, dry_run=False)
@@ -641,6 +648,142 @@ def test_clone_or_update_repo_no_change_returns_none(
 
     # Assert
     assert result is None
+
+
+def test_clone_or_update_repo_unshallows_before_diff(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
+    """Run ``git fetch --unshallow`` when .git/shallow exists before diffing.
+
+    Tests: clone_or_update_repo unshallows a shallow clone so before_sha is
+        reachable for git diff and git log.
+    How: Set up a fake repo with .git/shallow present, mock _run_git and
+        _git_head_sha to simulate a SHA change, then verify that the
+        ``fetch --unshallow`` call was made before diff/log.
+    Why: Shallow clones created with ``--depth 1`` do not retain older commits.
+        After a pull the before_sha becomes unreachable, causing git diff and
+        git log to fail. Unshallowing restores full history.
+    """
+    # Arrange
+    vendor_dir = tmp_path / "vendor"
+    platform = _make_git_platform()
+    dest = vendor_dir / platform.name
+    dest.mkdir(parents=True)
+    (dest / ".git").mkdir()
+    (dest / ".git" / "shallow").touch()
+
+    before_sha = "aaaa" * 10
+    after_sha = "bbbb" * 10
+
+    mocker.patch("scripts.fetch_platform_docs.VENDOR_DIR", vendor_dir)
+
+    sha_call_count = 0
+
+    def fake_git_head_sha(repo_dir: Path) -> str | None:
+        nonlocal sha_call_count
+        sha_call_count += 1
+        if sha_call_count == 1:
+            return before_sha
+        return after_sha
+
+    mocker.patch(
+        "scripts.fetch_platform_docs._git_head_sha",
+        side_effect=fake_git_head_sha,
+    )
+
+    git_calls: list[list[str]] = []
+
+    def fake_run_git(
+        args: list[str], *, cwd: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        git_calls.append(args)
+        return subprocess.CompletedProcess(
+            args=args, returncode=0, stdout="", stderr=""
+        )
+
+    mocker.patch(
+        "scripts.fetch_platform_docs._run_git",
+        side_effect=fake_run_git,
+    )
+
+    # Act
+    _ = clone_or_update_repo(platform, dry_run=False)
+
+    # Assert — fetch --unshallow was called
+    unshallow_calls = [c for c in git_calls if c == ["fetch", "--unshallow"]]
+    assert len(unshallow_calls) == 1, (
+        f"Expected exactly 1 unshallow call, got {git_calls}"
+    )
+
+    # Assert — unshallow happens before diff and log
+    call_commands = [c[0] for c in git_calls]
+    unshallow_idx = next(i for i, c in enumerate(git_calls) if "--unshallow" in c)
+    diff_indices = [i for i, c in enumerate(git_calls) if c[0] == "diff"]
+    log_indices = [i for i, c in enumerate(git_calls) if c[0] == "log"]
+    for idx in diff_indices + log_indices:
+        assert unshallow_idx < idx, (
+            f"unshallow (index {unshallow_idx}) must precede "
+            f"diff/log (index {idx}), calls: {call_commands}"
+        )
+
+
+def test_clone_or_update_repo_skips_unshallow_when_not_shallow(
+    tmp_path: Path, mocker: MockerFixture
+) -> None:
+    """Skip ``git fetch --unshallow`` when .git/shallow does not exist.
+
+    Tests: clone_or_update_repo does not unshallow a full clone.
+    How: Set up a fake repo WITHOUT .git/shallow, mock SHA change, verify
+        no fetch --unshallow call is made.
+    """
+    # Arrange
+    vendor_dir = tmp_path / "vendor"
+    platform = _make_git_platform()
+    dest = vendor_dir / platform.name
+    dest.mkdir(parents=True)
+    (dest / ".git").mkdir()
+    # No .git/shallow file — this is a full clone
+
+    before_sha = "aaaa" * 10
+    after_sha = "bbbb" * 10
+
+    mocker.patch("scripts.fetch_platform_docs.VENDOR_DIR", vendor_dir)
+
+    sha_call_count = 0
+
+    def fake_git_head_sha(repo_dir: Path) -> str | None:
+        nonlocal sha_call_count
+        sha_call_count += 1
+        if sha_call_count == 1:
+            return before_sha
+        return after_sha
+
+    mocker.patch(
+        "scripts.fetch_platform_docs._git_head_sha",
+        side_effect=fake_git_head_sha,
+    )
+
+    git_calls: list[list[str]] = []
+
+    def fake_run_git(
+        args: list[str], *, cwd: Path | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        git_calls.append(args)
+        return subprocess.CompletedProcess(
+            args=args, returncode=0, stdout="", stderr=""
+        )
+
+    mocker.patch(
+        "scripts.fetch_platform_docs._run_git",
+        side_effect=fake_run_git,
+    )
+
+    # Act
+    _ = clone_or_update_repo(platform, dry_run=False)
+
+    # Assert — no unshallow call
+    unshallow_calls = [c for c in git_calls if "--unshallow" in c]
+    assert len(unshallow_calls) == 0, f"Unexpected unshallow call in {git_calls}"
 
 
 def test_clone_or_update_repo_first_clone_returns_none(

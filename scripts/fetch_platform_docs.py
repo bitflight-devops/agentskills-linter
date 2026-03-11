@@ -364,6 +364,10 @@ def clone_or_update_repo(
     if before_sha is None or after_sha is None or before_sha == after_sha:
         return None
 
+    # Unshallow if needed so before_sha is reachable for diff/log
+    if (dest / ".git" / "shallow").exists():
+        _ = _run_git(["fetch", "--unshallow"], cwd=dest)
+
     # Capture doc-relevant diff and changelog between the two SHAs
     try:
         diff_result = _run_git(
@@ -455,12 +459,13 @@ def fetch_doc_site(
 
                 # Detect drift: only when there was a previous file and hashes differ
                 if before_hash is not None and before_hash != after_hash:
+                    assert existing_content is not None
                     changed_files.append(
                         HttpFileDriftResult(
                             filename=page.filename,
                             before_hash=before_hash,
                             after_hash=after_hash,
-                            before_content=existing_content,  # type: ignore[arg-type]
+                            before_content=existing_content,
                             after_content=new_content,
                         )
                     )
