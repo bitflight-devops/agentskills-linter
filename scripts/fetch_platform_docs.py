@@ -188,7 +188,7 @@ def _write_drift_report(report: DriftReport) -> None:
         report: The drift report to persist.
     """
     DRIFT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    DRIFT_FILE.write_text(
+    _ = DRIFT_FILE.write_text(
         json.dumps(report.to_dict(), indent=2) + "\n",
         encoding="utf-8",
     )
@@ -602,8 +602,7 @@ def fetch(
         provider_names = ", ".join(r.provider for r in changed_results)
         console.print(
             Panel(
-                f"Providers with changes: [bold]{provider_names}[/bold]\n"
-                f"Report written to: {DRIFT_FILE}",
+                f"Providers with changes: [bold]{provider_names}[/bold]\nReport written to: {DRIFT_FILE}",
                 title=":warning: Vendor Drift Detected",
                 border_style="yellow",
             )
