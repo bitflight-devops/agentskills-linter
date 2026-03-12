@@ -195,3 +195,4 @@ jobs:
         uses: python-semantic-release/python-semantic-release@v9.21.1
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
+          build_command: pip install build && python -m build
