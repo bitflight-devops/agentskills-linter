@@ -79,7 +79,7 @@ jobs:
         run: uv sync
 
       - name: Type check with ty
-        run: uv run ty check packages/
+        run: uv run ty check packages/ --output-format github
 
   test:
     name: Tests (Python ${{ matrix.python-version }})
