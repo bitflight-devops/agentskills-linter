@@ -5236,58 +5236,7 @@ def main(
         ),
     ] = None,
 ) -> None:
-    """Validate Claude Code plugins, skills, agents, and commands.
-
-    Validates frontmatter schema, plugin structure, skill complexity, internal links,
-    and progressive disclosure. Optionally auto-fixes issues.
-
-    Supports token counting for any markdown file (CLAUDE.md, reference docs, etc.).
-
-    Accepts one or more paths (compatible with pre-commit pass_filenames).
-
-    Examples:
-        # Validate single file (silent on success)
-        ./plugin_validator.py path/to/SKILL.md
-
-        # Validate multiple files (pre-commit mode, silent on success)
-        ./plugin_validator.py file1.md file2.md file3.md
-
-        # Validate entire plugin
-        ./plugin_validator.py plugins/my-plugin
-
-        # Auto-fix issues
-        ./plugin_validator.py --fix path/to/SKILL.md
-
-        # Validate for CI (no color)
-        ./plugin_validator.py --no-color plugins/my-plugin
-
-        # Show per-file PASSED/FAILED status
-        ./plugin_validator.py --show-progress plugins/my-plugin
-
-        # Show summary panel at the end
-        ./plugin_validator.py --show-summary plugins/my-plugin
-
-        # Count tokens in any markdown file
-        ./plugin_validator.py --verbose .claude/CLAUDE.md
-
-        # Get just the token count for programmatic use
-        ./plugin_validator.py --tokens-only .claude/CLAUDE.md
-
-        # Token counts for all skills in a plugin directory (batch mode)
-        ./plugin_validator.py --tokens-only --filter-type=skills plugins/my-plugin
-
-        # Token counts matching a custom glob pattern
-        ./plugin_validator.py --tokens-only --filter='**/SKILL.md' ../other-repo
-
-    Exit Codes:
-        0: Success (all checks passed)
-        1: Validation errors found
-        2: Usage error (invalid arguments)
-        130: Interrupted by user (Ctrl+C)
-
-    Raises:
-        typer.Exit: If validation fails or arguments are invalid.
-    """
+    """Validate Claude Code plugins, skills, agents, and commands."""
     # Show help when no arguments provided
     if not paths:
         _show_help_and_exit(ctx, code=0)
