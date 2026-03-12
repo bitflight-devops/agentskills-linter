@@ -92,7 +92,7 @@ def test_third_party_adapter_discovery(mocker):
     mock_ep = mocker.MagicMock()
     mock_ep.load.return_value = FourthAdapter
 
-    mocker.patch("skilllint.adapters.importlib.metadata.entry_points", return_value=[mock_ep])
+    mocker.patch("skilllint.adapters.registry.importlib.metadata.entry_points", return_value=[mock_ep])
 
     adapters = load_adapters()
     adapter_ids = {a.id() for a in adapters}

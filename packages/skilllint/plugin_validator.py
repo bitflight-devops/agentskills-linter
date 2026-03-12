@@ -1283,37 +1283,23 @@ class NamespaceReferenceValidator:
         # Collect all references: (pattern_label, plugin, name, ref_type)
         references = self._extract_references(body)
 
+        # Build name→dir mapping once: reads plugin.json "name" from each plugin dir
+        # so that namespace resolution uses the declared name, not the directory name.
+        name_to_dir = self._build_plugin_name_map(plugins_root)
+
         for label, plugin, name, ref_type in references:
             # Skip template placeholders containing { or }
             if "{" in plugin or "}" in plugin or "{" in name or "}" in name:
                 continue
 
-            match ref_type:
-                case "skill":
-                    found = self._resolve_skill_reference(plugins_root, plugin, name)
-                    expected = (
-                        f"plugins/{plugin}/skills/{name}/SKILL.md "
-                        f"or plugins/{plugin}/skills/{{category}}/{name}/SKILL.md"
-                    )
-                case "agent":
-                    # Skip built-in agent names
-                    if name in self.BUILTIN_AGENTS or plugin in self.BUILTIN_AGENTS:
-                        continue
-                    found = self._resolve_agent_reference(plugins_root, plugin, name)
-                    expected = f"plugins/{plugin}/agents/{name}.md"
-                case "command":
-                    found = self._resolve_command_reference(plugins_root, plugin, name)
-                    expected = (
-                        f"plugins/{plugin}/skills/{name}/SKILL.md, "
-                        f"plugins/{plugin}/skills/{{category}}/{name}/SKILL.md, "
-                        f"or plugins/{plugin}/commands/{name}.md"
-                    )
-                case _:
-                    continue
+            # Skip built-in agent names before directory resolution so they are
+            # not reported as missing plugin directories.
+            if name in self.BUILTIN_AGENTS or plugin in self.BUILTIN_AGENTS:
+                continue
 
-            # Check if the reference target is inside the plugins root
-            plugin_dir = plugins_root / plugin
-            if not plugin_dir.is_dir():
+            # Resolve the plugin directory via plugin.json name mapping
+            plugin_dir = name_to_dir.get(plugin)
+            if plugin_dir is None:
                 errors.append(
                     ValidationIssue(
                         field="namespace-reference",
@@ -1331,6 +1317,26 @@ class NamespaceReferenceValidator:
                     )
                 )
                 continue
+
+            match ref_type:
+                case "skill":
+                    found = self._resolve_skill_reference(plugin_dir, name)
+                    expected = (
+                        f"plugins/{plugin}/skills/{name}/SKILL.md "
+                        f"or plugins/{plugin}/skills/{{category}}/{name}/SKILL.md"
+                    )
+                case "agent":
+                    found = self._resolve_agent_reference(plugin_dir, name)
+                    expected = f"plugins/{plugin}/agents/{name}.md"
+                case "command":
+                    found = self._resolve_command_reference(plugin_dir, name)
+                    expected = (
+                        f"plugins/{plugin}/skills/{name}/SKILL.md, "
+                        f"plugins/{plugin}/skills/{{category}}/{name}/SKILL.md, "
+                        f"or plugins/{plugin}/commands/{name}.md"
+                    )
+                case _:
+                    continue
 
             if not found:
                 errors.append(
@@ -1448,33 +1454,71 @@ class NamespaceReferenceValidator:
                         pass
         return result
 
-    def _resolve_skill_reference(self, plugins_root: Path, plugin: str, name: str) -> bool:
+    @staticmethod
+    def _build_plugin_name_map(plugins_root: Path) -> dict[str, Path]:
+        """Build a mapping from plugin declared name to plugin directory path.
+
+        Scans each subdirectory of ``plugins_root`` and reads the ``"name"``
+        field from ``.claude-plugin/plugin.json`` (falling back to the
+        directory name when the file is absent or unparseable).  This ensures
+        that namespace references are resolved against the plugin's declared
+        name rather than its on-disk directory name.
+
+        Args:
+            plugins_root: Path to the ``plugins/`` directory
+
+        Returns:
+            Mapping of ``{declared_name: plugin_dir_path}`` for every plugin
+            directory found under ``plugins_root``
+        """
+        name_to_dir: dict[str, Path] = {}
+        if not plugins_root.is_dir():
+            return name_to_dir
+
+        for entry in plugins_root.iterdir():
+            if not entry.is_dir():
+                continue
+            # Attempt to read the declared name from plugin.json
+            plugin_json = entry / ".claude-plugin" / "plugin.json"
+            declared_name: str | None = None
+            if plugin_json.is_file():
+                try:
+                    data = json.loads(plugin_json.read_text(encoding="utf-8"))
+                    if isinstance(data, dict) and isinstance(data.get("name"), str):
+                        declared_name = data["name"]
+                except (OSError, ValueError):
+                    pass
+            # Fall back to directory name when plugin.json is absent/invalid
+            name_to_dir[declared_name or entry.name] = entry
+
+        return name_to_dir
+
+    def _resolve_skill_reference(self, plugin_dir: Path, name: str) -> bool:
         """Check if a skill reference resolves to an existing file.
 
         Checks direct path and nested (category) paths. Resolves symlinks and
         Git pointer files (Windows) before existence checks.
 
         Args:
-            plugins_root: Path to the ``plugins/`` directory
-            plugin: Plugin name (namespace prefix)
+            plugin_dir: Path to the resolved plugin directory
             name: Skill name
 
         Returns:
             True if the skill SKILL.md exists at any valid location
         """
-        # Direct: plugins/{plugin}/skills/{name}/SKILL.md
-        skill_dir = plugins_root / plugin / "skills" / name
+        # Direct: {plugin_dir}/skills/{name}/SKILL.md
+        skill_dir = plugin_dir / "skills" / name
         resolved_dir = self._resolve_to_directory(skill_dir)
         if resolved_dir is not None and (resolved_dir / "SKILL.md").is_file():
             return True
 
         # Also check direct path (real symlinks resolve via resolve())
-        direct = plugins_root / plugin / "skills" / name / "SKILL.md"
+        direct = plugin_dir / "skills" / name / "SKILL.md"
         if direct.is_file():
             return True
 
-        # Nested: plugins/{plugin}/skills/*/{name}/SKILL.md
-        nested_pattern = plugins_root / plugin / "skills"
+        # Nested: {plugin_dir}/skills/*/{name}/SKILL.md
+        nested_pattern = plugin_dir / "skills"
         if nested_pattern.is_dir():
             for category_dir in nested_pattern.iterdir():
                 resolved_cat = self._resolve_to_directory(category_dir)
@@ -1488,39 +1532,37 @@ class NamespaceReferenceValidator:
 
         return False
 
-    def _resolve_agent_reference(self, plugins_root: Path, plugin: str, name: str) -> bool:
+    def _resolve_agent_reference(self, plugin_dir: Path, name: str) -> bool:
         """Check if an agent reference resolves to an existing file.
 
         Args:
-            plugins_root: Path to the ``plugins/`` directory
-            plugin: Plugin name (namespace prefix)
+            plugin_dir: Path to the resolved plugin directory
             name: Agent name
 
         Returns:
             True if the agent .md file exists
         """
-        agent_path = plugins_root / plugin / "agents" / f"{name}.md"
+        agent_path = plugin_dir / "agents" / f"{name}.md"
         return agent_path.is_file()
 
-    def _resolve_command_reference(self, plugins_root: Path, plugin: str, name: str) -> bool:
+    def _resolve_command_reference(self, plugin_dir: Path, name: str) -> bool:
         """Check if a command/slash-command reference resolves to an existing file.
 
         Slash command references can resolve to skills or commands.
 
         Args:
-            plugins_root: Path to the ``plugins/`` directory
-            plugin: Plugin name (namespace prefix)
+            plugin_dir: Path to the resolved plugin directory
             name: Command or skill name
 
         Returns:
             True if the target exists as a skill or command
         """
         # Check as skill first (most common)
-        if self._resolve_skill_reference(plugins_root, plugin, name):
+        if self._resolve_skill_reference(plugin_dir, name):
             return True
 
-        # Check as command: plugins/{plugin}/commands/{name}.md
-        command_path = plugins_root / plugin / "commands" / f"{name}.md"
+        # Check as command: {plugin_dir}/commands/{name}.md
+        command_path = plugin_dir / "commands" / f"{name}.md"
         return command_path.is_file()
 
     @staticmethod
@@ -3336,6 +3378,8 @@ class PluginStructureValidator:
         _git_bash_path()
 
         # Run claude plugin validate
+        # Unset CLAUDECODE so the subprocess is not treated as a nested CLI session.
+        subprocess_env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
         try:
             result = subprocess.run(
                 [claude_path, "plugin", "validate", str(plugin_dir)],
@@ -3343,6 +3387,7 @@ class PluginStructureValidator:
                 text=True,
                 timeout=CLAUDE_TIMEOUT,
                 check=False,
+                env=subprocess_env,
             )
 
             # Parse output for errors
@@ -4082,6 +4127,8 @@ def validate_with_claude(plugin_dir: Path) -> tuple[bool, str]:
         return True, "Not a plugin directory (skipped)"
 
     # Run claude plugin validate with security best practices
+    # Unset CLAUDECODE so the subprocess is not treated as a nested CLI session.
+    subprocess_env = {k: v for k, v in os.environ.items() if k != "CLAUDECODE"}
     try:
         result = subprocess.run(
             [claude_path, "plugin", "validate", str(plugin_dir)],
@@ -4089,6 +4136,7 @@ def validate_with_claude(plugin_dir: Path) -> tuple[bool, str]:
             text=True,
             timeout=CLAUDE_TIMEOUT,
             check=False,  # Handle non-zero exit code ourselves
+            env=subprocess_env,
         )
     except subprocess.TimeoutExpired:
         return (False, f"Claude plugin validation timed out after {CLAUDE_TIMEOUT} seconds")

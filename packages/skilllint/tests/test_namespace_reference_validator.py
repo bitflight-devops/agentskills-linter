@@ -765,3 +765,178 @@ class TestEdgeCases:
 
         # Should pass because file is not inside plugins/ tree
         assert result.passed is True
+
+
+class TestNR001NamespaceFromPluginJson:
+    """Test NR001 uses plugin.json 'name' field -- not directory name -- as namespace.
+
+    Bug: The current implementation derives the plugin namespace from the
+    directory name on disk (``plugins_root / plugin``).  The correct behavior
+    is to read the ``"name"`` field from ``.claude-plugin/plugin.json`` (or
+    ``plugin.json`` at the plugin root) and match namespace references against
+    that value.
+
+    When the directory name differs from the ``"name"`` field, NR001 fires
+    incorrectly because it cannot find a directory whose name matches the
+    namespace prefix in the reference.
+    """
+
+    @staticmethod
+    def _make_plugin_with_json_name(plugins_root: Path, dir_name: str, json_name: str) -> Path:
+        """Create a plugin whose directory name differs from its plugin.json name.
+
+        Args:
+            plugins_root: The ``plugins/`` directory
+            dir_name: Name of the directory on disk
+            json_name: Value of the ``"name"`` field in plugin.json
+
+        Returns:
+            Path to the plugin directory
+        """
+        import json as _json
+
+        plugin_dir = plugins_root / dir_name
+        plugin_dir.mkdir(parents=True, exist_ok=True)
+
+        # .claude-plugin/plugin.json is the canonical location
+        claude_plugin_dir = plugin_dir / ".claude-plugin"
+        claude_plugin_dir.mkdir(exist_ok=True)
+        plugin_json = claude_plugin_dir / "plugin.json"
+        plugin_json.write_text(_json.dumps({"name": json_name}))
+
+        return plugin_dir
+
+    def test_skill_reference_uses_plugin_json_name_not_dir_name(self, tmp_path: Path) -> None:
+        """NR001 must resolve namespace via plugin.json name, not directory name.
+
+        Tests: NR001 namespace derivation for skill references
+        How: Create plugin directory ``my-plugin-dir`` with plugin.json
+             ``{"name": "my-actual-plugin"}``, create a skill inside it,
+             then reference it as ``Skill(command: "my-actual-plugin:my-skill")``.
+             The validator should find the skill because the namespace
+             ``my-actual-plugin`` maps to the directory via plugin.json.
+        Why: The namespace in references must match the plugin.json name field,
+             not the on-disk directory name.  Directory names are an
+             implementation detail; plugin.json is the source of truth.
+
+        Expected: PASS (no NR001 errors)
+        Current (buggy): FAIL (NR001 fires because no directory named
+        ``my-actual-plugin`` exists -- only ``my-plugin-dir`` exists)
+        """
+        plugins_root = _make_plugins_root(tmp_path)
+
+        # Directory name != plugin.json name
+        plugin_dir = self._make_plugin_with_json_name(
+            plugins_root, dir_name="my-plugin-dir", json_name="my-actual-plugin"
+        )
+
+        # Create a valid skill inside this plugin
+        _make_skill(plugin_dir, "my-skill")
+
+        # Source file references the plugin by its plugin.json name
+        body = 'Invoke Skill(command: "my-actual-plugin:my-skill") here.\n'
+        source_skill = _make_skill_md_with_body(plugins_root, "source-plugin", body)
+
+        # Arrange complete -- Act
+        validator = NamespaceReferenceValidator()
+        result = validator.validate(source_skill)
+
+        # Assert: the reference should resolve successfully
+        assert result.passed is True, (
+            f"NR001 incorrectly fired.  The validator used the directory name "
+            f"'my-plugin-dir' instead of the plugin.json name 'my-actual-plugin' "
+            f"as the namespace.  Errors: {[e.message for e in result.errors]}"
+        )
+        assert len(result.errors) == 0
+
+    def test_agent_reference_uses_plugin_json_name_not_dir_name(self, tmp_path: Path) -> None:
+        """NR001 must resolve namespace via plugin.json name for agent references.
+
+        Tests: NR001 namespace derivation for agent references
+        How: Create plugin directory ``agent-plugin-dir`` with plugin.json
+             ``{"name": "agent-plugin"}``, create an agent inside it,
+             then reference it as ``@agent-plugin:my-agent``.
+        Why: Agent references use the same namespace resolution as skills.
+
+        Expected: PASS (no NR001 errors)
+        Current (buggy): FAIL (NR001 fires -- directory ``agent-plugin``
+        does not exist)
+        """
+        plugins_root = _make_plugins_root(tmp_path)
+
+        plugin_dir = self._make_plugin_with_json_name(
+            plugins_root, dir_name="agent-plugin-dir", json_name="agent-plugin"
+        )
+
+        _make_agent(plugin_dir, "my-agent")
+
+        body = "Delegate to @agent-plugin:my-agent for this task.\n"
+        source_skill = _make_skill_md_with_body(plugins_root, "source-plugin", body)
+
+        validator = NamespaceReferenceValidator()
+        result = validator.validate(source_skill)
+
+        assert result.passed is True, (
+            f"NR001 incorrectly fired for agent reference.  The validator used "
+            f"the directory name 'agent-plugin-dir' instead of the plugin.json "
+            f"name 'agent-plugin'.  Errors: {[e.message for e in result.errors]}"
+        )
+        assert len(result.errors) == 0
+
+    def test_slash_command_reference_uses_plugin_json_name_not_dir_name(self, tmp_path: Path) -> None:
+        """NR001 must resolve namespace via plugin.json name for slash commands.
+
+        Tests: NR001 namespace derivation for slash command references
+        How: Create plugin directory ``cmd-plugin-dir`` with plugin.json
+             ``{"name": "cmd-plugin"}``, create a skill inside it,
+             then reference it as ``/cmd-plugin:my-skill``.
+        Why: Slash command references use the same namespace resolution.
+
+        Expected: PASS (no NR001 errors)
+        Current (buggy): FAIL (NR001 fires)
+        """
+        plugins_root = _make_plugins_root(tmp_path)
+
+        plugin_dir = self._make_plugin_with_json_name(plugins_root, dir_name="cmd-plugin-dir", json_name="cmd-plugin")
+
+        _make_skill(plugin_dir, "my-skill")
+
+        body = "Run /cmd-plugin:my-skill to activate.\n"
+        source_skill = _make_skill_md_with_body(plugins_root, "source-plugin", body)
+
+        validator = NamespaceReferenceValidator()
+        result = validator.validate(source_skill)
+
+        assert result.passed is True, (
+            f"NR001 incorrectly fired for slash command reference.  The validator "
+            f"used the directory name 'cmd-plugin-dir' instead of the plugin.json "
+            f"name 'cmd-plugin'.  Errors: {[e.message for e in result.errors]}"
+        )
+        assert len(result.errors) == 0
+
+    def test_dir_name_reference_still_works_when_matching_json_name(self, tmp_path: Path) -> None:
+        """When directory name equals plugin.json name, references still resolve.
+
+        Tests: Backward compatibility -- matching names still work
+        How: Create plugin where dir name == plugin.json name, validate reference
+        Why: Regression guard -- the fix must not break the common case where
+             directory name and plugin.json name are identical.
+
+        Expected: PASS (always -- this is the common case)
+        """
+        plugins_root = _make_plugins_root(tmp_path)
+
+        plugin_dir = self._make_plugin_with_json_name(
+            plugins_root, dir_name="same-name-plugin", json_name="same-name-plugin"
+        )
+
+        _make_skill(plugin_dir, "my-skill")
+
+        body = 'Invoke Skill(command: "same-name-plugin:my-skill") here.\n'
+        source_skill = _make_skill_md_with_body(plugins_root, "source-plugin", body)
+
+        validator = NamespaceReferenceValidator()
+        result = validator.validate(source_skill)
+
+        assert result.passed is True
+        assert len(result.errors) == 0
