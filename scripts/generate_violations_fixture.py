@@ -127,7 +127,7 @@ triggers:
 
 
 def _fm007_frontmatter(n: int) -> str:
-    """Return frontmatter with ``tools:`` as a YAML list instead of CSV (FM007).
+    """Return frontmatter with ``allowed-tools:`` as a YAML list instead of CSV (FM007).
 
     Args:
         n: Skill number (1-based).
@@ -141,7 +141,7 @@ description: Benchmark violation skill number {n} for FM007 testing
 version: 1.0.0
 triggers:
   - when working on violations skill {n}
-tools:
+allowed-tools:
   - Read
   - Write
   - Edit"""
@@ -185,7 +185,7 @@ triggers:
 
 
 def _fm007_fm008_frontmatter(n: int) -> str:
-    """Return frontmatter with both ``tools:`` and ``skills:`` as YAML lists (FM007+FM008).
+    """Return frontmatter with both ``allowed-tools:`` and ``skills:`` as YAML lists (FM007+FM008).
 
     Args:
         n: Skill number (1-based).
@@ -199,7 +199,7 @@ description: Benchmark violation skill number {n} for FM007+FM008 testing
 version: 1.0.0
 triggers:
   - when working on violations skill {n}
-tools:
+allowed-tools:
   - Read
   - Write
   - Edit

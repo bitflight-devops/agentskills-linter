@@ -48,7 +48,7 @@ def extracted_plugin_dir(tmp_path_factory: pytest.TempPathFactory, benchmark_plu
     return extract_root
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def plugin_file_count(extracted_plugin_dir: Path) -> int:
     """Return the number of SKILL.md files inside the extracted plugin directory.
 

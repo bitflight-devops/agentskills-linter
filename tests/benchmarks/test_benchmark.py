@@ -9,8 +9,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import pytest
-
 
 def _get_git_info() -> tuple[str, str]:
     """Return the current git SHA and branch name.
@@ -49,13 +47,12 @@ def _write_result(results_path: Path, record: dict[str, Any]) -> None:
     results_path.parent.mkdir(parents=True, exist_ok=True)
 
     existing: list[dict[str, Any]] = []
-    if results_path.exists():
-        try:
-            existing = json.loads(results_path.read_text(encoding="utf-8"))
-            if not isinstance(existing, list):
-                existing = []
-        except (json.JSONDecodeError, OSError):
+    try:
+        existing = json.loads(results_path.read_text(encoding="utf-8"))
+        if not isinstance(existing, list):
             existing = []
+    except (FileNotFoundError, json.JSONDecodeError, OSError):
+        existing = []
 
     existing.append(record)
     results_path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
@@ -65,7 +62,6 @@ _RESULTS_FILE = Path(__file__).parent.parent.parent / "scripts" / "results" / "b
 _TIME_LIMIT_SECONDS = 120.0
 
 
-@pytest.mark.usefixtures("extracted_plugin_dir")
 def test_io_scan_1000_skills_timing(extracted_plugin_dir: Path, plugin_file_count: int) -> None:
     """Run skilllint against the 1000-skill fixture and record timing.
 

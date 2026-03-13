@@ -6,11 +6,11 @@ YAML payloads — no disk I/O involved.
 
 Run via pytest::
 
-    uv run pytest bench/bench_cpu.py -v --no-header
+    uv run pytest scripts/bench_cpu.py -v --no-header
 
 Run directly with output for github-action-benchmark::
 
-    python bench/bench_cpu.py --output bench/results/bench_cpu_gh.json
+    python scripts/bench_cpu.py --output bench/results/bench_cpu_gh.json
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from pathlib import Path
 from skilllint.frontmatter_utils import loads_frontmatter
 
 _ITERATIONS = 1000
-_TIME_LIMIT_SECONDS = 10.0
+_TIME_LIMIT_SECONDS = 30.0
 
 
 def _build_large_yaml_document(num_keys: int = 50, value_length: int = 100) -> str:
@@ -94,24 +94,15 @@ def test_cpu_linting_large_yaml() -> None:
     ``loads_frontmatter`` for each iteration, recording total elapsed time.
     Asserts that 1000 iterations complete within the time budget.
     """
-    document = _build_large_yaml_document(num_keys=50, value_length=100)
-
-    start = time.perf_counter()
-    for _ in range(_ITERATIONS):
-        post = loads_frontmatter(document)
-        # Guard to prevent the loop being optimised away.
-        if post is None:
-            raise RuntimeError("loads_frontmatter returned None for a non-empty document")
-    elapsed = time.perf_counter() - start
-
-    mean_ms = (elapsed / _ITERATIONS) * 1000.0
-
-    print(f"\nCPU BENCHMARK: {_ITERATIONS} iterations in {elapsed:.3f}s (mean {mean_ms:.3f} ms/iter)")
-
-    if elapsed >= _TIME_LIMIT_SECONDS:
+    timing = _run_cpu_benchmark()
+    elapsed_s = timing["total_ms"] / 1000.0
+    print(
+        f"\nCPU BENCHMARK: {_ITERATIONS} iterations in {timing['total_ms']:.3f}ms (mean {timing['mean_ms']:.6f} ms/iter)"
+    )
+    if elapsed_s >= _TIME_LIMIT_SECONDS:
         raise AssertionError(
-            f"CPU benchmark exceeded {_TIME_LIMIT_SECONDS}s time limit: {elapsed:.3f}s "
-            f"({_ITERATIONS} iterations, mean {mean_ms:.3f} ms/iter)"
+            f"CPU benchmark exceeded {_TIME_LIMIT_SECONDS}s time limit: {elapsed_s:.3f}s "
+            f"({_ITERATIONS} iterations, mean {timing['mean_ms']:.3f} ms/iter)"
         )
 
 

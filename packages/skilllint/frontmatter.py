@@ -53,7 +53,7 @@ def process_markdown_file(file_path: str) -> None:
 
         # 3. The "Zero-Copy Body" Write
         if new_yaml_bytes is None:
-            return
+            raise RuntimeError("lint_and_fix requested a fix but returned no content for " + str(file_path))
         temp_path = file_path + ".tmp"
         with pathlib.Path(temp_path).open("wb") as temp_file:
             # Write the new frontmatter

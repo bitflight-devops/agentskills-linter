@@ -38,7 +38,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7.3.1
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
@@ -103,7 +103,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: actions/checkout@v6.0.2
         with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.base_ref || github.base_ref }}
+          ref: ${{ github.base_ref }}
           fetch-depth: 0
           clean: false
 
@@ -155,11 +155,11 @@ jobs:
 
           # compare_data is a list (appended by test); base_data is a plain dict
           if isinstance(compare_data, list) and compare_data:
-              compare_duration = compare_data[-1].get("duration_seconds", 0)
+              compare_duration = compare_data[-1].get("duration_seconds", 0)  # already in seconds
           else:
               compare_duration = 0
 
-          base_duration = base_data.get("mean_ms", 0) / 1000.0
+          base_duration = base_data.get("mean_ms", 0) / 1000.0  # mean_ms is milliseconds; convert to seconds
 
           if base_duration > 0 and compare_duration > 0:
               ratio = compare_duration / base_duration
@@ -184,7 +184,7 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.compare_ref || github.sha }}
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v7.3.1
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 

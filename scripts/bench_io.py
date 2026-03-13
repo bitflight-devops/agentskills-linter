@@ -59,6 +59,7 @@ def _run_once(plugin_dir: Path) -> float:
     # skilllint exits 0 (clean) or 1 (lint errors found) — both are valid.
     # Any other exit code is an unexpected failure.
     if result.returncode not in {0, 1}:
+        print(f"skilllint exited with unexpected code {result.returncode}. stderr: {result.stderr!r}", file=sys.stderr)
         raise subprocess.CalledProcessError(result.returncode, "skilllint", result.stdout, result.stderr)
     return elapsed
 
@@ -104,13 +105,13 @@ def build_gh_benchmark_array(result: dict[str, float | int]) -> list[dict[str, f
     mean_ms = float(result["mean_ms"])
     max_ms = float(result["max_ms"])
     file_count = int(result["file_count"])
-    skills_per_sec = file_count / (mean_ms / 1000.0) if mean_ms > 0 else 0.0
+    files_per_sec = file_count / (mean_ms / 1000.0) if mean_ms > 0 else 0.0
 
     return [
         {"name": "scan_min_ms", "value": round(min_ms, 3), "unit": "ms"},
         {"name": "scan_mean_ms", "value": round(mean_ms, 3), "unit": "ms"},
         {"name": "scan_max_ms", "value": round(max_ms, 3), "unit": "ms"},
-        {"name": "skills_per_second", "value": round(skills_per_sec, 3), "unit": "skills/s"},
+        {"name": "files_per_second", "value": round(files_per_sec, 3), "unit": "files/s"},
     ]
 
 
