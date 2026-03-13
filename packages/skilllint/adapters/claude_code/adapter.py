@@ -7,8 +7,9 @@ logic lives here — the core validator (plan 02-05) runs the checks.
 
 from __future__ import annotations
 
-import json
 from typing import TYPE_CHECKING
+
+import msgspec.json
 
 from skilllint import load_bundled_schema
 
@@ -58,8 +59,8 @@ class ClaudeCodeAdapter:
             return []
 
         try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError) as exc:
+            data = msgspec.json.decode(path.read_bytes())
+        except (msgspec.DecodeError, OSError) as exc:
             return [{"code": "PL002", "severity": "error", "message": f"Invalid JSON: {exc}"}]
 
         schema = self.get_schema("plugin")

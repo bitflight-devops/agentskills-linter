@@ -15,7 +15,7 @@ Tests:
 
 from __future__ import annotations
 
-import json
+import msgspec.json
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
@@ -52,7 +52,9 @@ def _make_plugin(tmp_path: Path, plugin_name: str = "test-plugin", plugin_json_c
         (claude_plugin / "plugin.json").write_text(plugin_json_content)
     else:
         default_config = {"name": plugin_name, "skills": [], "agents": [], "commands": []}
-        (claude_plugin / "plugin.json").write_text(json.dumps(default_config, indent=2))
+        (claude_plugin / "plugin.json").write_text(
+            msgspec.json.format(msgspec.json.encode(default_config), indent=2).decode()
+        )
 
     return plugin_dir
 
@@ -293,7 +295,8 @@ class TestUnregisteredSkill:
         Why: Registered capabilities should not generate PR001 warnings
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "skills": ["./skills/my-skill/"]})
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({"name": "test-plugin", "skills": ["./skills/my-skill/"]}).decode(),
         )
         _add_skill(plugin_dir, "my-skill")
 
@@ -365,7 +368,11 @@ class TestUnregisteredAgent:
         Why: Registered agents should not generate PR001 warnings
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "agents": ["./agents/my-agent.md"]})
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "agents": ["./agents/my-agent.md"],
+            }).decode(),
         )
         _add_agent(plugin_dir, "my-agent")
 
@@ -403,7 +410,11 @@ class TestUnregisteredCommand:
         Why: Registered commands should not generate PR001 warnings
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "commands": ["./commands/my-command.md"]})
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "commands": ["./commands/my-command.md"],
+            }).decode(),
         )
         _add_command(plugin_dir, "my-command")
 
@@ -445,7 +456,11 @@ class TestMissingRegisteredFile:
         Why: Registered paths that do not exist are broken configurations (PR002)
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "skills": ["./skills/phantom-skill/"]})
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "skills": ["./skills/phantom-skill/"],
+            }).decode(),
         )
         # Do NOT create the skills/phantom-skill/SKILL.md
 
@@ -464,7 +479,11 @@ class TestMissingRegisteredFile:
         Why: Registered agent paths that do not exist are broken configurations (PR002)
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "agents": ["./agents/phantom-agent.md"]})
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "agents": ["./agents/phantom-agent.md"],
+            }).decode(),
         )
         # Do NOT create agents/phantom-agent.md
 
@@ -483,7 +502,11 @@ class TestMissingRegisteredFile:
         Why: Registered command paths that do not exist are broken (PR002)
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "commands": ["./commands/phantom-cmd.md"]})
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "commands": ["./commands/phantom-cmd.md"],
+            }).decode(),
         )
         # Do NOT create commands/phantom-cmd.md
 
@@ -502,7 +525,11 @@ class TestMissingRegisteredFile:
         Why: Actionable suggestions help users remove or create the referenced path
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "skills": ["./skills/ghost-skill/"]})
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "skills": ["./skills/ghost-skill/"],
+            }).decode(),
         )
 
         validator = PluginRegistrationValidator()
@@ -525,12 +552,12 @@ class TestFullyRegistered:
         """
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps({
+            plugin_json_content=msgspec.json.encode({
                 "name": "test-plugin",
                 "skills": ["./skills/my-skill/"],
                 "agents": ["./agents/my-agent.md"],
                 "commands": ["./commands/my-cmd.md"],
-            }),
+            }).decode(),
         )
         _add_skill(plugin_dir, "my-skill")
         _add_agent(plugin_dir, "my-agent")
@@ -552,7 +579,8 @@ class TestFullyRegistered:
         Why: validate() must handle file inputs by traversing up to plugin root
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "skills": ["./skills/my-skill/"]})
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({"name": "test-plugin", "skills": ["./skills/my-skill/"]}).decode(),
         )
         skill_md = _add_skill(plugin_dir, "my-skill")
 
@@ -572,7 +600,11 @@ class TestFullyRegistered:
         Why: Each skill must be evaluated independently
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "skills": ["./skills/alpha-skill/"]})
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "skills": ["./skills/alpha-skill/"],
+            }).decode(),
         )
         _add_skill(plugin_dir, "alpha-skill")
         _add_skill(plugin_dir, "beta-skill")
@@ -600,7 +632,12 @@ class TestEmptyPlugin:
         """
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps({"name": "test-plugin", "skills": [], "agents": [], "commands": []}),
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "skills": [],
+                "agents": [],
+                "commands": [],
+            }).decode(),
         )
         # No skills/, agents/, or commands/ directories created
 
@@ -619,7 +656,7 @@ class TestEmptyPlugin:
         How: Write plugin.json with only name field, no capability arrays, validate
         Why: Capability arrays are optional; their absence should not cause errors
         """
-        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin"}).decode())
         # No directories created
 
         validator = PluginRegistrationValidator()
@@ -681,7 +718,7 @@ class TestMissingMetadata:
         How: plugin.json omits repository; git_metadata has repository; validate
         Why: Validator should inform user that repository can be populated from git
         """
-        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin"}).decode())
         # git_metadata has repository; plugin_config does not
         metadata = {"repository": _FULL_GIT_METADATA["repository"]}
 
@@ -700,7 +737,7 @@ class TestMissingMetadata:
         How: plugin.json omits homepage; git_metadata has homepage; validate
         Why: Validator should surface all populatable metadata fields
         """
-        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin"}).decode())
         metadata = {"homepage": _FULL_GIT_METADATA["homepage"]}
 
         with patch(_GIT_METADATA_MODULE, return_value=metadata):
@@ -718,7 +755,7 @@ class TestMissingMetadata:
         How: plugin.json omits author; git_metadata has author; validate
         Why: Validator should surface author as a populatable metadata field
         """
-        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin"}).decode())
         metadata = {"author": _FULL_GIT_METADATA["author"]}
 
         with patch(_GIT_METADATA_MODULE, return_value=metadata):
@@ -738,12 +775,12 @@ class TestMissingMetadata:
         """
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps({
+            plugin_json_content=msgspec.json.encode({
                 "name": "test-plugin",
                 "repository": "https://github.com/example/my-plugin",
                 "homepage": "https://github.com/example/my-plugin/tree/main",
                 "author": {"name": "Test Author"},
-            }),
+            }).decode(),
         )
 
         with patch(_GIT_METADATA_MODULE, return_value=_FULL_GIT_METADATA):
@@ -760,7 +797,7 @@ class TestMissingMetadata:
         How: _generate_plugin_metadata returns {}; validate
         Why: No git context means no metadata suggestion can be made
         """
-        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin"}).decode())
 
         with patch(_GIT_METADATA_MODULE, return_value={}):
             validator = PluginRegistrationValidator()
@@ -776,7 +813,7 @@ class TestMissingMetadata:
         How: Trigger PR003 for repository field, check suggestion contains JSON
         Why: Suggestion must be actionable -- user should be able to copy-paste
         """
-        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin"}).decode())
         metadata = {"repository": "https://github.com/example/my-plugin"}
 
         with patch(_GIT_METADATA_MODULE, return_value=metadata):
@@ -806,10 +843,10 @@ class TestRepositoryMismatch:
         """
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps({
+            plugin_json_content=msgspec.json.encode({
                 "name": "test-plugin",
                 "repository": "https://github.com/old-org/my-plugin",
-            }),
+            }).decode(),
         )
         metadata = {"repository": "https://github.com/example/my-plugin"}
 
@@ -830,7 +867,8 @@ class TestRepositoryMismatch:
         plugin_url = "https://github.com/old-org/my-plugin"
         git_url = "https://github.com/example/my-plugin"
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "repository": plugin_url})
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({"name": "test-plugin", "repository": plugin_url}).decode(),
         )
         metadata = {"repository": git_url}
 
@@ -853,10 +891,10 @@ class TestRepositoryMismatch:
         git_url = "https://github.com/example/my-plugin"
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps({
+            plugin_json_content=msgspec.json.encode({
                 "name": "test-plugin",
                 "repository": "https://github.com/old-org/my-plugin",
-            }),
+            }).decode(),
         )
         metadata = {"repository": git_url}
 
@@ -877,7 +915,8 @@ class TestRepositoryMismatch:
         """
         matching_url = "https://github.com/example/my-plugin"
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=json.dumps({"name": "test-plugin", "repository": matching_url})
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({"name": "test-plugin", "repository": matching_url}).decode(),
         )
         metadata = {"repository": matching_url}
 
@@ -895,7 +934,7 @@ class TestRepositoryMismatch:
         How: plugin.json omits repository; git_metadata has repository; validate
         Why: Mismatch check requires both sides to be present; absence triggers PR003
         """
-        plugin_dir = _make_plugin(tmp_path, plugin_json_content=json.dumps({"name": "test-plugin"}))
+        plugin_dir = _make_plugin(tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin"}).decode())
         metadata = {"repository": "https://github.com/example/my-plugin"}
 
         with patch(_GIT_METADATA_MODULE, return_value=metadata):
@@ -914,10 +953,10 @@ class TestRepositoryMismatch:
         """
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=json.dumps({
+            plugin_json_content=msgspec.json.encode({
                 "name": "test-plugin",
                 "repository": "https://github.com/example/my-plugin",
-            }),
+            }).decode(),
         )
         # git_metadata has author but no repository
         metadata = {"author": {"name": "Test Author"}}
