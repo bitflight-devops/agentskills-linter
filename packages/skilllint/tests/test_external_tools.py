@@ -430,7 +430,6 @@ def test_get_staged_files_os_error(mocker: MockerFixture) -> None:
     assert result == []
 
 
-
 def test_get_staged_files_uses_index_diff_against_head(mocker: MockerFixture) -> None:
     """Test get_staged_files calls index.diff with the HEAD commit.
 
