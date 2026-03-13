@@ -61,9 +61,15 @@ jobs:
 
       - name: Run bench_io for github-action-benchmark output
         run: |
+          set -o pipefail
           source .venv/bin/activate
           mkdir -p scripts/results
-          python scripts/bench_io.py /tmp/bench-plugin --output scripts/results/bench_io_gh.json | tee scripts/results/benchmark_results.json
+          BENCH_IO=scripts/bench_io.py
+          if [ ! -f "$BENCH_IO" ]; then
+            echo "scripts/bench_io.py not found on this ref; skipping bench_io run."
+            exit 0
+          fi
+          python "$BENCH_IO" /tmp/bench-plugin --output scripts/results/bench_io_gh.json | tee scripts/results/benchmark_results.json
 
       - name: Store I/O benchmark result
         if: github.ref == 'refs/heads/main'
@@ -88,7 +94,10 @@ jobs:
 
       - name: Preserve bench_io.py before base-ref checkout
         if: github.event_name == 'pull_request'
-        run: cp scripts/bench_io.py /tmp/bench_io.py
+        run: |
+          if [ -f scripts/bench_io.py ]; then
+            cp scripts/bench_io.py /tmp/bench_io.py
+          fi
 
       - name: Checkout base ref
         if: github.event_name == 'pull_request'
