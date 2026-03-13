@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - main
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       base_ref:
@@ -30,6 +32,7 @@ jobs:
   benchmark-io:
     name: I/O Performance Benchmark
     runs-on: ubuntu-latest
+    if: github.event_name != 'release'
     steps:
       - name: Checkout compare ref
         uses: actions/checkout@v6.0.2
@@ -148,6 +151,7 @@ jobs:
   benchmark-cpu:
     name: CPU/Logic Performance Benchmark
     runs-on: ubuntu-latest
+    if: github.event_name != 'release'
     steps:
       - name: Checkout compare ref
         uses: actions/checkout@v6.0.2
@@ -200,3 +204,102 @@ jobs:
           name: benchmark-results-cpu
           path: scripts/results/
           retention-days: 30
+
+  benchmark-release:
+    name: Release Benchmark
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Extract benchmark fixture
+        run: unzip tests/fixtures/benchmark-plugin-1000-skills.zip -d /tmp/bench-plugin
+
+      - name: Drop OS page cache
+        run: echo 3 | sudo tee /proc/sys/vm/drop_caches || true
+
+      - name: Resolve base ref tag
+        id: base_ref
+        run: |
+          source .venv/bin/activate
+          BASE=$(python scripts/resolve_base_ref.py --tag "${{ github.ref_name }}" 2>/dev/null || echo "")
+          echo "tag=${BASE}" >> "$GITHUB_OUTPUT"
+
+      - name: Run I/O benchmark (release)
+        run: |
+          source .venv/bin/activate
+          mkdir -p scripts/results
+          python scripts/bench_io.py /tmp/bench-plugin --output scripts/results/bench_io_gh.json | tee scripts/results/benchmark_results.json
+
+      - name: Run CPU benchmark (release)
+        run: |
+          source .venv/bin/activate
+          python scripts/bench_cpu.py --output scripts/results/bench_cpu_gh.json
+
+      - name: Preserve bench_io.py before base-ref checkout
+        run: |
+          if [ -f scripts/bench_io.py ]; then
+            cp scripts/bench_io.py /tmp/bench_io_release.py
+          fi
+
+      - name: Checkout base ref for comparison
+        if: steps.base_ref.outputs.tag != ''
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ steps.base_ref.outputs.tag }}
+          fetch-depth: 0
+          clean: false
+
+      - name: Drop OS page cache (base ref)
+        if: steps.base_ref.outputs.tag != ''
+        run: echo 3 | sudo tee /proc/sys/vm/drop_caches || true
+
+      - name: Run base I/O benchmark
+        if: steps.base_ref.outputs.tag != ''
+        run: |
+          source .venv/bin/activate
+          BENCH_IO=scripts/bench_io.py
+          if [ ! -f "$BENCH_IO" ]; then BENCH_IO=/tmp/bench_io_release.py; fi
+          python "$BENCH_IO" /tmp/bench-plugin --output scripts/results/bench_io_base_gh.json | tee scripts/results/benchmark_results_base.json
+
+      - name: Compute and print performance ratio
+        if: steps.base_ref.outputs.tag != ''
+        run: |
+          source .venv/bin/activate
+          python scripts/bench_ratio.py \
+            --compare scripts/results/benchmark_results.json \
+            --base scripts/results/benchmark_results_base.json
+
+      - name: Store I/O benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: customSmallerIsBetter
+          output-file-path: scripts/results/bench_io_gh.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: '130%'
+          comment-on-alert: true
+          fail-on-alert: false
+          benchmark-data-dir-path: dev/bench
+
+      - name: Upload release benchmark results
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: release-benchmark-${{ github.ref_name }}
+          path: scripts/results/
+          retention-days: 90
