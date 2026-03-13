@@ -74,6 +74,15 @@ jobs:
           fi
           python "$BENCH_IO" /tmp/bench-plugin --output scripts/results/bench_io_gh.json | tee scripts/results/benchmark_results.json
 
+      - name: Ensure gh-pages branch exists
+        run: |
+          git fetch origin gh-pages:gh-pages 2>/dev/null || \
+            git checkout --orphan gh-pages && \
+            git reset --hard && \
+            git commit --allow-empty -m "init gh-pages for benchmark graphs" && \
+            git push origin gh-pages && \
+            git checkout -
+
       - name: Store I/O benchmark result
         if: github.ref == 'refs/heads/main'
         uses: benchmark-action/github-action-benchmark@v1
@@ -284,6 +293,15 @@ jobs:
           python scripts/bench_ratio.py \
             --compare scripts/results/benchmark_results.json \
             --base scripts/results/benchmark_results_base.json
+
+      - name: Ensure gh-pages branch exists
+        run: |
+          git fetch origin gh-pages:gh-pages 2>/dev/null || \
+            git checkout --orphan gh-pages && \
+            git reset --hard && \
+            git commit --allow-empty -m "init gh-pages for benchmark graphs" && \
+            git push origin gh-pages && \
+            git checkout -
 
       - name: Store I/O benchmark result
         uses: benchmark-action/github-action-benchmark@v1
