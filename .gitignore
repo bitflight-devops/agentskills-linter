@@ -48,5 +48,5 @@ coverage/
 tmp/
 
 # Benchmark artifacts
-bench/bench-plugin/
-bench/results/
+scripts/bench-plugin/
+scripts/results/

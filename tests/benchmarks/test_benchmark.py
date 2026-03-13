@@ -61,7 +61,7 @@ def _write_result(results_path: Path, record: dict[str, Any]) -> None:
     results_path.write_text(json.dumps(existing, indent=2), encoding="utf-8")
 
 
-_RESULTS_FILE = Path(__file__).parent.parent.parent / "bench" / "results" / "benchmark_results.json"
+_RESULTS_FILE = Path(__file__).parent.parent.parent / "scripts" / "results" / "benchmark_results.json"
 _TIME_LIMIT_SECONDS = 120.0
 
 
@@ -71,7 +71,7 @@ def test_io_scan_1000_skills_timing(extracted_plugin_dir: Path, plugin_file_coun
 
     Executes ``skilllint`` (or ``agentlint``) via subprocess, measures
     wall-clock duration, writes the result to
-    ``bench/results/benchmark_results.json``, then asserts completion
+    ``scripts/results/benchmark_results.json``, then asserts completion
     within 120 seconds.
 
     Args:
