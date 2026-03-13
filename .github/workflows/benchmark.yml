@@ -51,8 +51,10 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Extract benchmark fixture
-        run: unzip tests/fixtures/benchmark-plugin-1000-skills.zip -d /tmp/bench-plugin
+      - name: Extract benchmark fixtures
+        run: |
+          unzip tests/fixtures/benchmark-plugin-1000-skills.zip -d /tmp/bench-clean
+          unzip tests/fixtures/benchmark-plugin-violations.zip -d /tmp/bench-violations
 
       - name: Drop OS page cache
         run: echo 3 | sudo tee /proc/sys/vm/drop_caches || true
@@ -62,24 +64,34 @@ jobs:
           source .venv/bin/activate
           pytest tests/benchmarks/test_benchmark.py -v --no-header -p no:xdist --no-cov --override-ini="addopts="
 
-      - name: Run bench_io for github-action-benchmark output
+      - name: Run scan-clean I/O benchmark
         run: |
           set -o pipefail
           source .venv/bin/activate
           mkdir -p scripts/results
-          BENCH_IO=scripts/bench_io.py
-          if [ ! -f "$BENCH_IO" ]; then
-            echo "scripts/bench_io.py not found on this ref; skipping bench_io run."
-            exit 0
-          fi
-          python "$BENCH_IO" /tmp/bench-plugin --output scripts/results/bench_io_gh.json | tee scripts/results/benchmark_results.json
+          python scripts/bench_io.py /tmp/bench-clean --output scripts/results/bench_io_clean_gh.json \
+            | tee scripts/results/bench_io_clean.json
+
+      - name: Run scan-violations I/O benchmark
+        run: |
+          set -o pipefail
+          source .venv/bin/activate
+          python scripts/bench_io.py /tmp/bench-violations --output scripts/results/bench_io_violations_gh.json \
+            | tee scripts/results/bench_io_violations.json
+
+      - name: Run fix-violations I/O benchmark
+        run: |
+          set -o pipefail
+          source .venv/bin/activate
+          python scripts/bench_io.py /tmp/bench-violations --mode fix --output scripts/results/bench_io_fix_gh.json \
+            | tee scripts/results/bench_io_fix.json
 
       - name: Store I/O benchmark result
         if: github.ref == 'refs/heads/main'
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: customSmallerIsBetter
-          output-file-path: scripts/results/bench_io_gh.json
+          output-file-path: scripts/results/bench_io_clean_gh.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: false
           save-data-file: true
@@ -101,11 +113,14 @@ jobs:
       - name: Upload compare benchmark results
         uses: actions/upload-artifact@v7.0.0
         with:
-          name: benchmark-results-compare
-          path: scripts/results/benchmark_results.json
+          name: benchmark-results-io-compare
+          path: |
+            scripts/results/bench_io_clean_gh.json
+            scripts/results/bench_io_violations_gh.json
+            scripts/results/bench_io_fix_gh.json
           retention-days: 30
 
-      - name: Preserve bench_io.py before base-ref checkout
+      - name: Preserve scripts before base-ref checkout
         if: github.event_name == 'pull_request'
         run: |
           if [ -f scripts/bench_io.py ]; then
@@ -113,6 +128,9 @@ jobs:
           fi
           if [ -f scripts/bench_ratio.py ]; then
             cp scripts/bench_ratio.py /tmp/bench_ratio.py
+          fi
+          if [ -f scripts/bench_comment.py ]; then
+            cp scripts/bench_comment.py /tmp/bench_comment.py
           fi
 
       - name: Checkout base ref
@@ -127,7 +145,7 @@ jobs:
         if: github.event_name == 'pull_request'
         run: echo 3 | sudo tee /proc/sys/vm/drop_caches || true
 
-      - name: Run base I/O benchmark
+      - name: Run base scan-clean I/O benchmark
         if: github.event_name == 'pull_request'
         run: |
           set -o pipefail
@@ -136,14 +154,39 @@ jobs:
           if [ ! -f "$BENCH_IO" ]; then
             BENCH_IO=/tmp/bench_io.py
           fi
-          python "$BENCH_IO" /tmp/bench-plugin --output scripts/results/bench_io_base_gh.json | tee scripts/results/benchmark_results_base.json
+          python "$BENCH_IO" /tmp/bench-clean --output scripts/results/bench_io_clean_base_gh.json | tee scripts/results/bench_io_clean_base.json
+
+      - name: Run base scan-violations I/O benchmark
+        if: github.event_name == 'pull_request'
+        run: |
+          set -o pipefail
+          source .venv/bin/activate
+          BENCH_IO=scripts/bench_io.py
+          if [ ! -f "$BENCH_IO" ]; then
+            BENCH_IO=/tmp/bench_io.py
+          fi
+          python "$BENCH_IO" /tmp/bench-violations --output scripts/results/bench_io_violations_base_gh.json | tee scripts/results/bench_io_violations_base.json
+
+      - name: Run base fix-violations I/O benchmark
+        if: github.event_name == 'pull_request'
+        run: |
+          set -o pipefail
+          source .venv/bin/activate
+          BENCH_IO=scripts/bench_io.py
+          if [ ! -f "$BENCH_IO" ]; then
+            BENCH_IO=/tmp/bench_io.py
+          fi
+          python "$BENCH_IO" /tmp/bench-violations --mode fix --output scripts/results/bench_io_fix_base_gh.json | tee scripts/results/bench_io_fix_base.json
 
       - name: Upload base benchmark results
         if: github.event_name == 'pull_request'
         uses: actions/upload-artifact@v7.0.0
         with:
-          name: benchmark-results-base
-          path: scripts/results/benchmark_results_base.json
+          name: benchmark-results-io-base
+          path: |
+            scripts/results/bench_io_clean_base_gh.json
+            scripts/results/bench_io_violations_base_gh.json
+            scripts/results/bench_io_fix_base_gh.json
           retention-days: 30
 
       - name: Compute and print performance ratio
@@ -155,8 +198,8 @@ jobs:
             BENCH_RATIO=/tmp/bench_ratio.py
           fi
           python "$BENCH_RATIO" \
-            --compare scripts/results/benchmark_results.json \
-            --base scripts/results/benchmark_results_base.json
+            --compare scripts/results/bench_io_clean.json \
+            --base scripts/results/bench_io_clean_base.json
 
   benchmark-cpu:
     name: CPU/Logic Performance Benchmark
@@ -193,6 +236,7 @@ jobs:
       - name: Run bench_cpu for github-action-benchmark output
         run: |
           source .venv/bin/activate
+          mkdir -p scripts/results
           python scripts/bench_cpu.py --output scripts/results/bench_cpu_gh.json
 
       - name: Store CPU benchmark result
@@ -209,12 +253,108 @@ jobs:
           fail-on-alert: false
           benchmark-data-dir-path: dev/bench
 
-      - name: Upload CPU benchmark results
+      - name: Upload CPU compare benchmark results
         uses: actions/upload-artifact@v7.0.0
         with:
-          name: benchmark-results-cpu
-          path: scripts/results/
+          name: benchmark-results-cpu-compare
+          path: scripts/results/bench_cpu_gh.json
           retention-days: 30
+
+      - name: Preserve bench_cpu.py before base-ref checkout
+        if: github.event_name == 'pull_request'
+        run: |
+          if [ -f scripts/bench_cpu.py ]; then
+            cp scripts/bench_cpu.py /tmp/bench_cpu.py
+          fi
+
+      - name: Checkout base ref for CPU comparison
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: ${{ github.base_ref }}
+          fetch-depth: 0
+          clean: false
+
+      - name: Drop OS page cache (base CPU benchmark)
+        if: github.event_name == 'pull_request'
+        run: echo 3 | sudo tee /proc/sys/vm/drop_caches || true
+
+      - name: Run base CPU benchmark
+        if: github.event_name == 'pull_request'
+        run: |
+          source .venv/bin/activate
+          BENCH_CPU=scripts/bench_cpu.py
+          if [ ! -f "$BENCH_CPU" ]; then
+            BENCH_CPU=/tmp/bench_cpu.py
+          fi
+          python "$BENCH_CPU" --output scripts/results/bench_cpu_base_gh.json
+
+      - name: Upload CPU base benchmark results
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v7.0.0
+        with:
+          name: benchmark-results-cpu-base
+          path: scripts/results/bench_cpu_base_gh.json
+          retention-days: 30
+
+  post-pr-comment:
+    name: Post Benchmark PR Comment
+    runs-on: ubuntu-latest
+    needs: [benchmark-io, benchmark-cpu]
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Download IO compare results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results-io-compare
+          path: scripts/results/
+
+      - name: Download IO base results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results-io-base
+          path: scripts/results/base/
+
+      - name: Download CPU compare results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results-cpu-compare
+          path: scripts/results/
+
+      - name: Download CPU base results
+        uses: actions/download-artifact@v4
+        with:
+          name: benchmark-results-cpu-base
+          path: scripts/results/base/
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+
+      - run: uv python install 3.12
+
+      - run: uv sync
+
+      - name: Generate benchmark comment
+        run: |
+          source .venv/bin/activate
+          python scripts/bench_comment.py \
+            --scenario "scan-clean:scripts/results/bench_io_clean_gh.json:scripts/results/base/bench_io_clean_base_gh.json" \
+            --scenario "scan-violations:scripts/results/bench_io_violations_gh.json:scripts/results/base/bench_io_violations_base_gh.json" \
+            --scenario "fix-violations:scripts/results/bench_io_fix_gh.json:scripts/results/base/bench_io_fix_base_gh.json" \
+            --scenario "cpu:scripts/results/bench_cpu_gh.json:scripts/results/base/bench_cpu_base_gh.json" \
+            --output /tmp/bench_comment.md \
+            --threshold 1.30 \
+            --pages-url "https://bitflight-devops.github.io/agentskills-linter/"
+
+      - name: Post comment to PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: benchmark-results
+          path: /tmp/bench_comment.md
 
   benchmark-release:
     name: Release Benchmark
