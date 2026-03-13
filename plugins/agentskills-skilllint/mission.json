@@ -1,0 +1,24 @@
+{
+  "status": "draft",
+  "name": "agentskills-skilllint",
+  "purpose": "Guide AI agents through using the skilllint CLI to validate, fix, and understand linting violations in Claude Code plugins, skills, agents, and commands.",
+  "values": [
+    "Actionable guidance — every instruction leads to a concrete command the agent can run",
+    "Rule transparency — agents should always know why a violation occurred, not just that it did",
+    "Progressive workflow — scan → identify → explain → fix, in that order",
+    "Tool-agnostic installation — support uv, pipx, and pip equally"
+  ],
+  "anti-patterns": [
+    "Vague advice like 'fix the frontmatter' without showing the exact command",
+    "Hiding rule meanings — always surface the explanation via `skilllint rule <id>`",
+    "Assuming a specific package manager — document all three (uv, pipx, pip)"
+  ],
+  "backlog_interview": {
+    "task": "Refine mission statement with maintainer",
+    "questions": [
+      "Should the skill also guide through creating new plugins from scratch?",
+      "Should it link to the agentskills.io specification for AS-series rules?",
+      "Should version checking be a separate argument path?"
+    ]
+  }
+}
