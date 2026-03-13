@@ -7,20 +7,20 @@ Trust this file first and only search the repo when these instructions are incom
 - `skilllint` is a small Python CLI package that statically validates AI agent assets: plugins, skills, agents, commands, hooks, and cross-plugin references.
 - It targets Claude Code, Cursor, Codex, and third-party adapters exposed through Python entry points.
 - Main language/runtime: Python 3.11-3.14. CI currently exercises Python 3.11 and 3.12.
-- Packaging/tooling: `uv`, Hatch/Hatchling + `hatch-vcs`, Ruff, `ty`, `pytest`, `prek`, Biome, markdownlint.
-- CLI entry points `skilllint`, `agentlint`, `pluginlint`, and `skillint` all point to `skilllint.plugin_validator:app`.
+- Packaging/tooling: `uv`, Hatch/Hatchling + `hatch-vcs`, Ruff, Astral's `ty` type checker, `pytest`, `prek` (the Rust pre-commit runner used in this repo), Biome, markdownlint.
+- CLI entry points `skilllint`, `agentlint`, `pluginlint`, and the legacy alias `skillint` all point to `skilllint.plugin_validator:app`.
 
 ## High-value paths
 
-- `/home/runner/work/agentskills-linter/agentskills-linter/packages/skilllint/plugin_validator.py` - main Typer CLI and most validation/reporting logic.
-- `/home/runner/work/agentskills-linter/agentskills-linter/packages/skilllint/frontmatter_core.py` - Pydantic frontmatter schemas and normalization helpers.
-- `/home/runner/work/agentskills-linter/agentskills-linter/packages/skilllint/frontmatter_utils.py` - ruamel YAML round-trip helpers used by auto-fix paths.
-- `/home/runner/work/agentskills-linter/agentskills-linter/packages/skilllint/auto_sync_manifests.py` - manifest sync/version-bump logic used by pre-commit-style workflows.
-- `/home/runner/work/agentskills-linter/agentskills-linter/packages/skilllint/adapters/` - bundled platform adapters (`claude_code`, `cursor`, `codex`).
-- `/home/runner/work/agentskills-linter/agentskills-linter/packages/skilllint/tests/` - primary pytest suite.
-- `/home/runner/work/agentskills-linter/agentskills-linter/scripts/fetch_platform_docs.py` - standalone `uv` script for refreshing vendor docs under `.claude/vendor/`.
-- `/home/runner/work/agentskills-linter/agentskills-linter/.github/workflows/test.yml` - CI format/lint/type/test/release flow.
-- `/home/runner/work/agentskills-linter/agentskills-linter/.github/workflows/publish.yml` - release-publish flow (`uv build` + `uv publish`).
+- `packages/skilllint/plugin_validator.py` - main Typer CLI and most validation/reporting logic.
+- `packages/skilllint/frontmatter_core.py` - Pydantic frontmatter schemas and normalization helpers.
+- `packages/skilllint/frontmatter_utils.py` - ruamel YAML round-trip helpers used by auto-fix paths.
+- `packages/skilllint/auto_sync_manifests.py` - manifest sync/version-bump logic used by pre-commit-style workflows.
+- `packages/skilllint/adapters/` - bundled platform adapters (`claude_code`, `cursor`, `codex`).
+- `packages/skilllint/tests/` - primary pytest suite.
+- `scripts/fetch_platform_docs.py` - standalone `uv` script for refreshing vendor docs under `.claude/vendor/`.
+- `.github/workflows/test.yml` - CI format/lint/type/test/release flow.
+- `.github/workflows/publish.yml` - release-publish flow (`uv build` + `uv publish`).
 - Root config files worth checking before edits: `pyproject.toml`, `.pre-commit-config.yaml`, `.pre-commit-hooks.yaml`, `biome.json`, `.markdownlint-cli2.jsonc`, `.prettierrc`.
 
 ## Repo root at a glance
@@ -32,7 +32,7 @@ Trust this file first and only search the repo when these instructions are incom
 
 ## Validated command sequence
 
-Always run commands from `/home/runner/work/agentskills-linter/agentskills-linter`.
+Always run commands from the repository root.
 
 1. **Install `uv` if it is missing.** In this sandbox `uv` was not preinstalled; `python3 -m pip install --user uv` was required, then `export PATH="$HOME/.local/bin:$PATH"`.
 2. **Bootstrap:** `uv sync`
@@ -45,6 +45,7 @@ Always run commands from `/home/runner/work/agentskills-linter/agentskills-linte
 6. **CLI smoke test:** `uv run skilllint --help` or `uv run skilllint <path>`
 7. **Build:** `uv build`
 8. **Pre-push gate:** `uv run prek run --all-files`
+   - This repo uses `prek` instead of the Python `pre-commit` CLI.
 
 ### Observed command behavior
 
