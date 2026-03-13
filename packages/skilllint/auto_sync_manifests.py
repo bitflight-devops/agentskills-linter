@@ -27,12 +27,12 @@ Version Bumping:
 from __future__ import annotations
 
 import argparse
-import json
 import shutil
 import subprocess
 import sys
-import tempfile
 from io import TextIOWrapper
+
+import msgspec.json
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -294,8 +294,8 @@ def _read_head_json(filepath: str | Path) -> object | None:
         return None
 
     try:
-        parsed: object = json.loads(result.stdout)
-    except (json.JSONDecodeError, ValueError):
+        parsed: object = msgspec.json.decode(result.stdout)
+    except (msgspec.DecodeError, ValueError):
         return None
     return parsed
 
@@ -332,8 +332,8 @@ def _version_already_bumped(filepath: str | Path, version_key_path: list[str]) -
         return False
 
     try:
-        current_data = json.loads(current_path.read_text(encoding="utf-8"))
-    except (json.JSONDecodeError, ValueError, OSError):
+        current_data = msgspec.json.decode(current_path.read_bytes())
+    except (msgspec.DecodeError, ValueError, OSError):
         return False
 
     current_version = _extract_version_from_json(current_data, version_key_path)
@@ -367,40 +367,6 @@ def _write_json_lf(path: Path, content: str) -> None:
     Uses write_bytes to avoid Windows CRLF conversion in text mode.
     """
     path.write_bytes(content.encode("utf-8"))
-
-
-def _format_json(data: object) -> str:
-    """Serialize data to JSON, formatted by prettier if available.
-
-    Writes ``json.dumps(indent=2)`` output.  If ``npx`` is available, runs
-    ``prettier --write`` to match the project's prettier configuration.
-    The ``--config`` flag is passed explicitly so that temp files outside
-    the repository still receive the project's formatting rules.
-
-    Args:
-        data: JSON-serialisable Python object.
-
-    Returns:
-        A prettier-formatted JSON string with trailing newline.
-    """
-    content = json.dumps(data, indent=2) + "\n"
-    if not _NPX_PATH:
-        return content
-    with tempfile.NamedTemporaryFile(encoding="utf-8", mode="w", suffix=".json", delete=False, newline="\n") as f:
-        f.write(content)
-        tmp_path = f.name
-    try:
-        cmd = [_NPX_PATH, "prettier", "--write"]
-        if _PRETTIERRC_PATH:
-            cmd.extend(["--config", str(_PRETTIERRC_PATH)])
-        cmd.append(tmp_path)
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        if result.returncode != 0:
-            sys.stderr.write(f"Warning: prettier formatting failed: {result.stderr.strip()}\n")
-            return content
-        return Path(tmp_path).read_text(encoding="utf-8")
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
 
 
 def _is_standard_path_skill(field_name: str, comp_path: str) -> bool:
@@ -517,8 +483,7 @@ def update_plugin_json(plugin_name: str, changes: ComponentChanges) -> tuple[boo
     if not plugin_json_path.exists():
         return False, "0.0.0"
 
-    with plugin_json_path.open(encoding="utf-8") as f:
-        data: dict[str, list[str] | str] = json.load(f)
+    data: dict[str, list[str] | str] = msgspec.json.decode(plugin_json_path.read_bytes())
 
     current_version = cast("str", data.get("version", "0.0.0"))
 
@@ -544,7 +509,7 @@ def update_plugin_json(plugin_name: str, changes: ComponentChanges) -> tuple[boo
         existing_content = plugin_json_path.read_text(encoding="utf-8")
 
         data["version"] = new_version
-        new_content = _format_json(data)
+        new_content = msgspec.json.format(msgspec.json.encode(data), indent=2).decode() + "\n"
 
         # Skip write when the formatted output already matches the file.
         # The primary double-bump defence is the _version_already_bumped
@@ -574,12 +539,12 @@ def _read_plugin_name(plugin_dir_name: str) -> str:
     plugin_json_path = Path(f"plugins/{plugin_dir_name}/.claude-plugin/plugin.json")
     if plugin_json_path.exists():
         try:
-            with plugin_json_path.open(encoding="utf-8") as f:
-                data = json.load(f)
-            name = data.get("name")
-            if name and isinstance(name, str):
-                return name
-        except (OSError, json.JSONDecodeError):
+            data = msgspec.json.decode(plugin_json_path.read_bytes())
+            if isinstance(data, dict):
+                name = data.get("name")
+                if name and isinstance(name, str):
+                    return name
+        except (OSError, msgspec.DecodeError):
             pass
     return plugin_dir_name
 
@@ -643,8 +608,7 @@ def update_marketplace_json(plugin_changes: MarketplaceChanges) -> bool:
         print("Warning: marketplace.json not found")
         return False
 
-    with marketplace_json_path.open(encoding="utf-8") as f:
-        data: dict[str, dict[str, str] | list[dict[str, str]]] = json.load(f)
+    data: dict[str, dict[str, str] | list[dict[str, str]]] = msgspec.json.decode(marketplace_json_path.read_bytes())
 
     metadata = cast("dict[str, str]", data.get("metadata", {}))
     current_version = metadata.get("version", "0.0.0")
@@ -675,7 +639,7 @@ def update_marketplace_json(plugin_changes: MarketplaceChanges) -> bool:
         metadata = cast("dict[str, str]", data["metadata"])
         metadata["version"] = new_version
 
-        new_content = _format_json(data)
+        new_content = msgspec.json.format(msgspec.json.encode(data), indent=2).decode() + "\n"
 
         if new_content == existing_content:
             return False
@@ -1007,8 +971,7 @@ def _reconcile_one_plugin(plugin_name: str, plugins_root: Path, *, dry_run: bool
     if not plugin_json_path.exists():
         return False
 
-    with plugin_json_path.open(encoding="utf-8") as f:
-        data: dict[str, list[str] | str] = json.load(f)
+    data: dict[str, list[str] | str] = msgspec.json.decode(plugin_json_path.read_bytes())
 
     disk_skills = _discover_skills(plugin_dir)
     disk_agents = _discover_agents(plugin_dir)
@@ -1043,7 +1006,7 @@ def _reconcile_one_plugin(plugin_name: str, plugins_root: Path, *, dry_run: bool
     if has_drift and not dry_run:
         current_version = cast("str", data.get("version", "0.0.0"))
         data["version"] = bump_version(current_version, "minor")
-        _write_json_lf(plugin_json_path, _format_json(data))
+        _write_json_lf(plugin_json_path, msgspec.json.format(msgspec.json.encode(data), indent=2).decode() + "\n")
         print(f"  Updated {plugin_name} -> {data['version']}")
 
     return has_drift
@@ -1187,8 +1150,7 @@ def _reconcile_marketplace(plugins_root: Path, *, dry_run: bool) -> bool:
         print("Warning: marketplace.json not found")
         return False
 
-    with marketplace_path.open(encoding="utf-8") as f:
-        data: dict[str, dict[str, str] | list[dict[str, str]]] = json.load(f)
+    data: dict[str, dict[str, str] | list[dict[str, str]]] = msgspec.json.decode(marketplace_path.read_bytes())
 
     plugins_list = cast("list[dict[str, str]]", data.get("plugins", []))
     registered_names = {p["name"] for p in plugins_list}
@@ -1230,7 +1192,7 @@ def _reconcile_marketplace(plugins_root: Path, *, dry_run: bool) -> bool:
         bump_type: Literal["major", "minor", "patch"] = "major" if stale else "minor"
         metadata["version"] = bump_version(current_version, bump_type)
         data["metadata"] = metadata
-        _write_json_lf(marketplace_path, _format_json(data))
+        _write_json_lf(marketplace_path, msgspec.json.format(msgspec.json.encode(data), indent=2).decode() + "\n")
         print(f"  Updated marketplace -> {metadata['version']}")
 
     return has_drift
@@ -1334,9 +1296,8 @@ def _precommit_sync() -> int:
         if marketplace_updated:
             _git_stage_file(".claude-plugin/marketplace.json")
 
-            with Path(".claude-plugin/marketplace.json").open(encoding="utf-8") as f:
-                data = json.load(f)
-                new_version = data["metadata"]["version"]
+            data = msgspec.json.decode(Path(".claude-plugin/marketplace.json").read_bytes())
+            new_version = data["metadata"]["version"]
 
             print(f"Updated marketplace -> {new_version}")
 

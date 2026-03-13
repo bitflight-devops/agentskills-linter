@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import json
+import msgspec.json
 from importlib.resources import files
 
 
@@ -16,21 +16,21 @@ def test_schema_file_readable_via_importlib_resources() -> None:
 def test_schema_json_is_valid() -> None:
     """v1.json contains valid JSON."""
     ref = files("skilllint.schemas.claude_code").joinpath("v1.json")
-    data = json.loads(ref.read_bytes())
+    data = msgspec.json.decode(ref.read_bytes())
     assert isinstance(data, dict), "Schema must be a JSON object"
 
 
 def test_schema_has_dollar_schema_key() -> None:
     """v1.json contains the '$schema' key required by must_haves."""
     ref = files("skilllint.schemas.claude_code").joinpath("v1.json")
-    data = json.loads(ref.read_bytes())
+    data = msgspec.json.decode(ref.read_bytes())
     assert "$schema" in data, "Schema must have a '$schema' key"
 
 
 def test_schema_has_platform_key() -> None:
     """v1.json contains a 'platform' key identifying the target platform."""
     ref = files("skilllint.schemas.claude_code").joinpath("v1.json")
-    data = json.loads(ref.read_bytes())
+    data = msgspec.json.decode(ref.read_bytes())
     assert data.get("platform") == "claude_code"
 
 

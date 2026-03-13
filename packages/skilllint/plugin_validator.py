@@ -14,13 +14,14 @@ Token-based complexity measurement replaces line counting for accurate AI cost e
 from __future__ import annotations
 
 import fnmatch
-import json
 import os
 import re
 import shutil
 import subprocess
 import sys
 from io import TextIOWrapper
+
+import msgspec.json
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -38,6 +39,8 @@ from typing import TYPE_CHECKING, Annotated, ClassVar, Literal, NoReturn, Protoc
 # YAML/JSON at the edge: dict, list, or JSON-serializable scalars. More specific than Any.
 YamlValue: TypeAlias = dict[str, "YamlValue"] | list["YamlValue"] | str | int | float | bool | None
 
+import contextlib
+
 import typer
 from git import Repo
 from git.exc import InvalidGitRepositoryError, NoSuchPathError
@@ -49,16 +52,12 @@ from rich.panel import Panel
 from ruamel.yaml import YAML, YAMLError
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
-# Enable import of sibling library modules (frontmatter_core, frontmatter_utils).
-# PEP 723 scripts run in an isolated venv; sys.path insertion exposes co-located
-# library modules that are not PEP 723 scripts themselves.
-_SCRIPTS_DIR = str(Path(__file__).parent)
-if _SCRIPTS_DIR not in sys.path:
-    sys.path.insert(0, _SCRIPTS_DIR)
+from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
+from skilllint.adapters.claude_code import ClaudeCodeAdapter
+from skilllint.rules.as_series import run_as_series
+from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
 
-import contextlib
-
-from frontmatter_core import (
+from .frontmatter_core import (
     MAX_SKILL_NAME_LENGTH,
     RECOMMENDED_DESCRIPTION_LENGTH,
     AgentFrontmatter,
@@ -68,12 +67,7 @@ from frontmatter_core import (
     fix_skill_name_field,
     get_frontmatter_model,
 )
-from frontmatter_utils import RuamelYAMLHandler
-
-from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
-from skilllint.adapters.claude_code import ClaudeCodeAdapter
-from skilllint.rules.as_series import run_as_series
-from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
+from .frontmatter_utils import RuamelYAMLHandler
 
 if TYPE_CHECKING:
     from pydantic_core import ErrorDetails
@@ -460,8 +454,8 @@ def _load_ignore_config(plugin_root: Path) -> IgnoreConfig:
     if not config_path.is_file():
         return {}
     try:
-        raw = json.loads(config_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        raw = msgspec.json.decode(config_path.read_bytes())
+    except (OSError, msgspec.DecodeError):
         return {}
     ignore = raw.get("ignore", {})
     if not isinstance(ignore, dict):
@@ -1483,10 +1477,10 @@ class NamespaceReferenceValidator:
             declared_name: str | None = None
             if plugin_json.is_file():
                 try:
-                    data = json.loads(plugin_json.read_text(encoding="utf-8"))
+                    data = msgspec.json.decode(plugin_json.read_bytes())
                     if isinstance(data, dict) and isinstance(data.get("name"), str):
                         declared_name = data["name"]
-                except (OSError, ValueError):
+                except (OSError, msgspec.DecodeError):
                     pass
             # Fall back to directory name when plugin.json is absent/invalid
             name_to_dir[declared_name or entry.name] = entry
@@ -1951,11 +1945,34 @@ class FrontmatterValidator:
         if not model_class:
             return ValidationResult(passed=True, errors=errors, warnings=warnings, info=info)
 
-        # Validate with Pydantic
+        self._validate_pydantic_model(model_class, data, file_type, path, errors=errors, warnings=warnings)
+
+        passed = len(errors) == 0
+        return ValidationResult(passed=passed, errors=errors, warnings=warnings, info=info)
+
+    def _validate_pydantic_model(
+        self,
+        model_class: type[SkillFrontmatter | CommandFrontmatter | AgentFrontmatter],
+        data: dict[str, YamlValue],
+        file_type: FileType,
+        path: Path,
+        *,
+        errors: list[ValidationIssue],
+        warnings: list[ValidationIssue],
+    ) -> None:
+        """Run Pydantic validation and post-validation checks.
+
+        Args:
+            model_class: Pydantic model class to validate against
+            data: Parsed frontmatter data
+            file_type: Detected file type
+            path: Path to the file being validated
+            errors: Mutable list to append errors to
+            warnings: Mutable list to append warnings to
+
+        """
         try:
             validated = model_class.model_validate(data)
-
-            # Add warning for long descriptions
             if (
                 hasattr(validated, "description")
                 and validated.description
@@ -1971,23 +1988,15 @@ class FrontmatterValidator:
                         suggestion=f"Front-load critical information in first {RECOMMENDED_DESCRIPTION_LENGTH} characters. Run /plugin-creator:write-frontmatter-description to generate an optimized description",
                     )
                 )
-
         except ValidationError as e:
             errors.extend(_pydantic_error_to_validation_issue(err) for err in e.errors())
 
-        if isinstance(data, dict):
-            _check_list_valued_tool_fields(data, errors)
-            _check_skill_name_and_directory(data, path, file_type, errors, warnings)
+        _check_list_valued_tool_fields(data, errors)
+        _check_skill_name_and_directory(data, path, file_type, errors, warnings)
 
-        # Validate hook script file-path references declared in frontmatter ``hooks:`` field.
-        # The ``hooks:`` field in SKILL.md / agent / command frontmatter uses the same
-        # structure as the root ``"hooks"`` key in hooks.json.
-        if isinstance(data, dict) and isinstance(data.get("hooks"), dict):
-            hook_validator = HookValidator()
-            hook_validator.validate_hook_script_references_in_hooks_dict(data["hooks"], path.parent, errors)
-
-        passed = len(errors) == 0
-        return ValidationResult(passed=passed, errors=errors, warnings=warnings, info=info)
+        hooks_value = data.get("hooks")
+        if isinstance(hooks_value, dict):
+            HookValidator().validate_hook_script_references_in_hooks_dict(hooks_value, path.parent, errors)
 
     def can_fix(self) -> bool:
         """Check if validator supports auto-fixing.
@@ -3027,7 +3036,7 @@ def _parse_registered_paths(plugin_config: dict[str, YamlValue], plugin_dir: Pat
         else:
             registered.add(Path(value.lstrip("./")))
     elif isinstance(value, list):
-        registered.update(Path(item.lstrip("./")) for item in value)
+        registered.update(Path(item.lstrip("./")) for item in value if isinstance(item, str))
 
     return registered
 
@@ -3082,9 +3091,8 @@ class PluginRegistrationValidator:
             return ValidationResult(passed=True, errors=errors, warnings=warnings, info=info)
 
         try:
-            with plugin_json_path.open() as f:
-                plugin_config = json.load(f)
-        except json.JSONDecodeError as e:
+            plugin_config = msgspec.json.decode(plugin_json_path.read_bytes())
+        except msgspec.DecodeError as e:
             errors.append(
                 ValidationIssue(
                     field="plugin.json",
@@ -3224,7 +3232,9 @@ class PluginRegistrationValidator:
         if git_metadata:
             missing = [k for k in ("repository", "homepage", "author") if k not in plugin_config and k in git_metadata]
             if missing:
-                suggestion_json = json.dumps({k: git_metadata[k] for k in missing}, indent=2)
+                suggestion_json = msgspec.json.format(
+                    msgspec.json.encode({k: git_metadata[k] for k in missing}), indent=2
+                ).decode()
                 info.append(
                     ValidationIssue(
                         field="plugin.json",
@@ -3496,9 +3506,8 @@ class PluginStructureValidator:
             None if valid; otherwise human-readable error message string.
         """
         try:
-            with Path(plugin_json_path).open(encoding="utf-8") as f:
-                json.load(f)
-        except json.JSONDecodeError as e:
+            msgspec.json.decode(Path(plugin_json_path).read_bytes())
+        except msgspec.DecodeError as e:
             return f"Invalid JSON syntax in plugin.json: {e}"
         except OSError as e:
             return f"Cannot read plugin.json: {e}"
@@ -3744,8 +3753,8 @@ class HookValidator:
             return ValidationResult(passed=False, errors=errors, warnings=warnings, info=info)
 
         try:
-            data = json.loads(content)
-        except json.JSONDecodeError as e:
+            data = msgspec.json.decode(content)
+        except msgspec.DecodeError as e:
             errors.append(
                 ValidationIssue(
                     field="(json)",
@@ -4066,9 +4075,11 @@ class HookValidator:
             for group in groups:
                 if not isinstance(group, dict):
                     continue
-                for entry in group.get("hooks", []):
-                    if isinstance(entry, dict):
-                        self._validate_command_script_references([entry], base_dir, errors)
+                hooks_entries = group.get("hooks", [])
+                if isinstance(hooks_entries, list):
+                    for entry in hooks_entries:
+                        if isinstance(entry, dict):
+                            self._validate_command_script_references([entry], base_dir, errors)
 
 
 # ============================================================================
