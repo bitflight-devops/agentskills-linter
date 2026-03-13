@@ -48,3 +48,27 @@ Claude operates as an orchestrator — it coordinates agents rather than doing f
 
 **For formatting/lint fixes:**
 - Delegate even single-file ruff format calls — the agent handles it without bloating orchestrator context
+
+## No inline CI code
+
+Never write logic directly in `.github/workflows/*.yml` `run:` blocks beyond a single-line call.
+
+**Why:** Inline shell in YAML cannot be linted, has no syntax highlighting, cannot be unit-tested, and is invisible to ruff/shellcheck.
+
+**Rule:** Any logic beyond a trivial one-liner belongs in `scripts/`. Create a Python or shell script there and call it from the workflow:
+
+```yaml
+# BAD — logic inline in CI
+- name: Run benchmark
+  run: |
+    python -c "import json, pathlib; ..."
+    if [ -f result.json ]; then
+      ...
+    fi
+
+# GOOD — script in scripts/, called from CI
+- name: Run benchmark
+  run: python scripts/bench_io.py /tmp/bench-plugin --output scripts/results/bench_io_gh.json
+```
+
+This applies to: data processing, conditional logic, multi-step setup, JSON manipulation, file operations.
