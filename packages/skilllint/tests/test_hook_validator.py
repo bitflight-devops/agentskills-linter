@@ -8,9 +8,9 @@ Tests:
 
 from __future__ import annotations
 
-import msgspec.json
 from typing import TYPE_CHECKING
 
+import msgspec.json
 import pytest
 
 from skilllint.plugin_validator import FileType, HookValidator

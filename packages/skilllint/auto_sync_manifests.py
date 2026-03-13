@@ -28,11 +28,12 @@ from __future__ import annotations
 
 import argparse
 import shutil
-import subprocess
 import sys
 from io import TextIOWrapper
 
+import git
 import msgspec.json
+from git.exc import InvalidGitRepositoryError
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -52,9 +53,6 @@ _NPX_PATH: str | None = shutil.which("npx")
 _MIN_PLUGIN_PATH_PARTS = 2
 _MIN_COMPONENT_PATH_PARTS = 3
 _MIN_SKILL_PATH_PARTS = 4
-
-# Resolve git binary once at module load
-_GIT_PATH: str | None = shutil.which("git")
 
 
 class PluginPathInfo(TypedDict):
@@ -88,28 +86,6 @@ class MarketplaceChanges(TypedDict):
     modified: list[tuple[str, str]]
 
 
-def run_git_command(args: list[str]) -> str:
-    """Run git command and return output.
-
-    Args:
-        args: List of git command arguments (e.g., ['status', '--short'])
-
-    Returns:
-        Git command stdout output stripped of whitespace
-
-    Raises:
-        FileNotFoundError: If git binary is not found in PATH.
-    """
-    if _GIT_PATH is None:
-        msg = "git executable not found in PATH"
-        raise FileNotFoundError(msg)
-
-    result = subprocess.run([_GIT_PATH, *args], capture_output=True, text=True, check=False)
-    if result.returncode != 0 and result.stderr:
-        sys.stderr.write(f"git {' '.join(args)}: {result.stderr.strip()}\n")
-    return result.stdout.strip()
-
-
 def get_git_status() -> dict[str, list[str]]:
     """Get staged file changes categorized by operation.
 
@@ -122,8 +98,13 @@ def get_git_status() -> dict[str, list[str]]:
     """
     status: dict[str, list[str]] = {"added": [], "deleted": [], "modified": []}
 
-    # Get staged changes
-    output = run_git_command(["diff", "--cached", "--name-status"])
+    try:
+        repo = git.Repo(search_parent_directories=True)
+    except InvalidGitRepositoryError:
+        return status
+
+    # Get staged changes as name-status output (equivalent to git diff --cached --name-status)
+    output = repo.git.diff("--cached", "--name-status")
 
     min_fields = 2
     rename_fields = 3
@@ -286,15 +267,14 @@ def _read_head_json(filepath: str | Path) -> object | None:
         Parsed JSON data, or None if the file does not exist in HEAD
         or cannot be parsed.
     """
-    if _GIT_PATH is None:
-        return None
-
-    result = subprocess.run([_GIT_PATH, "show", f"HEAD:{filepath}"], capture_output=True, text=True, check=False)
-    if result.returncode != 0:
+    try:
+        repo = git.Repo(search_parent_directories=True)
+        content = repo.git.show(f"HEAD:{filepath}")
+    except (InvalidGitRepositoryError, git.GitCommandError):
         return None
 
     try:
-        parsed: object = msgspec.json.decode(result.stdout)
+        parsed: object = msgspec.json.decode(content)
     except (msgspec.DecodeError, ValueError):
         return None
     return parsed
@@ -717,11 +697,13 @@ def _git_stage_file(filepath: str) -> None:
     Args:
         filepath: Relative path to stage.
     """
-    if not _GIT_PATH:
+    try:
+        repo = git.Repo(search_parent_directories=True)
+        repo.index.add([filepath])
+    except InvalidGitRepositoryError:
         return
-    result = subprocess.run([_GIT_PATH, "add", filepath], capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        sys.stderr.write(f"Warning: git add {filepath} failed: {result.stderr.strip()}\n")
+    except git.GitCommandError as exc:
+        sys.stderr.write(f"Warning: git add {filepath} failed: {exc}\n")
 
 
 def _discover_skills(plugin_dir: Path) -> list[str]:

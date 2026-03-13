@@ -19,8 +19,8 @@ import re
 from io import StringIO
 from typing import TYPE_CHECKING, TypeAlias
 
-from frontmatter import Post, dump, dumps, load, loads
-from frontmatter.default_handlers import BaseHandler
+from frontmatter import Post, dump, dumps, load, loads  # type: ignore[attr-defined]
+from frontmatter.default_handlers import BaseHandler  # type: ignore[attr-defined]
 from ruamel.yaml import YAML
 
 if TYPE_CHECKING:

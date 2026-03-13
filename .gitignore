@@ -17,6 +17,7 @@ dist/
 !.claude/vendor/CLAUDE.md
 .claude/worktrees
 .claude/reports/*
+.claude/smells/
 
 # ── GSD baseline (auto-generated) ──
 .gsd/activity/
@@ -46,3 +47,7 @@ vendor/
 coverage/
 .cache/
 tmp/
+
+# Benchmark artifacts
+scripts/bench-plugin/
+scripts/results/

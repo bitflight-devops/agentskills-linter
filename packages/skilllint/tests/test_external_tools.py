@@ -310,34 +310,17 @@ def test_validate_with_claude_sets_timeout(mocker: MockerFixture, sample_plugin_
 # ============================================================================
 
 
-def test_get_staged_files_when_git_not_available(mocker: MockerFixture) -> None:
-    """Test get_staged_files returns empty list when git not available.
-
-    Tests: Git detection using shutil.which
-    How: Mock shutil.which to return None
-    Why: Verify graceful degradation when git not installed
-    """
-    # Arrange: Mock git as unavailable
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value=None)
-
-    # Act: Get staged files
-    result = get_staged_files()
-
-    # Assert: Returns empty list
-    assert result == []
-
-
 def test_get_staged_files_when_not_git_repo(mocker: MockerFixture) -> None:
     """Test get_staged_files returns empty list when not in git repo.
 
     Tests: Handling non-git directories
-    How: Mock subprocess.run to return non-zero exit code
+    How: Mock Repo to raise InvalidGitRepositoryError
     Why: Verify no crash when running outside git repository
     """
-    # Arrange: Mock git available but not in repo
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
-    mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(returncode=128, stdout="", stderr="Not a git repository")
+    from git.exc import InvalidGitRepositoryError
+
+    # Arrange: Mock Repo to raise when not in a git repo
+    mocker.patch("skilllint.plugin_validator.Repo", side_effect=InvalidGitRepositoryError("not a repo"))
 
     # Act: Get staged files
     result = get_staged_files()
@@ -349,16 +332,19 @@ def test_get_staged_files_when_not_git_repo(mocker: MockerFixture) -> None:
 def test_get_staged_files_with_staged_files(mocker: MockerFixture) -> None:
     """Test get_staged_files returns Path objects for staged files.
 
-    Tests: Git diff parsing for staged files
-    How: Mock subprocess.run to return file list
-    Why: Verify correct parsing of git diff output
+    Tests: GitPython index diff parsing for staged files
+    How: Mock Repo.index.diff to return diff items with a_path attributes
+    Why: Verify correct extraction of staged file paths
     """
-    # Arrange: Mock git available with staged files
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
-    mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(
-        returncode=0, stdout="plugins/plugin-creator/SKILL.md\nplugins/test/agent.md\n", stderr=""
-    )
+    # Arrange: Build mock diff items
+    diff_item_1 = mocker.Mock()
+    diff_item_1.a_path = "plugins/plugin-creator/SKILL.md"
+    diff_item_2 = mocker.Mock()
+    diff_item_2.a_path = "plugins/test/agent.md"
+
+    mock_repo = mocker.Mock()
+    mock_repo.index.diff.return_value = [diff_item_1, diff_item_2]
+    mocker.patch("skilllint.plugin_validator.Repo", return_value=mock_repo)
 
     # Act: Get staged files
     result = get_staged_files()
@@ -373,14 +359,14 @@ def test_get_staged_files_with_staged_files(mocker: MockerFixture) -> None:
 def test_get_staged_files_with_no_staged_files(mocker: MockerFixture) -> None:
     """Test get_staged_files returns empty list when no files staged.
 
-    Tests: Empty git diff output handling
-    How: Mock subprocess.run to return empty stdout
-    Why: Verify correct handling of empty diff output
+    Tests: Empty index diff handling
+    How: Mock Repo.index.diff to return empty list
+    Why: Verify correct handling of no staged changes
     """
-    # Arrange: Mock git available but no staged files
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
-    mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(returncode=0, stdout="", stderr="")
+    # Arrange: Mock repo with no staged files
+    mock_repo = mocker.Mock()
+    mock_repo.index.diff.return_value = []
+    mocker.patch("skilllint.plugin_validator.Repo", return_value=mock_repo)
 
     # Act: Get staged files
     result = get_staged_files()
@@ -389,17 +375,15 @@ def test_get_staged_files_with_no_staged_files(mocker: MockerFixture) -> None:
     assert result == []
 
 
-def test_get_staged_files_timeout(mocker: MockerFixture) -> None:
-    """Test get_staged_files handles timeout gracefully.
+def test_get_staged_files_handles_value_error(mocker: MockerFixture) -> None:
+    """Test get_staged_files handles ValueError gracefully (e.g. empty/bare repo).
 
-    Tests: Timeout handling for git diff
-    How: Mock subprocess.run to raise TimeoutExpired
-    Why: Verify timeout doesn't crash, returns empty list
+    Tests: Handling repos with no HEAD commit
+    How: Mock Repo to raise ValueError
+    Why: Verify graceful degradation for empty repositories
     """
-    # Arrange: Mock git available but times out
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
-    mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.side_effect = subprocess.TimeoutExpired(cmd=["git", "diff", "--cached", "--name-only"], timeout=10)
+    # Arrange: Mock Repo to raise ValueError (e.g. no HEAD)
+    mocker.patch("skilllint.plugin_validator.Repo", side_effect=ValueError("no HEAD"))
 
     # Act: Get staged files
     result = get_staged_files()
@@ -408,17 +392,19 @@ def test_get_staged_files_timeout(mocker: MockerFixture) -> None:
     assert result == []
 
 
-def test_get_staged_files_file_not_found(mocker: MockerFixture) -> None:
-    """Test get_staged_files handles FileNotFoundError gracefully.
+def test_get_staged_files_handles_diff_error(mocker: MockerFixture) -> None:
+    """Test get_staged_files handles errors from index.diff gracefully.
 
-    Tests: Handling when git executable not found despite shutil.which
-    How: Mock subprocess.run to raise FileNotFoundError
-    Why: Verify edge case where git path becomes invalid
+    Tests: Handling GitPython diff failures
+    How: Mock index.diff to raise an exception
+    Why: Verify non-repo errors are handled gracefully
     """
-    # Arrange: Mock git available but subprocess fails
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
-    mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.side_effect = FileNotFoundError("git not found")
+    from git.exc import InvalidGitRepositoryError
+
+    # Arrange: Mock repo where index.diff raises
+    mock_repo = mocker.Mock()
+    mock_repo.index.diff.side_effect = InvalidGitRepositoryError("error")
+    mocker.patch("skilllint.plugin_validator.Repo", return_value=mock_repo)
 
     # Act: Get staged files
     result = get_staged_files()
@@ -430,14 +416,12 @@ def test_get_staged_files_file_not_found(mocker: MockerFixture) -> None:
 def test_get_staged_files_os_error(mocker: MockerFixture) -> None:
     """Test get_staged_files handles OSError gracefully.
 
-    Tests: Handling general subprocess errors
-    How: Mock subprocess.run to raise OSError
-    Why: Verify non-timeout subprocess failures handled gracefully
+    Tests: Handling general OS-level git errors
+    How: Mock Repo to raise OSError
+    Why: Verify non-git OS failures handled gracefully
     """
-    # Arrange: Mock git available but subprocess fails
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
-    mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.side_effect = OSError("Permission denied")
+    # Arrange: Mock Repo to raise OSError
+    mocker.patch("skilllint.plugin_validator.Repo", side_effect=OSError("Permission denied"))
 
     # Act: Get staged files
     result = get_staged_files()
@@ -446,115 +430,48 @@ def test_get_staged_files_os_error(mocker: MockerFixture) -> None:
     assert result == []
 
 
-def test_get_staged_files_no_shell_true(mocker: MockerFixture) -> None:
-    """Test get_staged_files never uses shell=True.
+def test_get_staged_files_uses_index_diff_against_head(mocker: MockerFixture) -> None:
+    """Test get_staged_files calls index.diff with the HEAD commit.
 
-    Tests: Subprocess security - no shell injection risk
-    How: Mock subprocess.run, verify shell parameter
-    Why: Security requirement - shell=True enables command injection
+    Tests: GitPython API usage — staged files are index diff vs HEAD
+    How: Mock Repo, verify index.diff is called with head commit
+    Why: Confirm the correct GitPython pattern is used for staged files
     """
-    # Arrange: Mock git available
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
-    mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(returncode=0, stdout="", stderr="")
+    # Arrange: Mock repo with no staged files
+    mock_repo = mocker.Mock()
+    mock_repo.index.diff.return_value = []
+    mocker.patch("skilllint.plugin_validator.Repo", return_value=mock_repo)
 
     # Act: Get staged files
     get_staged_files()
 
-    # Assert: subprocess.run called without shell=True
-    mock_run.assert_called_once()
-    call_kwargs = mock_run.call_args[1]
-    # shell parameter should be absent (defaults to False)
-    assert "shell" not in call_kwargs or call_kwargs["shell"] is False
+    # Assert: index.diff called with the HEAD commit object
+    mock_repo.index.diff.assert_called_once_with(mock_repo.head.commit)
 
 
-def test_get_staged_files_uses_list_arguments(mocker: MockerFixture) -> None:
-    """Test get_staged_files passes command as list, not string.
+def test_get_staged_files_filters_items_without_path(mocker: MockerFixture) -> None:
+    """Test get_staged_files skips diff items that have no a_path.
 
-    Tests: Subprocess security - list arguments prevent shell injection
-    How: Mock subprocess.run, verify first argument is list
-    Why: Security requirement - list arguments are safer than shell strings
+    Tests: Defensive filtering of diff items with empty paths
+    How: Mock index.diff to return items with and without a_path
+    Why: Verify only items with actual paths are returned
     """
-    # Arrange: Mock git available
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
-    mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(returncode=0, stdout="", stderr="")
+    # Arrange: Mix of items with and without a_path
+    item_with_path = mocker.Mock()
+    item_with_path.a_path = "plugins/test/file1.md"
+    item_empty_path = mocker.Mock()
+    item_empty_path.a_path = ""
 
-    # Act: Get staged files
-    get_staged_files()
-
-    # Assert: First argument is list, not string
-    mock_run.assert_called_once()
-    call_args = mock_run.call_args[0][0]
-    assert isinstance(call_args, list), "Command must be list, not string"
-    assert len(call_args) == 4  # [git_path, "diff", "--cached", "--name-only"]
-
-
-def test_get_staged_files_uses_full_path(mocker: MockerFixture) -> None:
-    """Test get_staged_files uses full path from shutil.which.
-
-    Tests: Subprocess security - uses full command path
-    How: Mock shutil.which, verify subprocess.run uses returned path
-    Why: Security requirement - prevents PATH manipulation attacks
-    """
-    # Arrange: Mock git at specific path
-    git_path = "/opt/custom/bin/git"
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value=git_path)
-    mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(returncode=0, stdout="", stderr="")
-
-    # Act: Get staged files
-    get_staged_files()
-
-    # Assert: Uses full path from shutil.which
-    mock_run.assert_called_once()
-    call_args = mock_run.call_args[0][0]
-    assert call_args[0] == git_path
-
-
-def test_get_staged_files_sets_timeout(mocker: MockerFixture) -> None:
-    """Test get_staged_files sets timeout parameter.
-
-    Tests: Subprocess timeout configuration
-    How: Mock subprocess.run, verify timeout parameter set
-    Why: Prevent hanging on stuck git commands
-    """
-    # Arrange: Mock git available
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
-    mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(returncode=0, stdout="", stderr="")
-
-    # Act: Get staged files
-    get_staged_files()
-
-    # Assert: Timeout parameter set to 10 seconds
-    mock_run.assert_called_once()
-    call_kwargs = mock_run.call_args[1]
-    assert "timeout" in call_kwargs
-    assert call_kwargs["timeout"] == 10
-
-
-def test_get_staged_files_filters_empty_lines(mocker: MockerFixture) -> None:
-    """Test get_staged_files filters out empty lines from git output.
-
-    Tests: Empty line filtering in git diff output
-    How: Mock subprocess.run to return output with empty lines
-    Why: Verify only actual file paths returned, not empty strings
-    """
-    # Arrange: Mock git with empty lines in output
-    mocker.patch("skilllint.plugin_validator.shutil.which", return_value="/usr/bin/git")
-    mock_run = mocker.patch("skilllint.plugin_validator.subprocess.run")
-    mock_run.return_value = mocker.Mock(
-        returncode=0, stdout="\nplugins/test/file1.md\n\n\nplugins/test/file2.md\n\n", stderr=""
-    )
+    mock_repo = mocker.Mock()
+    mock_repo.index.diff.return_value = [item_with_path, item_empty_path]
+    mocker.patch("skilllint.plugin_validator.Repo", return_value=mock_repo)
 
     # Act: Get staged files
     result = get_staged_files()
 
     # Assert: Only non-empty paths returned
-    assert len(result) == 2
+    assert len(result) == 1
     assert result[0] == Path("plugins/test/file1.md")
-    assert result[1] == Path("plugins/test/file2.md")
 
 
 # ============================================================================

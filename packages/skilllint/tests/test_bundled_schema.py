@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import msgspec.json
 from importlib.resources import files
+
+import msgspec.json
 
 
 def test_schema_file_readable_via_importlib_resources() -> None:

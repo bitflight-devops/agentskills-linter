@@ -2895,18 +2895,12 @@ def _get_git_remote_url(repo_dir: Path) -> str | None:
     Returns:
         Remote URL string with .git suffix stripped, or None if unavailable.
     """
-    git_path = shutil.which("git")
-    if not git_path:
-        return None
-
     try:
-        result = subprocess.run(
-            [git_path, "remote", "get-url", "origin"], capture_output=True, text=True, cwd=str(repo_dir), check=True
-        )
-    except (subprocess.CalledProcessError, FileNotFoundError):
+        repo = Repo(str(repo_dir))
+        remote_url = repo.remotes.origin.url
+    except (InvalidGitRepositoryError, NoSuchPathError, AttributeError, ValueError):
         return None
 
-    remote_url = result.stdout.strip()
     if not remote_url:
         return None
 
@@ -2919,28 +2913,24 @@ def _get_git_author() -> dict[str, str] | None:
     Returns:
         Dict with 'name' and optionally 'email', or None if unavailable.
     """
-    git_path = shutil.which("git")
-    if not git_path:
-        return None
-
     try:
-        name_result = subprocess.run([git_path, "config", "user.name"], capture_output=True, text=True, check=True)
-    except (subprocess.CalledProcessError, FileNotFoundError):
+        repo = Repo(search_parent_directories=True)
+        reader = repo.config_reader()
+        name = reader.get_value("user", "name", default="")
+    except (InvalidGitRepositoryError, NoSuchPathError, KeyError):
         return None
 
-    name = name_result.stdout.strip()
     if not name:
         return None
 
     try:
-        email_result = subprocess.run([git_path, "config", "user.email"], capture_output=True, text=True, check=False)
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return {"name": name}
+        email = repo.config_reader().get_value("user", "email", default="")
+    except KeyError:
+        email = ""
 
-    email = email_result.stdout.strip() if email_result.returncode == 0 else None
-    author: dict[str, str] = {"name": name}
+    author: dict[str, str] = {"name": str(name)}
     if email:
-        author["email"] = email
+        author["email"] = str(email)
     return author
 
 
@@ -4170,13 +4160,8 @@ def validate_with_claude(plugin_dir: Path) -> tuple[bool, str]:
 def get_staged_files() -> list[Path]:
     """Get list of staged files for pre-commit context.
 
-    Parses output of `git diff --cached --name-only` to identify which files
-    are staged for commit. Used in pre-commit hooks to validate only changed files.
-
-    Security requirements:
-    - Uses list arguments: ["git", "diff", ...]
-    - Sets timeout to prevent hanging
-    - Never uses shell=True
+    Uses GitPython to identify which files are staged for commit (index vs HEAD).
+    Used in pre-commit hooks to validate only changed files.
 
     Returns:
         List of Path objects for staged files
@@ -4185,36 +4170,14 @@ def get_staged_files() -> list[Path]:
     Raises:
         Never raises - returns empty list on failure
     """
-    # Get full path to git command
-    git_path = shutil.which("git")
-    if git_path is None:
-        return []
-
     try:
-        result = subprocess.run(
-            [git_path, "diff", "--cached", "--name-only"],
-            capture_output=True,
-            text=True,
-            timeout=10,  # 10 seconds should be plenty for git diff
-            check=False,
-        )
-
-        # If command failed (not a git repo, etc.), return empty list
-        if result.returncode != 0:
-            return []
-
-        # Parse output into Path objects
-        # Filter out empty lines
-        return [Path(line.strip()) for line in result.stdout.splitlines() if line.strip()]
-
-    except subprocess.TimeoutExpired:
-        # Git diff shouldn't take this long - something is wrong
+        repo = Repo(search_parent_directories=True)
+        # diff between index (staged) and HEAD commit gives staged files
+        diffs = repo.index.diff(repo.head.commit)
+        return [Path(item.a_path) for item in diffs if item.a_path]
+    except (InvalidGitRepositoryError, NoSuchPathError, ValueError):
         return []
-    except FileNotFoundError:
-        # Git not found (should be caught by shutil.which check above)
-        return []
-    except OSError:
-        # Other subprocess errors
+    except Exception:  # noqa: BLE001
         return []
 
 
