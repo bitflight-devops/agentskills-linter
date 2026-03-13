@@ -793,7 +793,7 @@ class TestNR001NamespaceFromPluginJson:
         Returns:
             Path to the plugin directory
         """
-        import json as _json
+        import msgspec.json as _msgspec_json
 
         plugin_dir = plugins_root / dir_name
         plugin_dir.mkdir(parents=True, exist_ok=True)
@@ -802,7 +802,7 @@ class TestNR001NamespaceFromPluginJson:
         claude_plugin_dir = plugin_dir / ".claude-plugin"
         claude_plugin_dir.mkdir(exist_ok=True)
         plugin_json = claude_plugin_dir / "plugin.json"
-        plugin_json.write_text(_json.dumps({"name": json_name}))
+        plugin_json.write_text(_msgspec_json.encode({"name": json_name}).decode())
 
         return plugin_dir
 

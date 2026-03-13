@@ -39,7 +39,7 @@ plugin is installed."
 from __future__ import annotations
 
 import importlib.util
-import json
+import msgspec.json
 import sys
 from pathlib import Path
 
@@ -101,7 +101,7 @@ def _make_standard_plugin(tmp_path: Path, skills: list[str]) -> tuple[Path, Path
     plugin_json_dir = plugin_root / ".claude-plugin"
     plugin_json_dir.mkdir(parents=True)
     plugin_json_path = plugin_json_dir / "plugin.json"
-    plugin_json_path.write_text(json.dumps({"name": "demo-plugin", "version": "1.0.0"}, indent=2), encoding="utf-8")
+    plugin_json_path.write_text(msgspec.json.format(msgspec.json.encode({"name": "demo-plugin", "version": "1.0.0"}), indent=2).decode(), encoding="utf-8")
 
     return plugin_root, plugin_json_path
 
@@ -138,14 +138,14 @@ class TestReconcileOnePluginDoesNotAddSkillsArrayForStandardPaths:
         # Arrange
         _plugin_root, plugin_json_path = _make_standard_plugin(tmp_path, skills=["my-skill", "other-skill"])
         plugins_root = tmp_path / "plugins"
-        original_json = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+        original_json = msgspec.json.decode(plugin_json_path.read_text(encoding="utf-8"))
         assert "skills" not in original_json, "Precondition: plugin.json must start without skills array"
 
         # Act
         auto_sync._reconcile_one_plugin("demo-plugin", plugins_root, dry_run=False)
 
         # Assert — plugin.json must NOT have acquired a skills field
-        result = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+        result = msgspec.json.decode(plugin_json_path.read_text(encoding="utf-8"))
         assert "skills" not in result, (
             "Bug 1: _reconcile_one_plugin added a 'skills' array for standard-path skills. "
             "Standard-path skills are auto-discovered and must not be explicitly registered."
@@ -211,14 +211,14 @@ class TestReconcileDoesNotAddCommandsArrayForInvocableStandardPathSkills:
         # Arrange
         _plugin_root, plugin_json_path = _make_standard_plugin(tmp_path, skills=["invocable-skill"])
         plugins_root = tmp_path / "plugins"
-        original_json = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+        original_json = msgspec.json.decode(plugin_json_path.read_text(encoding="utf-8"))
         assert "commands" not in original_json, "Precondition: plugin.json must start without commands array"
 
         # Act
         auto_sync._reconcile_one_plugin("demo-plugin", plugins_root, dry_run=False)
 
         # Assert
-        result = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+        result = msgspec.json.decode(plugin_json_path.read_text(encoding="utf-8"))
         assert "commands" not in result, (
             "Bug 2: _reconcile_one_plugin added a 'commands' array containing "
             "standard-path user-invocable skills.  Skills under ./skills/ are "
@@ -389,7 +389,7 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
         claude_plugin = plugin_root / ".claude-plugin"
         claude_plugin.mkdir(parents=True)
         (claude_plugin / "plugin.json").write_text(
-            json.dumps({"name": "test-plugin", "version": "1.0.0"}, indent=2), encoding="utf-8"
+            msgspec.json.format(msgspec.json.encode({"name": "test-plugin", "version": "1.0.0"}), indent=2).decode(), encoding="utf-8"
         )
 
         return plugin_root
@@ -498,7 +498,7 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
         # validator can find the skill at all; without this the validator won't
         # know about custom-skills/ and won't fire.
         (claude_plugin / "plugin.json").write_text(
-            json.dumps({"name": "nonstandard-plugin", "version": "1.0.0", "skills": "./custom-skills/"}, indent=2),
+            msgspec.json.format(msgspec.json.encode({"name": "nonstandard-plugin", "version": "1.0.0", "skills": "./custom-skills/"}), indent=2).decode(),
             encoding="utf-8",
         )
 
@@ -547,13 +547,13 @@ class TestReconcileModeASkipsSkillsReconciliation:
         # Arrange
         _plugin_root, plugin_json_path = _make_standard_plugin(tmp_path, skills=["skill-a", "skill-b"])
         plugins_root = tmp_path / "plugins"
-        assert "skills" not in json.loads(plugin_json_path.read_text(encoding="utf-8"))
+        assert "skills" not in msgspec.json.decode(plugin_json_path.read_text(encoding="utf-8"))
 
         # Act
         auto_sync._reconcile_one_plugin("demo-plugin", plugins_root, dry_run=False)
 
         # Assert
-        result = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+        result = msgspec.json.decode(plugin_json_path.read_text(encoding="utf-8"))
         assert "skills" not in result, (
             "Mode A: reconcile added a 'skills' field to a plugin with no 'skills' field. "
             "Standard-path skills are auto-discovered — the field must remain absent."
@@ -601,13 +601,13 @@ class TestReconcileModeASkipsSkillsReconciliation:
         # Arrange
         _plugin_root, plugin_json_path = _make_standard_plugin(tmp_path, skills=["invocable-skill"])
         plugins_root = tmp_path / "plugins"
-        assert "commands" not in json.loads(plugin_json_path.read_text(encoding="utf-8"))
+        assert "commands" not in msgspec.json.decode(plugin_json_path.read_text(encoding="utf-8"))
 
         # Act
         auto_sync._reconcile_one_plugin("demo-plugin", plugins_root, dry_run=False)
 
         # Assert
-        result = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+        result = msgspec.json.decode(plugin_json_path.read_text(encoding="utf-8"))
         assert "commands" not in result, (
             "Mode A: reconcile added a 'commands' field for a standard-path invocable skill. "
             "Auto-discovered invocable skills must not be explicitly registered in commands."
@@ -647,7 +647,7 @@ def _make_mode_b_plugin(tmp_path: Path, registered_skills: list[str], disk_skill
     plugin_json_dir.mkdir(parents=True)
     plugin_json_path = plugin_json_dir / "plugin.json"
     manifest = {"name": "mode-b-plugin", "version": "1.0.0", "skills": [f"./skills/{s}" for s in registered_skills]}
-    plugin_json_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+    plugin_json_path.write_text(msgspec.json.format(msgspec.json.encode(manifest), indent=2).decode(), encoding="utf-8")
 
     return plugin_root, plugin_json_path
 
@@ -687,7 +687,7 @@ class TestReconcileModeBOnlyRemovesDeletedSkills:
         auto_sync._reconcile_one_plugin("mode-b-plugin", plugins_root, dry_run=False)
 
         # Assert
-        result = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+        result = msgspec.json.decode(plugin_json_path.read_text(encoding="utf-8"))
         skills = result.get("skills", [])
         assert "./skills/skill-b" not in skills, (
             "Mode B: reconcile did not remove the stale entry './skills/skill-b' "
@@ -725,7 +725,7 @@ class TestReconcileModeBOnlyRemovesDeletedSkills:
         auto_sync._reconcile_one_plugin("mode-b-plugin", plugins_root, dry_run=False)
 
         # Assert
-        result = json.loads(plugin_json_path.read_text(encoding="utf-8"))
+        result = msgspec.json.decode(plugin_json_path.read_text(encoding="utf-8"))
         skills = result.get("skills", [])
         assert "./skills/new-skill" not in skills, (
             "Mode B: reconcile auto-added './skills/new-skill' to the skills array. "
@@ -802,7 +802,7 @@ class TestSK009ManualSkillSelectionInfo:
         claude_plugin = plugin_root / ".claude-plugin"
         claude_plugin.mkdir(parents=True)
         manifest = {"name": "explicit-plugin", "version": "1.0.0", "skills": [f"./skills/{s}" for s in skills]}
-        (claude_plugin / "plugin.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        (claude_plugin / "plugin.json").write_text(msgspec.json.format(msgspec.json.encode(manifest), indent=2).decode(), encoding="utf-8")
 
         return plugin_root
 
@@ -881,7 +881,7 @@ class TestSK009ManualSkillSelectionInfo:
 
         # Write validator.json suppressing SK009 at the plugin root level
         validator_json_path = plugin_root / ".claude-plugin" / "validator.json"
-        validator_json_path.write_text(json.dumps({"ignore": {".": ["SK009"]}}), encoding="utf-8")
+        validator_json_path.write_text(msgspec.json.encode({"ignore": {".": ["SK009"]}}).decode(), encoding="utf-8")
 
         validator = PluginRegistrationValidator()
 
@@ -928,7 +928,7 @@ class TestSK009ManualSkillSelectionInfo:
         claude_plugin.mkdir(parents=True)
         # Only list one of the two skills in the explicit array.
         manifest = {"name": "mixed-plugin", "version": "1.0.0", "skills": ["./skills/listed-skill"]}
-        (claude_plugin / "plugin.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        (claude_plugin / "plugin.json").write_text(msgspec.json.format(msgspec.json.encode(manifest), indent=2).decode(), encoding="utf-8")
 
         validator = PluginRegistrationValidator()
 
