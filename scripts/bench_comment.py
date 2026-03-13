@@ -160,14 +160,10 @@ def render_scenario_table(
     cmp_idx = build_index(compare_entries)
     base_idx = build_index(base_entries)
 
-    # Union of all metric names from both compare and base.
-    keys = set(cmp_idx) | set(base_idx)
-    all_names = sorted(keys)
-
     rows: list[str] = []
     has_regression = False
 
-    for name in all_names:
+    for name in sorted(set(cmp_idx) | set(base_idx)):
         cmp_entry = cmp_idx.get(name)
         base_entry = base_idx.get(name)
 
