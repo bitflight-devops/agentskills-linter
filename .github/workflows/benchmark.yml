@@ -62,7 +62,8 @@ jobs:
       - name: Run bench_io for github-action-benchmark output
         run: |
           source .venv/bin/activate
-          python scripts/bench_io.py /tmp/bench-plugin --output scripts/results/bench_io_gh.json
+          mkdir -p scripts/results
+          python scripts/bench_io.py /tmp/bench-plugin --output scripts/results/bench_io_gh.json | tee scripts/results/benchmark_results.json
 
       - name: Store I/O benchmark result
         if: github.ref == 'refs/heads/main'
