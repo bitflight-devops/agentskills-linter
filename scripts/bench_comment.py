@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate a markdown PR comment comparing benchmark results across multiple scenarios.
+r"""Generate a markdown PR comment comparing benchmark results across multiple scenarios.
 
 Reads github-action-benchmark JSON files for each named scenario and writes a
 markdown comment showing per-scenario tables with before/after values, change
@@ -23,8 +23,7 @@ import argparse
 import json
 import pathlib
 import sys
-from datetime import datetime, timezone
-
+from datetime import UTC, datetime
 
 # Metrics where smaller is better (timing metrics).
 _SMALLER_IS_BETTER: frozenset[str] = frozenset({
@@ -43,6 +42,9 @@ _SMALLER_IS_BETTER: frozenset[str] = frozenset({
 
 # Hidden marker so sticky-pull-request-comment can find and update the comment.
 _MARKER = "<!-- benchmark-results -->"
+
+# Number of colon-separated parts in a --scenario argument: NAME:COMPARE_PATH:BASE_PATH
+_SCENARIO_PARTS = 3
 
 
 def load_entries(path: pathlib.Path, label: str) -> list[dict[str, object]]:
@@ -202,7 +204,7 @@ def parse_scenario_arg(raw: str) -> tuple[str, pathlib.Path, pathlib.Path]:
             colon-separated parts.
     """
     parts = raw.split(":", 2)
-    if len(parts) != 3:
+    if len(parts) != _SCENARIO_PARTS:
         raise argparse.ArgumentTypeError(f"--scenario must be NAME:COMPARE_PATH:BASE_PATH, got: {raw!r}")
     name, compare_raw, base_raw = parts
     return name, pathlib.Path(compare_raw), pathlib.Path(base_raw)
@@ -223,7 +225,7 @@ def render_markdown(scenarios: list[tuple[str, pathlib.Path, pathlib.Path]], thr
         Complete markdown string for the PR comment.
     """
     threshold_pct = int((threshold - 1.0) * 100)
-    now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
 
     sections: list[str] = []
     any_regression = False
