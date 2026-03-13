@@ -15,10 +15,10 @@ Tests:
 
 from __future__ import annotations
 
-import msgspec.json
 from typing import TYPE_CHECKING
 from unittest.mock import patch
 
+import msgspec.json
 import pytest
 
 from skilllint.plugin_validator import PluginRegistrationValidator

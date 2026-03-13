@@ -39,9 +39,10 @@ plugin is installed."
 from __future__ import annotations
 
 import importlib.util
-import msgspec.json
 import sys
 from pathlib import Path
+
+import msgspec.json
 
 # ---------------------------------------------------------------------------
 # Module imports — auto_sync_manifests.py has a hyphen-containing filename so

@@ -25,12 +25,12 @@ Test isolation strategy:
 from __future__ import annotations
 
 import importlib.util
-import msgspec.json
 import shutil
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import msgspec.json
 import pytest
 
 if TYPE_CHECKING:
