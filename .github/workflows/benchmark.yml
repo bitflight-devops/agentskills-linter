@@ -167,7 +167,7 @@ jobs:
       - name: Run CPU benchmark tests
         run: |
           source .venv/bin/activate
-          pytest scripts/bench_cpu.py -v --no-header
+          pytest scripts/bench_cpu.py -v --no-header -p no:xdist --no-cov
 
       - name: Run bench_cpu for github-action-benchmark output
         run: |
