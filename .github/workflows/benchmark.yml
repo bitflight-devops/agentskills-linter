@@ -133,68 +133,10 @@ jobs:
       - name: Compute and print performance ratio
         if: github.event_name == 'pull_request'
         run: |
-          uv run python - <<'EOF'
-          import json, pathlib, sys
-
-          compare_file = pathlib.Path("scripts/results/benchmark_results.json")
-          base_file = pathlib.Path("scripts/results/benchmark_results_base.json")
-
-          if not compare_file.exists() or not base_file.exists():
-              print("Skipping ratio computation: result files not found.")
-              sys.exit(0)
-
-          compare_text = compare_file.read_text().strip()
-          base_text = base_file.read_text().strip()
-
-          if not compare_text or not base_text:
-              print("Skipping ratio computation: one or both result files are empty.")
-              sys.exit(0)
-
-          compare_data = json.loads(compare_text)
-          base_data = json.loads(base_text)
-
-          # compare_data: list of result dicts with duration_seconds (seconds)
-          if isinstance(compare_data, list) and compare_data:
-              last = compare_data[-1]
-              if "duration_seconds" in last:
-                  compare_duration = float(last["duration_seconds"])  # already in seconds
-              elif "mean_ms" in last:
-                  compare_duration = float(last["mean_ms"]) / 1000.0  # convert ms → s
-              else:
-                  print("compare_data entry missing duration_seconds or mean_ms", file=sys.stderr)
-                  sys.exit(0)
-          elif isinstance(compare_data, dict):
-              if "duration_seconds" in compare_data:
-                  compare_duration = float(compare_data["duration_seconds"])
-              elif "mean_ms" in compare_data:
-                  compare_duration = float(compare_data["mean_ms"]) / 1000.0
-              else:
-                  print("compare_data missing duration_seconds or mean_ms", file=sys.stderr)
-                  sys.exit(0)
-          else:
-              compare_duration = 0
-
-          # base_data: dict with mean_ms (milliseconds)
-          if isinstance(base_data, dict) and "mean_ms" in base_data:
-              base_duration = float(base_data["mean_ms"]) / 1000.0  # mean_ms is ms; convert to seconds
-          elif isinstance(base_data, dict) and "duration_seconds" in base_data:
-              base_duration = float(base_data["duration_seconds"])  # already in seconds
-          else:
-              print("base_data missing mean_ms or duration_seconds", file=sys.stderr)
-              sys.exit(0)
-
-          if base_duration > 0 and compare_duration > 0:
-              ratio = compare_duration / base_duration
-              change_pct = (ratio - 1.0) * 100.0
-              direction = "slower" if ratio > 1.0 else "faster"
-              print(
-                  f"BENCHMARK RATIO: compare={compare_duration:.2f}s  "
-                  f"base={base_duration:.2f}s  "
-                  f"ratio={ratio:.3f}x ({abs(change_pct):.1f}% {direction})"
-              )
-          else:
-              print("Could not compute ratio: one or both durations are zero.")
-          EOF
+          source .venv/bin/activate
+          python scripts/bench_ratio.py \
+            --compare scripts/results/benchmark_results.json \
+            --base scripts/results/benchmark_results_base.json
 
   benchmark-cpu:
     name: CPU/Logic Performance Benchmark
