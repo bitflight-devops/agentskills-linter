@@ -21,6 +21,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+  deployments: write
+  pull-requests: write
+
 jobs:
   benchmark-io:
     name: I/O Performance Benchmark
@@ -52,6 +57,23 @@ jobs:
       - name: Run I/O benchmark tests
         run: uv run pytest tests/benchmarks/test_benchmark.py -v --no-header -p no:xdist
 
+      - name: Run bench_io for github-action-benchmark output
+        run: |
+          python bench/bench_io.py /tmp/bench-plugin --output bench/results/bench_io_gh.json
+
+      - name: Store I/O benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: customSmallerIsBetter
+          output-file-path: bench/results/bench_io_gh.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: ${{ github.ref == 'refs/heads/main' }}
+          alert-threshold: '130%'
+          comment-on-alert: true
+          fail-on-alert: false
+          alert-comment-cc-users: '@bitflight-devops'
+          benchmark-data-dir-path: dev/bench
+
       - name: Upload compare benchmark results
         uses: actions/upload-artifact@v7.0.0
         with:
@@ -73,7 +95,7 @@ jobs:
 
       - name: Run base I/O benchmark
         if: github.event_name == 'pull_request'
-        run: python bench/bench_io.py /tmp/bench-plugin | tee bench/results/benchmark_results_base.json
+        run: python bench/bench_io.py /tmp/bench-plugin --output bench/results/bench_io_base_gh.json | tee bench/results/benchmark_results_base.json
 
       - name: Upload base benchmark results
         if: github.event_name == 'pull_request'
@@ -142,6 +164,22 @@ jobs:
 
       - name: Run CPU benchmark tests
         run: uv run pytest bench/bench_cpu.py -v --no-header
+
+      - name: Run bench_cpu for github-action-benchmark output
+        run: |
+          python bench/bench_cpu.py --output bench/results/bench_cpu_gh.json
+
+      - name: Store CPU benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: customSmallerIsBetter
+          output-file-path: bench/results/bench_cpu_gh.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: ${{ github.ref == 'refs/heads/main' }}
+          alert-threshold: '130%'
+          comment-on-alert: true
+          fail-on-alert: false
+          benchmark-data-dir-path: dev/bench
 
       - name: Upload CPU benchmark results
         uses: actions/upload-artifact@v7.0.0

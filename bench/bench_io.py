@@ -6,10 +6,12 @@ repeats the measurement three times, and emits a JSON summary to stdout.
 Usage::
 
     python bench/bench_io.py <plugin_dir>
+    python bench/bench_io.py <plugin_dir> --output path/to/output.json
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import shutil
@@ -88,24 +90,65 @@ def run_benchmark(plugin_dir: Path, runs: int = 3) -> dict[str, float | int]:
     }
 
 
+def build_gh_benchmark_array(result: dict[str, float | int]) -> list[dict[str, float | str]]:
+    """Build a ``customSmallerIsBetter`` JSON array for github-action-benchmark.
+
+    Args:
+        result: Aggregated timing data returned by :func:`run_benchmark`.
+
+    Returns:
+        List of benchmark entry dicts, each with ``name``, ``value``, and
+        ``unit`` keys, suitable for the ``customSmallerIsBetter`` tool format.
+    """
+    min_ms = float(result["min_ms"])
+    mean_ms = float(result["mean_ms"])
+    max_ms = float(result["max_ms"])
+    file_count = int(result["file_count"])
+    skills_per_sec = file_count / (mean_ms / 1000.0) if mean_ms > 0 else 0.0
+
+    return [
+        {"name": "scan_min_ms", "value": round(min_ms, 3), "unit": "ms"},
+        {"name": "scan_mean_ms", "value": round(mean_ms, 3), "unit": "ms"},
+        {"name": "scan_max_ms", "value": round(max_ms, 3), "unit": "ms"},
+        {"name": "skills_per_second", "value": round(skills_per_sec, 3), "unit": "skills/s"},
+    ]
+
+
 def main() -> None:
-    """Entry point: parse CLI arg, run benchmark, print JSON to stdout.
+    """Entry point: parse CLI args, run benchmark, print JSON to stdout.
+
+    When ``--output`` is provided, also write the ``customSmallerIsBetter``
+    JSON array to the given file path.
 
     Raises:
         SystemExit: With code 2 if the plugin_dir argument is missing or
             the path does not exist.
     """
-    if len(sys.argv) != 2:  # noqa: PLR2004
-        print(f"Usage: {sys.argv[0]} <plugin_dir>", file=sys.stderr)
-        sys.exit(2)
+    parser = argparse.ArgumentParser(description="I/O benchmark for the skilllint CLI")
+    parser.add_argument("plugin_dir", type=Path, help="Path to the extracted plugin directory")
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=None,
+        metavar="PATH",
+        help="Write customSmallerIsBetter JSON array to this file path",
+    )
+    args = parser.parse_args()
 
-    plugin_dir = Path(sys.argv[1])
+    plugin_dir: Path = args.plugin_dir
+    output_path: Path | None = args.output
+
     if not plugin_dir.is_dir():
         print(f"Error: '{plugin_dir}' is not a directory", file=sys.stderr)
         sys.exit(2)
 
     result = run_benchmark(plugin_dir)
     print(json.dumps(result, indent=2))
+
+    if output_path is not None:
+        gh_array = build_gh_benchmark_array(result)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_text(json.dumps(gh_array, indent=2), encoding="utf-8")
 
 
 if __name__ == "__main__":
