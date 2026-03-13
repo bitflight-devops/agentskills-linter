@@ -16,7 +16,7 @@ Date: 2026-03-13
 - Installation section covers: uv, pipx, pip
 - Version checking: cover `uv tool upgrade skilllint`, `pipx upgrade skilllint`, `pip install --upgrade skilllint`
 - The `skilllint rule <rule-id>` pattern: document how to look up rule explanations in the CLI
-- Fix workflow: scan → identify rule IDs → `skilllint rule <id>` for explanation → `skilllint --fix` for auto-fixable issues
+- Fix workflow: scan → identify rule IDs → `skilllint rule <id>` for explanation → `skilllint check --fix` for auto-fixable issues
 - Rule categories to cover: FM-series (frontmatter), SK-series (skill structure/tokens), AS-series (agentskills standard)
 - Progressive disclosure: inline rule reference in the skill; separate references/ file for full rule catalog
 - Plugin structure: single skill, no agents, no hooks

@@ -56,6 +56,7 @@ from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
 from skilllint.adapters.claude_code import ClaudeCodeAdapter
 from skilllint.rules.as_series import run_as_series
 from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
+from skilllint.version import __version__
 
 from .frontmatter_core import (
     MAX_SKILL_NAME_LENGTH,
@@ -67,7 +68,6 @@ from .frontmatter_core import (
     fix_skill_name_field,
     get_frontmatter_model,
 )
-from .frontmatter_utils import RuamelYAMLHandler
 
 if TYPE_CHECKING:
     from pydantic_core import ErrorDetails
@@ -75,9 +75,9 @@ if TYPE_CHECKING:
 # Module-level ruamel.yaml safe-mode instance (replaces yaml.safe_load)
 _yaml_safe = YAML(typ="safe")
 
-# Round-trip YAML instance (via shared handler) for dumping with format preservation
-_rt_handler = RuamelYAMLHandler()
-_rt_yaml = _rt_handler.yaml
+# Round-trip YAML instance for dumping with format preservation
+_rt_yaml = YAML(typ="rt")
+_rt_yaml.preserve_quotes = False
 _rt_yaml.width = 10000  # prevent line wrapping
 
 # Platform adapter registry — loaded once at module level.
@@ -579,7 +579,7 @@ class FileType(StrEnum):
             result = FileType.COMMAND
         elif path.name == "hooks.json":
             result = FileType.HOOK_CONFIG
-        elif "hooks" in path.parts and path.suffix in {".js", ".cjs"}:
+        elif "hooks" in path.parts:
             result = FileType.HOOK_SCRIPT
         elif path.name == "CLAUDE.md":
             result = FileType.CLAUDE_MD
@@ -5261,10 +5261,21 @@ def main(
 # Create Typer app
 app = typer.Typer(help="Validate Claude Code plugins and skills", add_completion=False)
 
+# Version option handled via callback
 
-@app.callback()
-def _callback() -> None:
+
+@app.callback(invoke_without_command=True)
+def _callback(
+    ctx: typer.Context,
+    version: Annotated[bool, typer.Option("--version", "-V", help="Show version and exit", is_eager=True)] = False,
+) -> None:
     """Validate Claude Code plugins, skills, agents, and commands."""
+    if version:
+        print(f"skilllint {__version__}")
+        raise typer.Exit
+    if ctx.invoked_subcommand is None:
+        print("Use 'skilllint --help' for usage.")
+        raise typer.Exit(1)
 
 
 def _show_rules_list(platform: str | None = None, category: str | None = None, severity: str | None = None) -> None:

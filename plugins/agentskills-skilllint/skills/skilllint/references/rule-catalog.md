@@ -1,6 +1,6 @@
 # skilllint Rule Catalog
 
-Complete reference for all rule IDs emitted by `skilllint`. Use `skilllint --verbose <path>` to see explanatory text alongside each violation.
+Complete reference for all rule IDs emitted by `skilllint`. Use `skilllint check --verbose <path>` to see explanatory text alongside each violation.
 
 ---
 

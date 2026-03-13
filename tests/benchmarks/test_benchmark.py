@@ -76,10 +76,7 @@ def test_io_scan_1000_skills_timing(extracted_plugin_dir: Path, plugin_file_coun
     """
     start = time.perf_counter()
     result = subprocess.run(
-        ["skilllint", "check", str(extracted_plugin_dir)],
-        capture_output=True,
-        text=True,
-        check=False,
+        ["skilllint", "check", str(extracted_plugin_dir)], capture_output=True, text=True, check=False
     )
     duration = time.perf_counter() - start
 

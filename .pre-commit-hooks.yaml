@@ -2,6 +2,6 @@
   name: skilllint
   description: Validate AI agent plugins, skills, and agents
   language: python
-  entry: skilllint
+  entry: skilllint check
   types_or: [markdown, json, yaml]
   pass_filenames: true

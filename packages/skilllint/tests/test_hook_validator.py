@@ -68,12 +68,44 @@ class TestDetectFileType:
         result = FileType.detect_file_type(hook_cjs)
         assert result == FileType.HOOK_SCRIPT
 
+    def test_sh_in_hooks_dir_detected_as_hook_script(self, tmp_path: Path) -> None:
+        """Test shell script in hooks/ directory is detected as HOOK_SCRIPT.
+
+        Tests: FileType detection for non-JS hook scripts
+        How: Create hooks/my-hook.sh, call detect_file_type
+        Why: Any executable script in hooks/ should be valid HOOK_SCRIPT
+        """
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        hook_sh = hooks_dir / "my-hook.sh"
+        hook_sh.write_text("#!/bin/bash\necho 'hook'")
+        hook_sh.chmod(0o755)
+
+        result = FileType.detect_file_type(hook_sh)
+        assert result == FileType.HOOK_SCRIPT
+
+    def test_py_in_hooks_dir_detected_as_hook_script(self, tmp_path: Path) -> None:
+        """Test Python script in hooks/ directory is detected as HOOK_SCRIPT.
+
+        Tests: FileType detection for Python hook scripts
+        How: Create hooks/my-hook.py, call detect_file_type
+        Why: Any executable script in hooks/ should be valid HOOK_SCRIPT
+        """
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        hook_py = hooks_dir / "my-hook.py"
+        hook_py.write_text("#!/usr/bin/env python3\nprint('hook')")
+        hook_py.chmod(0o755)
+
+        result = FileType.detect_file_type(hook_py)
+        assert result == FileType.HOOK_SCRIPT
+
     def test_js_outside_hooks_dir_not_detected_as_hook(self, tmp_path: Path) -> None:
         """Test .js file outside hooks/ directory is detected as UNKNOWN.
 
         Tests: FileType detection scope limitation
         How: Create scripts/util.js, call detect_file_type
-        Why: Only .js/.cjs files inside a hooks/ directory are HOOK_SCRIPT
+        Why: Only files inside a hooks/ directory are HOOK_SCRIPT (any extension)
         """
         scripts_dir = tmp_path / "scripts"
         scripts_dir.mkdir()

@@ -5,14 +5,143 @@ files using memory-mapped I/O. Files that already pass linting are exited
 immediately without any write operations. Files that require fixes are rewritten
 atomically via a temporary file and ``pathlib.Path.replace``, making the processor safe
 to run across large collections of files.
+
+Also provides a fast in-memory frontmatter parser that avoids the python-frontmatter
+dependency overhead while maintaining API compatibility.
 """
 
 from __future__ import annotations
 
 import mmap
 import pathlib
+from dataclasses import dataclass
+from io import StringIO
+from typing import TypeAlias
+
+from ruamel.yaml import YAML
 
 DELIMITER = b"---\n"
+
+# Recursive type for YAML-serializable frontmatter values.
+FrontmatterValue: TypeAlias = dict[str, "FrontmatterValue"] | list["FrontmatterValue"] | str | int | float | bool | None
+
+# Shared ruamel.yaml instance (round-trip mode for formatting preservation)
+_yaml = YAML(typ="rt")
+_yaml.preserve_quotes = False
+_yaml.width = 2147483647
+
+
+@dataclass
+class Post:
+    """Simple frontmatter post object compatible with python-frontmatter API.
+
+    Attributes:
+        metadata: Parsed YAML frontmatter as a dict.
+        content: Body content after the frontmatter block.
+    """
+
+    metadata: dict[str, FrontmatterValue]
+    content: str
+
+
+def loads_frontmatter(text: str) -> Post:
+    """Parse frontmatter from a string.
+
+    Fast in-memory parser that extracts YAML frontmatter and body content
+    without the python-frontmatter dependency overhead.
+
+    Args:
+        text: Markdown string potentially containing YAML frontmatter.
+
+    Returns:
+        A Post object with metadata and content attributes.
+    """
+    # Fast path: check for opening delimiter
+    if not text.startswith("---"):
+        return Post(metadata={}, content=text)
+
+    # Find closing delimiter (must be on its own line)
+    end_match = text.find("\n---", 3)
+    if end_match == -1:
+        # Malformed: no closing delimiter
+        return Post(metadata={}, content=text)
+
+    # Extract frontmatter (between delimiters)
+    frontmatter_text = text[3:end_match]
+
+    # Find where body starts (after closing delimiter line)
+    body_start = end_match + 4  # Skip past "\n---"
+    # Skip any newlines immediately after the closing delimiter
+    while body_start < len(text) and text[body_start] == "\n":
+        body_start += 1
+    content = text[body_start:] if body_start < len(text) else ""
+    # Strip trailing newline for consistency with python-frontmatter
+    content = content.removesuffix("\n")
+
+    # Parse YAML
+    metadata: dict[str, FrontmatterValue] = {}
+    if frontmatter_text.strip():
+        try:
+            parsed = _yaml.load(frontmatter_text)
+            if isinstance(parsed, dict):
+                metadata = parsed
+        except (OSError, ValueError, KeyError, TypeError):
+            # On parse error, return empty metadata
+            pass
+
+    return Post(metadata=metadata, content=content)
+
+
+def load_frontmatter(path: str | pathlib.Path) -> Post:
+    """Load frontmatter from a file path.
+
+    Args:
+        path: Path to a markdown file with YAML frontmatter.
+
+    Returns:
+        A Post object with metadata and content attributes.
+    """
+    text = pathlib.Path(path).read_text(encoding="utf-8")
+    return loads_frontmatter(text)
+
+
+def dump_frontmatter(post: Post) -> str:
+    """Serialize a Post object to a string.
+
+    Args:
+        post: A Post object with metadata and content.
+
+    Returns:
+        Full markdown string with YAML frontmatter delimiters and body.
+    """
+    buf = StringIO()
+    _yaml.dump(post.metadata, buf)
+    yaml_str = buf.getvalue().strip()
+    return f"---\n{yaml_str}\n---\n{post.content}"
+
+
+def dumps_frontmatter(post: Post, path: str | pathlib.Path) -> None:
+    """Write a Post object to a file.
+
+    Args:
+        post: A Post object with metadata and content.
+        path: Destination file path.
+    """
+    content = dump_frontmatter(post)
+    pathlib.Path(path).write_text(content, encoding="utf-8")
+
+
+def update_field(path: str | pathlib.Path, key: str, value: FrontmatterValue) -> None:
+    """Load a file, update one key, and write back.
+
+    Args:
+        path: Path to the markdown file.
+        key: Frontmatter field name to set.
+        value: New value for the field.
+    """
+    post = load_frontmatter(path)
+    post.metadata[key] = value
+    dumps_frontmatter(post, path)
 
 
 def process_markdown_file(file_path: str) -> None:
