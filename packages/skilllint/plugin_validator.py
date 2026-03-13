@@ -454,7 +454,7 @@ def _load_ignore_config(plugin_root: Path) -> IgnoreConfig:
     if not config_path.is_file():
         return {}
     try:
-        raw = msgspec.json.decode(config_path.read_text(encoding="utf-8"))
+        raw = msgspec.json.decode(config_path.read_bytes())
     except (OSError, msgspec.DecodeError):
         return {}
     ignore = raw.get("ignore", {})
@@ -1477,7 +1477,7 @@ class NamespaceReferenceValidator:
             declared_name: str | None = None
             if plugin_json.is_file():
                 try:
-                    data = msgspec.json.decode(plugin_json.read_text(encoding="utf-8"))
+                    data = msgspec.json.decode(plugin_json.read_bytes())
                     if isinstance(data, dict) and isinstance(data.get("name"), str):
                         declared_name = data["name"]
                 except (OSError, msgspec.DecodeError):
@@ -1945,11 +1945,33 @@ class FrontmatterValidator:
         if not model_class:
             return ValidationResult(passed=True, errors=errors, warnings=warnings, info=info)
 
-        # Validate with Pydantic
+        self._validate_pydantic_model(model_class, data, file_type, path, errors, warnings)
+
+        passed = len(errors) == 0
+        return ValidationResult(passed=passed, errors=errors, warnings=warnings, info=info)
+
+    def _validate_pydantic_model(
+        self,
+        model_class: type,
+        data: dict[str, YamlValue],
+        file_type: FileType,
+        path: Path,
+        errors: list[ValidationIssue],
+        warnings: list[ValidationIssue],
+    ) -> None:
+        """Run Pydantic validation and post-validation checks.
+
+        Args:
+            model_class: Pydantic model class to validate against
+            data: Parsed frontmatter data
+            file_type: Detected file type
+            path: Path to the file being validated
+            errors: Mutable list to append errors to
+            warnings: Mutable list to append warnings to
+
+        """
         try:
             validated = model_class.model_validate(data)
-
-            # Add warning for long descriptions
             if (
                 hasattr(validated, "description")
                 and validated.description
@@ -1965,25 +1987,15 @@ class FrontmatterValidator:
                         suggestion=f"Front-load critical information in first {RECOMMENDED_DESCRIPTION_LENGTH} characters. Run /plugin-creator:write-frontmatter-description to generate an optimized description",
                     )
                 )
-
         except ValidationError as e:
             errors.extend(_pydantic_error_to_validation_issue(err) for err in e.errors())
 
-        if isinstance(data, dict):
-            _check_list_valued_tool_fields(data, errors)
-            _check_skill_name_and_directory(data, path, file_type, errors, warnings)
+        _check_list_valued_tool_fields(data, errors)
+        _check_skill_name_and_directory(data, path, file_type, errors, warnings)
 
-        # Validate hook script file-path references declared in frontmatter ``hooks:`` field.
-        # The ``hooks:`` field in SKILL.md / agent / command frontmatter uses the same
-        # structure as the root ``"hooks"`` key in hooks.json.
-        if isinstance(data, dict):
-            hooks_value = data.get("hooks")
-            if isinstance(hooks_value, dict):
-                hook_validator = HookValidator()
-                hook_validator.validate_hook_script_references_in_hooks_dict(hooks_value, path.parent, errors)
-
-        passed = len(errors) == 0
-        return ValidationResult(passed=passed, errors=errors, warnings=warnings, info=info)
+        hooks_value = data.get("hooks")
+        if isinstance(hooks_value, dict):
+            HookValidator().validate_hook_script_references_in_hooks_dict(hooks_value, path.parent, errors)
 
     def can_fix(self) -> bool:
         """Check if validator supports auto-fixing.
@@ -3219,7 +3231,9 @@ class PluginRegistrationValidator:
         if git_metadata:
             missing = [k for k in ("repository", "homepage", "author") if k not in plugin_config and k in git_metadata]
             if missing:
-                suggestion_json = msgspec.json.format(msgspec.json.encode({k: git_metadata[k] for k in missing}), indent=2).decode()
+                suggestion_json = msgspec.json.format(
+                    msgspec.json.encode({k: git_metadata[k] for k in missing}), indent=2
+                ).decode()
                 info.append(
                     ValidationIssue(
                         field="plugin.json",

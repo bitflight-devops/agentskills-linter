@@ -101,7 +101,10 @@ def _make_standard_plugin(tmp_path: Path, skills: list[str]) -> tuple[Path, Path
     plugin_json_dir = plugin_root / ".claude-plugin"
     plugin_json_dir.mkdir(parents=True)
     plugin_json_path = plugin_json_dir / "plugin.json"
-    plugin_json_path.write_text(msgspec.json.format(msgspec.json.encode({"name": "demo-plugin", "version": "1.0.0"}), indent=2).decode(), encoding="utf-8")
+    plugin_json_path.write_text(
+        msgspec.json.format(msgspec.json.encode({"name": "demo-plugin", "version": "1.0.0"}), indent=2).decode(),
+        encoding="utf-8",
+    )
 
     return plugin_root, plugin_json_path
 
@@ -389,7 +392,8 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
         claude_plugin = plugin_root / ".claude-plugin"
         claude_plugin.mkdir(parents=True)
         (claude_plugin / "plugin.json").write_text(
-            msgspec.json.format(msgspec.json.encode({"name": "test-plugin", "version": "1.0.0"}), indent=2).decode(), encoding="utf-8"
+            msgspec.json.format(msgspec.json.encode({"name": "test-plugin", "version": "1.0.0"}), indent=2).decode(),
+            encoding="utf-8",
         )
 
         return plugin_root
@@ -498,7 +502,10 @@ class TestPluginRegistrationValidatorDoesNotWarnAboutStandardPathSkills:
         # validator can find the skill at all; without this the validator won't
         # know about custom-skills/ and won't fire.
         (claude_plugin / "plugin.json").write_text(
-            msgspec.json.format(msgspec.json.encode({"name": "nonstandard-plugin", "version": "1.0.0", "skills": "./custom-skills/"}), indent=2).decode(),
+            msgspec.json.format(
+                msgspec.json.encode({"name": "nonstandard-plugin", "version": "1.0.0", "skills": "./custom-skills/"}),
+                indent=2,
+            ).decode(),
             encoding="utf-8",
         )
 
@@ -802,7 +809,9 @@ class TestSK009ManualSkillSelectionInfo:
         claude_plugin = plugin_root / ".claude-plugin"
         claude_plugin.mkdir(parents=True)
         manifest = {"name": "explicit-plugin", "version": "1.0.0", "skills": [f"./skills/{s}" for s in skills]}
-        (claude_plugin / "plugin.json").write_text(msgspec.json.format(msgspec.json.encode(manifest), indent=2).decode(), encoding="utf-8")
+        (claude_plugin / "plugin.json").write_text(
+            msgspec.json.format(msgspec.json.encode(manifest), indent=2).decode(), encoding="utf-8"
+        )
 
         return plugin_root
 
@@ -928,7 +937,9 @@ class TestSK009ManualSkillSelectionInfo:
         claude_plugin.mkdir(parents=True)
         # Only list one of the two skills in the explicit array.
         manifest = {"name": "mixed-plugin", "version": "1.0.0", "skills": ["./skills/listed-skill"]}
-        (claude_plugin / "plugin.json").write_text(msgspec.json.format(msgspec.json.encode(manifest), indent=2).decode(), encoding="utf-8")
+        (claude_plugin / "plugin.json").write_text(
+            msgspec.json.format(msgspec.json.encode(manifest), indent=2).decode(), encoding="utf-8"
+        )
 
         validator = PluginRegistrationValidator()
 

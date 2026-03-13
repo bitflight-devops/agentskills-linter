@@ -85,7 +85,9 @@ def _make_marketplace_json(base: Path, data: Mapping[str, Any]) -> Path:
     claude_dir = base / ".claude-plugin"
     claude_dir.mkdir(parents=True, exist_ok=True)
     marketplace_json = claude_dir / "marketplace.json"
-    marketplace_json.write_text(msgspec.json.format(msgspec.json.encode(data), indent=2).decode() + "\n", encoding="utf-8")
+    marketplace_json.write_text(
+        msgspec.json.format(msgspec.json.encode(data), indent=2).decode() + "\n", encoding="utf-8"
+    )
     return marketplace_json
 
 
@@ -1138,7 +1140,6 @@ class TestVersionAlreadyBumped:
         monkeypatch.setattr(auto_sync, "_read_head_json", lambda _fp: {"metadata": {"version": "2.0.0"}})
 
         assert auto_sync._version_already_bumped(str(marketplace_json), ["metadata", "version"]) is True
-
 
 
 # ============================================================================

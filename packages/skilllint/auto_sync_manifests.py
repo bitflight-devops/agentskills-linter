@@ -332,7 +332,7 @@ def _version_already_bumped(filepath: str | Path, version_key_path: list[str]) -
         return False
 
     try:
-        current_data = msgspec.json.decode(current_path.read_text(encoding="utf-8"))
+        current_data = msgspec.json.decode(current_path.read_bytes())
     except (msgspec.DecodeError, ValueError, OSError):
         return False
 

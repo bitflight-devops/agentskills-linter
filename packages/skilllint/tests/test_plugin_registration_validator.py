@@ -52,7 +52,9 @@ def _make_plugin(tmp_path: Path, plugin_name: str = "test-plugin", plugin_json_c
         (claude_plugin / "plugin.json").write_text(plugin_json_content)
     else:
         default_config = {"name": plugin_name, "skills": [], "agents": [], "commands": []}
-        (claude_plugin / "plugin.json").write_text(msgspec.json.format(msgspec.json.encode(default_config), indent=2).decode())
+        (claude_plugin / "plugin.json").write_text(
+            msgspec.json.format(msgspec.json.encode(default_config), indent=2).decode()
+        )
 
     return plugin_dir
 
@@ -293,7 +295,8 @@ class TestUnregisteredSkill:
         Why: Registered capabilities should not generate PR001 warnings
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin", "skills": ["./skills/my-skill/"]}).decode()
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({"name": "test-plugin", "skills": ["./skills/my-skill/"]}).decode(),
         )
         _add_skill(plugin_dir, "my-skill")
 
@@ -365,7 +368,11 @@ class TestUnregisteredAgent:
         Why: Registered agents should not generate PR001 warnings
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin", "agents": ["./agents/my-agent.md"]}).decode()
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "agents": ["./agents/my-agent.md"],
+            }).decode(),
         )
         _add_agent(plugin_dir, "my-agent")
 
@@ -403,7 +410,11 @@ class TestUnregisteredCommand:
         Why: Registered commands should not generate PR001 warnings
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin", "commands": ["./commands/my-command.md"]}).decode()
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "commands": ["./commands/my-command.md"],
+            }).decode(),
         )
         _add_command(plugin_dir, "my-command")
 
@@ -445,7 +456,11 @@ class TestMissingRegisteredFile:
         Why: Registered paths that do not exist are broken configurations (PR002)
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin", "skills": ["./skills/phantom-skill/"]}).decode()
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "skills": ["./skills/phantom-skill/"],
+            }).decode(),
         )
         # Do NOT create the skills/phantom-skill/SKILL.md
 
@@ -464,7 +479,11 @@ class TestMissingRegisteredFile:
         Why: Registered agent paths that do not exist are broken configurations (PR002)
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin", "agents": ["./agents/phantom-agent.md"]}).decode()
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "agents": ["./agents/phantom-agent.md"],
+            }).decode(),
         )
         # Do NOT create agents/phantom-agent.md
 
@@ -483,7 +502,11 @@ class TestMissingRegisteredFile:
         Why: Registered command paths that do not exist are broken (PR002)
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin", "commands": ["./commands/phantom-cmd.md"]}).decode()
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "commands": ["./commands/phantom-cmd.md"],
+            }).decode(),
         )
         # Do NOT create commands/phantom-cmd.md
 
@@ -502,7 +525,11 @@ class TestMissingRegisteredFile:
         Why: Actionable suggestions help users remove or create the referenced path
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin", "skills": ["./skills/ghost-skill/"]}).decode()
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "skills": ["./skills/ghost-skill/"],
+            }).decode(),
         )
 
         validator = PluginRegistrationValidator()
@@ -552,7 +579,8 @@ class TestFullyRegistered:
         Why: validate() must handle file inputs by traversing up to plugin root
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin", "skills": ["./skills/my-skill/"]}).decode()
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({"name": "test-plugin", "skills": ["./skills/my-skill/"]}).decode(),
         )
         skill_md = _add_skill(plugin_dir, "my-skill")
 
@@ -572,7 +600,11 @@ class TestFullyRegistered:
         Why: Each skill must be evaluated independently
         """
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin", "skills": ["./skills/alpha-skill/"]}).decode()
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "skills": ["./skills/alpha-skill/"],
+            }).decode(),
         )
         _add_skill(plugin_dir, "alpha-skill")
         _add_skill(plugin_dir, "beta-skill")
@@ -600,7 +632,12 @@ class TestEmptyPlugin:
         """
         plugin_dir = _make_plugin(
             tmp_path,
-            plugin_json_content=msgspec.json.encode({"name": "test-plugin", "skills": [], "agents": [], "commands": []}).decode(),
+            plugin_json_content=msgspec.json.encode({
+                "name": "test-plugin",
+                "skills": [],
+                "agents": [],
+                "commands": [],
+            }).decode(),
         )
         # No skills/, agents/, or commands/ directories created
 
@@ -830,7 +867,8 @@ class TestRepositoryMismatch:
         plugin_url = "https://github.com/old-org/my-plugin"
         git_url = "https://github.com/example/my-plugin"
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin", "repository": plugin_url}).decode()
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({"name": "test-plugin", "repository": plugin_url}).decode(),
         )
         metadata = {"repository": git_url}
 
@@ -877,7 +915,8 @@ class TestRepositoryMismatch:
         """
         matching_url = "https://github.com/example/my-plugin"
         plugin_dir = _make_plugin(
-            tmp_path, plugin_json_content=msgspec.json.encode({"name": "test-plugin", "repository": matching_url}).decode()
+            tmp_path,
+            plugin_json_content=msgspec.json.encode({"name": "test-plugin", "repository": matching_url}).decode(),
         )
         metadata = {"repository": matching_url}
 

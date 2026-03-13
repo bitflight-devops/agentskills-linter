@@ -109,7 +109,9 @@ class TestHookConfigValidation:
         """
         hooks_json = tmp_path / "hooks.json"
         hooks_json.write_text(
-            msgspec.json.encode({"hooks": {"SubagentStop": [{"hooks": [{"type": "prompt", "prompt": "Check the output"}]}]}}).decode()
+            msgspec.json.encode({
+                "hooks": {"SubagentStop": [{"hooks": [{"type": "prompt", "prompt": "Check the output"}]}]}
+            }).decode()
         )
 
         validator = HookValidator()
@@ -159,7 +161,9 @@ class TestHookConfigValidation:
         """
         hooks_json = tmp_path / "hooks.json"
         hooks_json.write_text(
-            msgspec.json.encode({"hooks": {"InvalidEvent": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}}).decode()
+            msgspec.json.encode({
+                "hooks": {"InvalidEvent": [{"hooks": [{"type": "command", "command": "echo hi"}]}]}
+            }).decode()
         )
 
         validator = HookValidator()
@@ -180,7 +184,9 @@ class TestHookConfigValidation:
         for event in valid_events:
             hooks_json = tmp_path / "hooks.json"
             hooks_json.write_text(
-                msgspec.json.encode({"hooks": {event: [{"hooks": [{"type": "command", "command": "echo test"}]}]}}).decode()
+                msgspec.json.encode({
+                    "hooks": {event: [{"hooks": [{"type": "command", "command": "echo test"}]}]}
+                }).decode()
             )
 
             validator = HookValidator()
@@ -196,7 +202,9 @@ class TestHookConfigValidation:
         Why: Each hook entry must specify its type
         """
         hooks_json = tmp_path / "hooks.json"
-        hooks_json.write_text(msgspec.json.encode({"hooks": {"PreToolUse": [{"hooks": [{"command": "echo missing type"}]}]}}).decode())
+        hooks_json.write_text(
+            msgspec.json.encode({"hooks": {"PreToolUse": [{"hooks": [{"command": "echo missing type"}]}]}}).decode()
+        )
 
         validator = HookValidator()
         result = validator.validate(hooks_json)
@@ -228,7 +236,9 @@ class TestHookConfigValidation:
         Why: Prompt hooks must have a prompt string
         """
         hooks_json = tmp_path / "hooks.json"
-        hooks_json.write_text(msgspec.json.encode({"hooks": {"SubagentStop": [{"hooks": [{"type": "prompt"}]}]}}).decode())
+        hooks_json.write_text(
+            msgspec.json.encode({"hooks": {"SubagentStop": [{"hooks": [{"type": "prompt"}]}]}}).decode()
+        )
 
         validator = HookValidator()
         result = validator.validate(hooks_json)
