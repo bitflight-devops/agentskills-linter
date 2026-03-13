@@ -52,4 +52,4 @@ tmp/
 scripts/bench-plugin/
 scripts/results/
 
-.bg-shell/*
+.bg-shell/*walkthrough/
