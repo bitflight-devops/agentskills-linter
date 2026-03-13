@@ -45,8 +45,6 @@ agentlint = "skilllint.plugin_validator:app"
 pluginlint = "skilllint.plugin_validator:app"
 skillint = "skilllint.plugin_validator:app"
 skilllint = "skilllint.plugin_validator:app"
-skilllint-rule = "skilllint.rule_cli:rule_app"
-skilllint-rules = "skilllint.rule_cli:rules_app"
 
 [project.urls]
 Homepage = "https://github.com/bitflight-devops/agentskills-linter"

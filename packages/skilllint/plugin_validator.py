@@ -5211,6 +5211,10 @@ def main(
     ] = None,
 ) -> None:
     """Validate Claude Code plugins, skills, agents, and commands."""
+    # If a subcommand was invoked, don't run validation
+    if ctx.invoked_subcommand is not None:
+        return
+
     # Show help when no arguments provided
     if not paths:
         _show_help_and_exit(ctx, code=0)
@@ -5250,9 +5254,135 @@ def main(
         raise typer.Exit(130) from None
 
 
+# =============================================================================
+# CLI APP SETUP
+# =============================================================================
+
 # Create Typer app
 app = typer.Typer(help="Validate Claude Code plugins and skills", add_completion=False)
-app.command()(main)
+
+
+@app.callback()
+def _callback() -> None:
+    """Validate Claude Code plugins, skills, agents, and commands."""
+
+
+def _show_rules_list(platform: str | None = None, category: str | None = None, severity: str | None = None) -> None:
+    """Show list of rules (shared logic for callback and rules_cmd)."""
+    rules = _list_rules(platform=platform, category=category, severity=severity)
+
+    if not rules:
+        _rule_console.print("[yellow]No rules found matching the specified filters.[/yellow]")
+        return
+
+    severity_colors = {"error": "red", "warning": "yellow", "info": "blue"}
+
+    table = _Table(title="Validation Rules", show_header=True, header_style="bold")
+    table.add_column("ID", style="cyan", no_wrap=True)
+    table.add_column("Severity", no_wrap=True)
+    table.add_column("Category", no_wrap=True)
+    table.add_column("Summary")
+
+    for rule in rules:
+        sev_color = severity_colors.get(rule.severity, "white")
+        summary = rule.docstring.split("\n")[0] if rule.docstring else ""
+        table.add_row(rule.id, f"[{sev_color}]{rule.severity}[/{sev_color}]", rule.category, summary)
+
+    _rule_console.print(table)
+
+
+def _show_rule_doc(rule_id: str) -> None:
+    """Show documentation for a single rule (shared logic for callback and rule_cmd)."""
+    entry = _get_rule(rule_id)
+    if not entry:
+        _rule_console.print(f"[red]Unknown rule: {rule_id}[/red]")
+        _rule_console.print("\n[dim]Run [bold]skilllint rules[/bold] to see all available rules.[/dim]")
+        raise typer.Exit(1)
+
+    severity_colors = {"error": "red", "warning": "yellow", "info": "blue"}
+    sev_color = severity_colors.get(entry.severity, "white")
+
+    _rule_console.print()
+    _rule_console.print(f"[bold]{entry.id}[/bold] — [{sev_color}]{entry.severity}[/{sev_color}]")
+    _rule_console.print(f"[dim]Category: {entry.category} | Platforms: {', '.join(entry.platforms)}[/dim]")
+    _rule_console.print()
+    _rule_console.print(_Panel(entry.docstring, title=entry.id, border_style="dim"))
+
+
+# =============================================================================
+# CHECK COMMAND
+# =============================================================================
+
+
+@app.command("check")
+def check_cmd(
+    ctx: typer.Context,
+    paths: Annotated[list[Path] | None, typer.Argument(help="Paths to validate")] = None,
+    *,
+    check: Annotated[bool, typer.Option("--check", help="Validate only, don't auto-fix")] = False,
+    fix: Annotated[bool, typer.Option("--fix", help="Auto-fix issues where possible")] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Show detailed output")] = False,
+    no_color: Annotated[bool, typer.Option("--no-color", help="Disable color")] = False,
+    tokens_only: Annotated[bool, typer.Option("--tokens-only", help="Output token count only")] = False,
+    show_progress: Annotated[bool, typer.Option("--show-progress", help="Show per-file status")] = False,
+    show_summary: Annotated[bool, typer.Option("--show-summary", help="Show summary panel")] = False,
+    filter_glob: Annotated[str | None, typer.Option("--filter", help="Glob pattern")] = None,
+    filter_type: Annotated[str | None, typer.Option("--filter-type", help="Filter type")] = None,
+    platform: Annotated[str | None, typer.Option("--platform", help="Platform adapter")] = None,
+) -> None:
+    """Validate Claude Code plugins, skills, agents, and commands."""
+    main(
+        ctx=ctx,
+        paths=paths,
+        check=check,
+        fix=fix,
+        verbose=verbose,
+        no_color=no_color,
+        tokens_only=tokens_only,
+        show_progress=show_progress,
+        show_summary=show_summary,
+        filter_glob=filter_glob,
+        filter_type=filter_type,
+        platform=platform,
+    )
+
+
+# =============================================================================
+# RULE DOCUMENTATION COMMANDS
+# =============================================================================
+
+from rich.console import Console as _Console
+from rich.panel import Panel as _Panel
+from rich.table import Table as _Table
+
+# Import rules to register them
+import skilllint.rules.as_series  # noqa: F401
+from skilllint.rule_registry import get_rule as _get_rule, list_rules as _list_rules
+
+_rule_console = _Console()
+
+
+@app.command("rule")
+def rule_cmd(rule_id: str) -> None:
+    """Show documentation for a validation rule.
+
+    Args:
+        rule_id: Rule identifier (e.g., "SK001", "FM002", "AS001")
+    """
+    _show_rule_doc(rule_id)
+
+
+@app.command("rules")
+def rules_cmd(
+    platform: Annotated[str | None, typer.Option("--platform", "-p", help="Filter rules by platform")] = None,
+    category: Annotated[str | None, typer.Option("--category", "-c", help="Filter rules by category")] = None,
+    severity: Annotated[
+        str | None, typer.Option("--severity", "-s", help="Filter rules by severity (error, warning, info)")
+    ] = None,
+) -> None:
+    """List all available validation rules."""
+    _show_rules_list(platform=platform, category=category, severity=severity)
+    _rule_console.print("\n[dim]Run [bold]skilllint rule <ID>[/bold] for details.[/dim]")
 
 
 if __name__ == "__main__":

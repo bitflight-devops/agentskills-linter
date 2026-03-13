@@ -278,7 +278,7 @@ class TestTokensOnlyCLIFlag:
         md_file = tmp_path / "test.md"
         md_file.write_text("# Hello\n\nSome content for token counting.\n")
 
-        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", str(md_file)])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--tokens-only", str(md_file)])
 
         assert result.exit_code == 0
         # Output should be a single integer (possibly with trailing newline)
@@ -296,7 +296,7 @@ class TestTokensOnlyCLIFlag:
         md_file = tmp_path / "test.md"
         md_file.write_text("Content.\n")
 
-        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", str(md_file)])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--tokens-only", str(md_file)])
 
         assert result.exit_code == 0
 
@@ -307,7 +307,7 @@ class TestTokensOnlyCLIFlag:
         How: Run CLI with --tokens-only on nonexistent path
         Why: Scripts need to detect errors
         """
-        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", "/nonexistent/file.md"])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--tokens-only", "/nonexistent/file.md"])
 
         assert result.exit_code == 2
 
@@ -321,7 +321,7 @@ class TestTokensOnlyCLIFlag:
         md_file = tmp_path / "test.md"
         md_file.write_text("# Test\n\nBody content.\n")
 
-        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", str(md_file)])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--tokens-only", str(md_file)])
 
         assert "\x1b[" not in result.stdout  # No ANSI escape codes
         assert "Validation" not in result.stdout  # No summary panel
@@ -337,7 +337,7 @@ class TestTokensOnlyCLIFlag:
         Why: Users may want token counts for any markdown file
         """
         skill_file = sample_skill_dir / "SKILL.md"
-        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", str(skill_file)])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--tokens-only", str(skill_file)])
 
         assert result.exit_code == 0
         output = result.stdout.strip()
@@ -356,7 +356,7 @@ class TestTokensOnlyCLIFlag:
         file_a.write_text("Short.\n")
         file_b.write_text("Also short content.\n")
 
-        result = cli_runner.invoke(plugin_validator.app, ["--tokens-only", str(file_a), str(file_b)])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--tokens-only", str(file_a), str(file_b)])
 
         assert result.exit_code == 0
         lines = result.stdout.strip().split("\n")
@@ -364,13 +364,13 @@ class TestTokensOnlyCLIFlag:
         assert all(line.strip().isdigit() for line in lines)
 
     def test_tokens_only_shown_in_help(self, cli_runner: CliRunner) -> None:
-        """Verify --tokens-only appears in help output.
+        """Verify --tokens-only appears in check subcommand help output.
 
-        Tests: Help documents the new flag
-        How: Run --help and check for flag
+        Tests: Help documents the new flag on check command
+        How: Run check --help and check for flag
         Why: Users need to discover the feature
         """
-        result = cli_runner.invoke(plugin_validator.app, ["--help"])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--help"])
 
         assert result.exit_code == 0
         assert "--tokens-only" in result.stdout
@@ -389,7 +389,7 @@ class TestCLIMarkdownValidation:
         claude_md = tmp_path / "CLAUDE.md"
         claude_md.write_text("# Project Instructions\n\nDo things.\n")
 
-        result = cli_runner.invoke(plugin_validator.app, ["--no-color", str(claude_md)])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--no-color", str(claude_md)])
 
         assert result.exit_code == 0
 
@@ -405,7 +405,7 @@ class TestCLIMarkdownValidation:
         ref_md = refs_dir / "guide.md"
         ref_md.write_text("# Guide\n\nReference content.\n")
 
-        result = cli_runner.invoke(plugin_validator.app, ["--no-color", str(ref_md)])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--no-color", str(ref_md)])
 
         assert result.exit_code == 0
 
@@ -419,7 +419,7 @@ class TestCLIMarkdownValidation:
         readme = tmp_path / "README.md"
         readme.write_text("# My Project\n\nProject documentation.\n")
 
-        result = cli_runner.invoke(plugin_validator.app, ["--no-color", str(readme)])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--no-color", str(readme)])
 
         assert result.exit_code == 0
 
@@ -435,7 +435,7 @@ class TestCLIMarkdownValidation:
         claude_md = tmp_path / "CLAUDE.md"
         claude_md.write_text("# Instructions\n\nContent for counting.\n")
 
-        result = cli_runner.invoke(plugin_validator.app, ["--verbose", "--no-color", str(claude_md)])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--verbose", "--no-color", str(claude_md)])
 
         assert result.exit_code == 0
         assert "tokens" in result.stdout.lower()
@@ -450,7 +450,7 @@ class TestCLIMarkdownValidation:
         claude_md = tmp_path / "CLAUDE.md"
         claude_md.write_text("# No frontmatter here\n\nJust content.\n")
 
-        result = cli_runner.invoke(plugin_validator.app, ["--verbose", "--no-color", str(claude_md)])
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--verbose", "--no-color", str(claude_md)])
 
         assert result.exit_code == 0
         # Should NOT contain skill-specific validator names
