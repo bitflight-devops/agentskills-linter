@@ -49,16 +49,9 @@ from rich.panel import Panel
 from ruamel.yaml import YAML, YAMLError
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
-# Enable import of sibling library modules (frontmatter_core, frontmatter_utils).
-# PEP 723 scripts run in an isolated venv; sys.path insertion exposes co-located
-# library modules that are not PEP 723 scripts themselves.
-_SCRIPTS_DIR = str(Path(__file__).parent)
-if _SCRIPTS_DIR not in sys.path:
-    sys.path.insert(0, _SCRIPTS_DIR)
-
 import contextlib
 
-from frontmatter_core import (
+from .frontmatter_core import (
     MAX_SKILL_NAME_LENGTH,
     RECOMMENDED_DESCRIPTION_LENGTH,
     AgentFrontmatter,
@@ -68,7 +61,7 @@ from frontmatter_core import (
     fix_skill_name_field,
     get_frontmatter_model,
 )
-from frontmatter_utils import RuamelYAMLHandler
+from .frontmatter_utils import RuamelYAMLHandler
 
 from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
 from skilllint.adapters.claude_code import ClaudeCodeAdapter
