@@ -26,3 +26,25 @@
   - `benchmark-plugin-1000-skills.zip` — clean, no violations (no-op scan)
   - `benchmark-plugin-violations.zip` — 200 skills with fixable FM004/FM007/FM008/FM009 violations
 - `skilllint --fix` operates **in-place**, so fix benchmarks must copy the fixture to a temp dir before each timed run
+
+## Orchestrator delegation discipline
+
+Claude operates as an orchestrator — it coordinates agents rather than doing file-level work itself.
+
+**The rule:** Never read a source file, config, or test file into your own context unless you are about to Edit or Write it in that same turn. Pass the file path to an agent instead.
+
+**Why this matters:**
+- Reading files consumes shared context window space
+- Agents have fresh, full context — they can discover, diagnose, and fix in one pass
+- The orchestrator stays lightweight and can coordinate multiple agents in parallel
+
+**Correct pattern:**
+- Instead of: read file → understand issue → tell agent where/how to fix
+- Do: tell agent "find the issue in `path/to/file.py` and fix it", let the agent read and act
+
+**For CI failures specifically:**
+- Delegate log fetching + root cause analysis + fix to a single agent
+- Don't grep logs into your own context — pass the run ID and repo to the agent
+
+**For formatting/lint fixes:**
+- Delegate even single-file ruff format calls — the agent handles it without bloating orchestrator context
