@@ -63,7 +63,7 @@ Plans:
 **Depends on**: Phase 2
 **Requirements**: CFG-01, CFG-02, CFG-03, CFG-04, VAL-01, VAL-02, VAL-03, VAL-04, VAL-05, VAL-06, VAL-07, VAL-08, VAL-09, SAM-01
 **Success Criteria** (what must be TRUE):
-  1. `skilllint --fix` auto-applies safe fixes (array format, multiline normalization) and leaves unsafe violations as report-only warnings
+  1. `skilllint check --fix` auto-applies safe fixes (array format, multiline normalization) and leaves unsafe violations as report-only warnings
   2. A `[tool.skilllint]` section in `pyproject.toml` (or `linter.toml`) enables disabling individual rule codes and setting per-directory overrides — changes take effect without restarting the linter
   3. Validating one file with four validators reports "Total files: 1" (not 4); SK005 fires only on SKILL files; SK004 fires on SKILL and AGENT files but not COMMAND files
   4. Hook files (`.js` in `hooks/` and `hooks.json`) are detected, validated with HK001+ error codes, and pre-commit runs only on changed files with template directories excluded from FM003

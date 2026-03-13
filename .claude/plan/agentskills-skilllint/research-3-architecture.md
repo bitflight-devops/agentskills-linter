@@ -131,7 +131,7 @@ For each violation reported, read its explanation from [references/rule-catalog.
 ### 4. Fix (if requested)
 
 ```bash
-skilllint --fix <target/>
+skilllint check --fix <target/>
 ```
 
 Auto-fixable rules: FM004, FM007, FM008, FM009. For non-auto-fixable rules, provide manual fix guidance from the rule catalog.

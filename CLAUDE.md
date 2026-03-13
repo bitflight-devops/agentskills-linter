@@ -25,7 +25,7 @@
 - Fixtures in `tests/fixtures/`:
   - `benchmark-plugin-1000-skills.zip` — clean, no violations (no-op scan)
   - `benchmark-plugin-violations.zip` — 200 skills with fixable FM004/FM007/FM008/FM009 violations
-- `skilllint --fix` operates **in-place**, so fix benchmarks must copy the fixture to a temp dir before each timed run
+- `skilllint check --fix` operates **in-place**, so fix benchmarks must copy the fixture to a temp dir before each timed run
 
 ## Orchestrator delegation discipline
 

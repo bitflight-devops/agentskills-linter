@@ -32,7 +32,7 @@ Key pattern: `plugin.json` requires only `name`. All other fields (`version`, `d
 
 **Dynamic context injection (`!` backtick)** — Selective use: a version/install check at skill activation (`!command -v skilllint ...`) is appropriate. Do NOT use it for scan output — scan targets depend on user context and cannot be parameterized at load time.
 
-**`skilllint rule <id>` subcommand** — Does NOT exist. The CLI is a single command with options. The skill must tell agents to look up rules in `references/rule-catalog.md`, and use `skilllint --verbose <path>` for detailed output.
+**`skilllint rule <id>` subcommand** — Now exists. Use `skilllint rule <id>` to see documentation for a specific rule, or `skilllint rules` to list all rules. Use `skilllint check --verbose <path>` for detailed output with info-level messages.
 
 ## 3. Architecture Patterns
 

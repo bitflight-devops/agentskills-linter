@@ -205,8 +205,8 @@ argument-hint: "[rule-id | path]"
 
 The current CLI (`skilllint --help`) has no `rule` subcommand. The discuss-CONTEXT.md mentions `skilllint rule <rule-id>` but this does not exist in the current codebase. The skill should document the actual CLI interface:
 - `skilllint <path>` -- validate a plugin/skill/agent
-- `skilllint --fix <path>` -- auto-fix where possible
-- `skilllint --check <path>` -- validate only
+- `skilllint check --fix <path>` -- auto-fix where possible
+- `skilllint check <path>` -- validate only
 - `skilllint --filter-type skills|agents|commands <path>` -- filter by file type
 - `skilllint --platform claude-code|cursor|codex <path>` -- platform-specific validation
 
