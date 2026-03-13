@@ -369,39 +369,6 @@ def _write_json_lf(path: Path, content: str) -> None:
     path.write_bytes(content.encode("utf-8"))
 
 
-def _format_json(data: object) -> str:
-    """Serialize data to JSON, formatted by prettier if available.
-
-    Writes ``json.dumps(indent=2)`` output.  If ``npx`` is available, runs
-    ``prettier --write`` to match the project's prettier configuration.
-    The ``--config`` flag is passed explicitly so that temp files outside
-    the repository still receive the project's formatting rules.
-
-    Args:
-        data: JSON-serialisable Python object.
-
-    Returns:
-        A prettier-formatted JSON string with trailing newline.
-    """
-    content = json.dumps(data, indent=2) + "\n"
-    if not _NPX_PATH:
-        return content
-    with tempfile.NamedTemporaryFile(encoding="utf-8", mode="w", suffix=".json", delete=False, newline="\n") as f:
-        f.write(content)
-        tmp_path = f.name
-    try:
-        cmd = [_NPX_PATH, "prettier", "--write"]
-        if _PRETTIERRC_PATH:
-            cmd.extend(["--config", str(_PRETTIERRC_PATH)])
-        cmd.append(tmp_path)
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
-        if result.returncode != 0:
-            sys.stderr.write(f"Warning: prettier formatting failed: {result.stderr.strip()}\n")
-            return content
-        return Path(tmp_path).read_text(encoding="utf-8")
-    finally:
-        Path(tmp_path).unlink(missing_ok=True)
-
 
 def _is_standard_path_skill(field_name: str, comp_path: str) -> bool:
     """Return True when the component is an auto-discovered standard-path skill.
@@ -544,7 +511,7 @@ def update_plugin_json(plugin_name: str, changes: ComponentChanges) -> tuple[boo
         existing_content = plugin_json_path.read_text(encoding="utf-8")
 
         data["version"] = new_version
-        new_content = _format_json(data)
+        new_content = json.dumps(data, indent=2) + "\n"
 
         # Skip write when the formatted output already matches the file.
         # The primary double-bump defence is the _version_already_bumped
@@ -675,7 +642,7 @@ def update_marketplace_json(plugin_changes: MarketplaceChanges) -> bool:
         metadata = cast("dict[str, str]", data["metadata"])
         metadata["version"] = new_version
 
-        new_content = _format_json(data)
+        new_content = json.dumps(data, indent=2) + "\n"
 
         if new_content == existing_content:
             return False
@@ -1043,7 +1010,7 @@ def _reconcile_one_plugin(plugin_name: str, plugins_root: Path, *, dry_run: bool
     if has_drift and not dry_run:
         current_version = cast("str", data.get("version", "0.0.0"))
         data["version"] = bump_version(current_version, "minor")
-        _write_json_lf(plugin_json_path, _format_json(data))
+        _write_json_lf(plugin_json_path, json.dumps(data, indent=2) + "\n")
         print(f"  Updated {plugin_name} -> {data['version']}")
 
     return has_drift
@@ -1230,7 +1197,7 @@ def _reconcile_marketplace(plugins_root: Path, *, dry_run: bool) -> bool:
         bump_type: Literal["major", "minor", "patch"] = "major" if stale else "minor"
         metadata["version"] = bump_version(current_version, bump_type)
         data["metadata"] = metadata
-        _write_json_lf(marketplace_path, _format_json(data))
+        _write_json_lf(marketplace_path, json.dumps(data, indent=2) + "\n")
         print(f"  Updated marketplace -> {metadata['version']}")
 
     return has_drift

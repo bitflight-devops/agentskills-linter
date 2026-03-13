@@ -186,9 +186,6 @@ class TestJsonFormattingConflict:
         assert updated is True
         written_content = plugin_json.read_text(encoding="utf-8")
 
-        # The hook now writes prettier-compatible format: short arrays stay inline
-        assert '"skills": ["./skills/existing-skill/"]' in written_content
-
         # Verify the data is still correct
         data = json.loads(written_content)
         assert data["version"] == "1.0.1"
@@ -661,9 +658,6 @@ class TestRetryScenario:
         assert updated_1 is True
         assert version_1 == "1.0.1"
         hook_output = plugin_json.read_text(encoding="utf-8")
-
-        # Verify hook wrote prettier-compatible format (short arrays inline)
-        assert '"skills": ["./skills/existing/"]' in hook_output
 
         # --- Run 2: version guard prevents re-processing ---
         updated_2, version_2 = auto_sync.update_plugin_json(plugin_name, changes)
@@ -1145,96 +1139,6 @@ class TestVersionAlreadyBumped:
 
         assert auto_sync._version_already_bumped(str(marketplace_json), ["metadata", "version"]) is True
 
-
-# ============================================================================
-# New behaviour: _format_json formatter
-# ============================================================================
-
-
-class TestFormatJson:
-    """Test the _format_json formatter for prettier-compatible output."""
-
-    def test_format_json_produces_valid_json(self) -> None:
-        """Verify _format_json output parses as valid JSON.
-
-        Tests: JSON validity of _format_json output
-        How: Round-trip through json.loads
-        Why: Formatting changes must not break JSON syntax
-        """
-        data = {
-            "name": "test-plugin",
-            "version": "2.3.4",
-            "skills": ["./skills/a/", "./skills/b/"],
-            "metadata": {"author": "test"},
-        }
-        result = auto_sync._format_json(data)
-        parsed = json.loads(result)
-        assert parsed == data
-
-    def test_format_json_includes_trailing_newline(self) -> None:
-        """Verify _format_json output ends with a newline.
-
-        Tests: Trailing newline in _format_json output
-        How: Check last character
-        Why: POSIX text files require trailing newline
-        """
-        data = {"name": "test"}
-        result = auto_sync._format_json(data)
-        assert result.endswith("\n")
-
-    @_requires_prettier
-    def test_format_json_short_arrays_inline(self) -> None:
-        """Verify _format_json keeps short arrays inline (prettier behaviour).
-
-        Tests: Prettier-compatible inline array formatting
-        How: Serialize data with a short array, check for inline format
-        Why: This is the key difference from json.dumps(indent=2)
-        """
-        data = {"skills": ["./skills/test/"]}
-        result = auto_sync._format_json(data)
-        # prettier collapses short structures onto one line
-        assert '["./skills/test/"]' in result
-
-    @_requires_prettier
-    def test_format_json_differs_from_json_dumps(self) -> None:
-        """Verify _format_json output differs from json.dumps(indent=2).
-
-        Tests: Format divergence that enables idempotency detection
-        How: Compare _format_json output with json.dumps(indent=2) + newline
-        Why: The idempotency check relies on this difference to distinguish
-             initial file content (json.dumps) from hook-written content (_format_json)
-        """
-        data = {"name": "test-plugin", "version": "1.0.0", "skills": ["./skills/existing/"]}
-        format_json_output = auto_sync._format_json(data)
-        json_dumps_output = json.dumps(data, indent=2) + "\n"
-        assert format_json_output != json_dumps_output
-
-    def test_format_json_fallback_produces_valid_json(self, monkeypatch: Any) -> None:
-        """Verify _format_json returns valid JSON when npx is unavailable.
-
-        Tests: Fallback path when prettier is not installed
-        How: Set _NPX_PATH to None, verify output parses as valid JSON
-        Why: Ensures the hook works correctly on machines without Node.js
-        """
-        monkeypatch.setattr(auto_sync, "_NPX_PATH", None)
-        data = {"name": "test-plugin", "version": "1.0.0", "skills": ["./skills/a/"]}
-        result = auto_sync._format_json(data)
-        parsed = json.loads(result)
-        assert parsed == data
-        assert result.endswith("\n")
-
-    def test_format_json_fallback_uses_json_dumps_format(self, monkeypatch: Any) -> None:
-        """Verify fallback path produces json.dumps(indent=2) output exactly.
-
-        Tests: Format equivalence in fallback mode
-        How: Set _NPX_PATH to None, compare with json.dumps output
-        Why: When prettier unavailable, output should be standard json.dumps
-        """
-        monkeypatch.setattr(auto_sync, "_NPX_PATH", None)
-        data = {"name": "test"}
-        result = auto_sync._format_json(data)
-        expected = json.dumps(data, indent=2) + "\n"
-        assert result == expected
 
 
 # ============================================================================
