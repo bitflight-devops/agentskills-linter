@@ -59,11 +59,19 @@ def load_entries(path: pathlib.Path, label: str) -> list[dict[str, object]]:
     if not path.exists():
         print(f"Warning: {label} file not found: {path}", file=sys.stderr)
         return []
-    text = path.read_text(encoding="utf-8").strip()
+    try:
+        text = path.read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"Warning: could not read {label} file {path}: {exc}", file=sys.stderr)
+        return []
     if not text:
         print(f"Warning: {label} file is empty: {path}", file=sys.stderr)
         return []
-    data = json.loads(text)
+    try:
+        data = json.loads(text)
+    except ValueError as exc:
+        print(f"Warning: could not parse {label} file {path}: {exc}", file=sys.stderr)
+        return []
     if isinstance(data, list):
         return data  # type: ignore[return-value]
     # Single-dict fallback (shouldn't happen with bench output).
@@ -152,8 +160,9 @@ def render_scenario_table(
     cmp_idx = build_index(compare_entries)
     base_idx = build_index(base_entries)
 
-    # Use compare keys first, then fall back to base keys for any missing entries.
-    all_names = list(cmp_idx.keys()) or list(base_idx.keys())
+    # Union of all metric names from both compare and base.
+    keys = set(cmp_idx) | set(base_idx)
+    all_names = sorted(keys)
 
     rows: list[str] = []
     has_regression = False

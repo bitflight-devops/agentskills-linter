@@ -18,6 +18,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -58,7 +59,11 @@ def _run_once(plugin_dir: Path, skilllint_exe: str, fix: bool = False) -> float:
     cmd.append(str(plugin_dir))
 
     start = time.perf_counter()
-    result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False, timeout=30)
+    except subprocess.TimeoutExpired as exc:
+        print(f"skilllint timed out after 30 s. cmd: {cmd!r}", file=sys.stderr)
+        raise subprocess.CalledProcessError(1, "skilllint") from exc
     elapsed = time.perf_counter() - start
     # skilllint exits 0 (clean) or 1 (lint errors found) — both are valid.
     # Any other exit code is an unexpected failure.
@@ -94,7 +99,15 @@ def run_benchmark(plugin_dir: Path, runs: int = 3, mode: str = "scan") -> dict[s
     fix = mode == "fix"
     timings: list[float] = []
     for _ in range(runs):
-        elapsed = _run_once(plugin_dir, skilllint_exe, fix=fix)
+        if fix:
+            # Copy to a fresh temp dir so --fix doesn't mutate the fixture for
+            # subsequent iterations.
+            with tempfile.TemporaryDirectory() as tmp:
+                run_dir = Path(tmp) / "plugin"
+                shutil.copytree(plugin_dir, run_dir)
+                elapsed = _run_once(run_dir, skilllint_exe, fix=True)
+        else:
+            elapsed = _run_once(plugin_dir, skilllint_exe, fix=False)
         timings.append(elapsed * 1000.0)
 
     file_count = _count_files(plugin_dir)
