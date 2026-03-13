@@ -27,48 +27,55 @@ def process_markdown_file(file_path: str) -> None:
     Args:
         file_path: Absolute or relative path to the markdown file to process.
     """
-    # Skip empty files
-    if pathlib.Path(file_path).stat().st_size == 0:
-        return
+    path = pathlib.Path(file_path)
 
-    with pathlib.Path(file_path).open("rb") as f, mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ) as mm:
-        # 1. Find the frontmatter boundaries
-        if mm[: len(DELIMITER)] != DELIMITER:
-            return  # No frontmatter found
+    with path.open("rb") as f:
+        try:
+            mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
+        except ValueError:
+            # mmap raises ValueError on zero-length files — skip silently
+            return
+        with mm:
+            # 1. Find the frontmatter boundaries
+            if mm[: len(DELIMITER)] != DELIMITER:
+                return  # No frontmatter found
 
-        end_pos = mm.find(DELIMITER, len(DELIMITER))
-        if end_pos == -1:
-            return  # Malformed: No closing delimiter
+            end_pos = mm.find(DELIMITER, len(DELIMITER))
+            if end_pos == -1:
+                return  # Malformed: No closing delimiter
 
-        frontmatter_end_index = end_pos + len(DELIMITER)
+            frontmatter_end_index = end_pos + len(DELIMITER)
 
-        # 2. Extract and parse frontmatter
-        raw_yaml = mm[len(DELIMITER) : end_pos]
+            # 2. Extract and parse frontmatter
+            raw_yaml = mm[len(DELIMITER) : end_pos]
 
-        # (Insert your linting/YAML parsing logic here)
-        needs_fix, new_yaml_bytes = lint_and_fix(raw_yaml)
+            # (Insert your linting/YAML parsing logic here)
+            needs_fix, new_yaml_bytes = lint_and_fix(raw_yaml)
 
-        if not needs_fix:
-            return  # Fast exit! Lint passed, do nothing.
+            if not needs_fix:
+                return  # Fast exit! Lint passed, do nothing.
 
-        # 3. The "Zero-Copy Body" Write
-        if new_yaml_bytes is None:
-            raise RuntimeError("lint_and_fix requested a fix but returned no content for " + str(file_path))
-        temp_path = file_path + ".tmp"
-        with pathlib.Path(temp_path).open("wb") as temp_file:
-            # Write the new frontmatter
-            temp_file.write(DELIMITER)
-            temp_file.write(new_yaml_bytes)
-            if not new_yaml_bytes.endswith(b"\n"):
-                temp_file.write(b"\n")
-            temp_file.write(DELIMITER)
+            # 3. The "Zero-Copy Body" Write
+            if new_yaml_bytes is None:
+                raise RuntimeError("lint_and_fix requested a fix but returned no content for " + str(file_path))
+            temp_path = path.with_suffix(path.suffix + ".tmp")
+            try:
+                with temp_path.open("wb") as temp_file:
+                    # Write the new frontmatter
+                    temp_file.write(DELIMITER)
+                    temp_file.write(new_yaml_bytes)
+                    if not new_yaml_bytes.endswith(b"\n"):
+                        temp_file.write(b"\n")
+                    temp_file.write(DELIMITER)
 
-            # Dump the rest of the file directly from the memory map
-            # Python handles this as a highly optimized block transfer
-            temp_file.write(mm[frontmatter_end_index:])
-
-    # 4. Atomic Replace (Safe across thousands of files)
-    pathlib.Path(temp_path).replace(file_path)
+                    # Dump the rest of the file directly from the memory map
+                    # Python handles this as a highly optimized block transfer
+                    temp_file.write(mm[frontmatter_end_index:])
+                # 4. Atomic Replace (Safe across thousands of files)
+                temp_path.replace(path)
+            except BaseException:
+                temp_path.unlink(missing_ok=True)
+                raise
 
 
 def lint_and_fix(raw_yaml: bytes) -> tuple[bool, bytes | None]:

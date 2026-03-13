@@ -36,23 +36,20 @@ def _count_files(directory: Path) -> int:
     return count
 
 
-def _run_once(plugin_dir: Path) -> float:
+def _run_once(plugin_dir: Path, skilllint_exe: str) -> float:
     """Run ``skilllint`` against *plugin_dir* and return wall-clock seconds.
 
     Args:
         plugin_dir: Path to the extracted plugin directory.
+        skilllint_exe: Absolute path to the ``skilllint`` executable.
 
     Returns:
         Elapsed wall-clock time in seconds.
 
     Raises:
-        FileNotFoundError: If the ``skilllint`` executable cannot be located on PATH.
         subprocess.CalledProcessError: If skilllint exits with a non-zero code
             that is not an expected lint-result code (1 = lint errors found).
     """
-    skilllint_exe = shutil.which("skilllint")
-    if skilllint_exe is None:
-        raise FileNotFoundError("'skilllint' executable not found on PATH")
     start = time.perf_counter()
     result = subprocess.run([skilllint_exe, str(plugin_dir)], capture_output=True, text=True, check=False)
     elapsed = time.perf_counter() - start
@@ -74,10 +71,16 @@ def run_benchmark(plugin_dir: Path, runs: int = 3) -> dict[str, float | int]:
     Returns:
         Dictionary with keys ``min_ms``, ``mean_ms``, ``max_ms``,
         ``runs``, and ``file_count``.
+
+    Raises:
+        FileNotFoundError: If the ``skilllint`` executable cannot be located on PATH.
     """
+    skilllint_exe = shutil.which("skilllint")
+    if skilllint_exe is None:
+        raise FileNotFoundError("'skilllint' executable not found on PATH")
     timings: list[float] = []
     for _ in range(runs):
-        elapsed = _run_once(plugin_dir)
+        elapsed = _run_once(plugin_dir, skilllint_exe)
         timings.append(elapsed * 1000.0)
 
     file_count = _count_files(plugin_dir)
