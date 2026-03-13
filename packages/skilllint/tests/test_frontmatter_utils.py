@@ -17,7 +17,7 @@ class TestRuamelYAMLHandler:
 
     def test_load_simple_frontmatter(self) -> None:
         """Handler parses simple frontmatter without quotes."""
-        from frontmatter_utils import loads_frontmatter
+        from skilllint.frontmatter_utils import loads_frontmatter
 
         text = "---\ndescription: A simple skill\ntools: Read, Write\n---\n\n# Body\n"
         post = loads_frontmatter(text)
@@ -27,7 +27,7 @@ class TestRuamelYAMLHandler:
 
     def test_load_quoted_frontmatter(self) -> None:
         """Handler preserves quotes when YAML syntax requires them."""
-        from frontmatter_utils import loads_frontmatter
+        from skilllint.frontmatter_utils import loads_frontmatter
 
         text = '---\ndescription: "Has colon: in value"\n---\n\n# Body\n'
         post = loads_frontmatter(text)
@@ -36,7 +36,7 @@ class TestRuamelYAMLHandler:
 
     def test_load_no_frontmatter(self) -> None:
         """Handler returns empty metadata for files without frontmatter."""
-        from frontmatter_utils import loads_frontmatter
+        from skilllint.frontmatter_utils import loads_frontmatter
 
         text = "# Just a heading\n\nSome content.\n"
         post = loads_frontmatter(text)
@@ -46,7 +46,7 @@ class TestRuamelYAMLHandler:
 
     def test_roundtrip_preserves_unquoted(self) -> None:
         """Round-trip does not add unnecessary quotes."""
-        from frontmatter_utils import dump_frontmatter, loads_frontmatter
+        from skilllint.frontmatter_utils import dump_frontmatter, loads_frontmatter
 
         text = "---\ndescription: Simple value\nname: test-skill\n---\n\n# Body\n"
         post = loads_frontmatter(text)
@@ -59,7 +59,7 @@ class TestRuamelYAMLHandler:
 
     def test_roundtrip_preserves_required_quotes(self) -> None:
         """Round-trip keeps quotes where YAML demands them (colon-space)."""
-        from frontmatter_utils import dump_frontmatter, loads_frontmatter
+        from skilllint.frontmatter_utils import dump_frontmatter, loads_frontmatter
 
         text = '---\ndescription: "Has colon: in value"\n---\n\n# Body\n'
         post = loads_frontmatter(text)
@@ -72,7 +72,7 @@ class TestRuamelYAMLHandler:
 
     def test_roundtrip_removes_unnecessary_quotes(self) -> None:
         """Round-trip strips quotes that YAML does not require."""
-        from frontmatter_utils import dump_frontmatter, loads_frontmatter
+        from skilllint.frontmatter_utils import dump_frontmatter, loads_frontmatter
 
         text = '---\ndescription: "No special characters here"\n---\n\n# Body\n'
         post = loads_frontmatter(text)
@@ -88,7 +88,7 @@ class TestConvenienceAPI:
 
     def test_loads_frontmatter_from_string(self) -> None:
         """Parse frontmatter from a string."""
-        from frontmatter_utils import loads_frontmatter
+        from skilllint.frontmatter_utils import loads_frontmatter
 
         text = "---\nname: my-skill\ndescription: A test\n---\n\nContent here.\n"
         post = loads_frontmatter(text)
@@ -99,7 +99,7 @@ class TestConvenienceAPI:
 
     def test_dumps_frontmatter_to_file(self, tmp_path: Path) -> None:
         """Write frontmatter post to a file."""
-        from frontmatter_utils import dumps_frontmatter, load_frontmatter, loads_frontmatter
+        from skilllint.frontmatter_utils import dumps_frontmatter, load_frontmatter, loads_frontmatter
 
         text = "---\nname: my-skill\n---\n\n# Body\n"
         post = loads_frontmatter(text)
@@ -113,7 +113,7 @@ class TestConvenienceAPI:
 
     def test_update_field_existing(self, tmp_path: Path) -> None:
         """Update an existing field without re-serializing everything."""
-        from frontmatter_utils import load_frontmatter, update_field
+        from skilllint.frontmatter_utils import load_frontmatter, update_field
 
         md_file = tmp_path / "test.md"
         md_file.write_text("---\nname: old-name\ndescription: Keep this\n---\n\n# Body\n")
@@ -126,7 +126,7 @@ class TestConvenienceAPI:
 
     def test_update_field_new(self, tmp_path: Path) -> None:
         """Add a new field that did not exist."""
-        from frontmatter_utils import load_frontmatter, update_field
+        from skilllint.frontmatter_utils import load_frontmatter, update_field
 
         md_file = tmp_path / "test.md"
         md_file.write_text("---\nname: my-skill\n---\n\n# Body\n")
@@ -139,7 +139,7 @@ class TestConvenienceAPI:
 
     def test_body_content_preserved(self) -> None:
         """Markdown body with code blocks and special chars survives round-trip."""
-        from frontmatter_utils import dump_frontmatter, loads_frontmatter
+        from skilllint.frontmatter_utils import dump_frontmatter, loads_frontmatter
 
         body = "# Title\n\n```python\ndef foo():\n    return 'bar: baz'\n```\n\n> Quote with special chars: <>&"
         text = f"---\nname: test\n---\n\n{body}\n"
@@ -156,7 +156,7 @@ class TestEdgeCases:
 
     def test_empty_file(self, tmp_path: Path) -> None:
         """Empty file does not crash."""
-        from frontmatter_utils import load_frontmatter
+        from skilllint.frontmatter_utils import load_frontmatter
 
         md_file = tmp_path / "empty.md"
         md_file.write_text("")
@@ -167,7 +167,7 @@ class TestEdgeCases:
 
     def test_frontmatter_with_boolean_values(self) -> None:
         """Boolean-like strings preserved as strings when quoted, actual booleans as True."""
-        from frontmatter_utils import loads_frontmatter
+        from skilllint.frontmatter_utils import loads_frontmatter
 
         text = '---\nuser-invocable: true\nquoted_bool: "true"\n---\n\n# Body\n'
         post = loads_frontmatter(text)
@@ -177,7 +177,7 @@ class TestEdgeCases:
 
     def test_frontmatter_with_list_values(self) -> None:
         """List values handled correctly."""
-        from frontmatter_utils import loads_frontmatter
+        from skilllint.frontmatter_utils import loads_frontmatter
 
         text = "---\nitems:\n  - one\n  - two\n  - three\n---\n\n# Body\n"
         post = loads_frontmatter(text)
@@ -186,7 +186,7 @@ class TestEdgeCases:
 
     def test_unicode_in_description(self) -> None:
         """Unicode characters survive round-trip (em-dashes, curly quotes)."""
-        from frontmatter_utils import dump_frontmatter, loads_frontmatter
+        from skilllint.frontmatter_utils import dump_frontmatter, loads_frontmatter
 
         text = "---\ndescription: Uses em\u2014dash and \u201ccurly quotes\u201d\n---\n\n# Body\n"
         post = loads_frontmatter(text)
