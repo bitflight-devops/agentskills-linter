@@ -67,7 +67,6 @@ from .frontmatter_core import (
     fix_skill_name_field,
     get_frontmatter_model,
 )
-from .frontmatter_utils import RuamelYAMLHandler
 
 if TYPE_CHECKING:
     from pydantic_core import ErrorDetails
@@ -75,9 +74,9 @@ if TYPE_CHECKING:
 # Module-level ruamel.yaml safe-mode instance (replaces yaml.safe_load)
 _yaml_safe = YAML(typ="safe")
 
-# Round-trip YAML instance (via shared handler) for dumping with format preservation
-_rt_handler = RuamelYAMLHandler()
-_rt_yaml = _rt_handler.yaml
+# Round-trip YAML instance for dumping with format preservation
+_rt_yaml = YAML(typ="rt")
+_rt_yaml.preserve_quotes = False
 _rt_yaml.width = 10000  # prevent line wrapping
 
 # Platform adapter registry — loaded once at module level.
