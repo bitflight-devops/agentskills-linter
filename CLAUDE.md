@@ -72,3 +72,23 @@ Never write logic directly in `.github/workflows/*.yml` `run:` blocks beyond a s
 ```
 
 This applies to: data processing, conditional logic, multi-step setup, JSON manipulation, file operations.
+
+## Test directory layout
+
+The project has two test locations — this is intentional, not accidental.
+
+### `packages/skilllint/tests/`
+Unit and integration tests for the `skilllint` package itself: validators, CLI, adapters, reporters, frontmatter utilities. These tests import directly from the package and run entirely in-process.
+
+### `tests/` (root)
+Project-level tests that are not owned by any package:
+- `test_fetch_platform_docs.py` — tests `scripts/fetch_platform_docs.py`, a root-level project script
+- `tests/benchmarks/` — performance benchmarks that invoke `skilllint` as an installed CLI via subprocess (black-box tests); cannot live inside the package tests because they treat `skilllint` as an external process
+- `tests/fixtures/` — shared zip archives used by the benchmark suite
+
+### Rule: where does a new test go?
+- Tests that `import` from `skilllint` → `packages/skilllint/tests/`
+- Tests for root-level scripts (`scripts/*.py`) → `tests/`
+- Benchmarks (subprocess/CLI invocation) → `tests/benchmarks/`
+
+Both locations are discovered by `pytest` via `testpaths = ["**/tests"]` in `pyproject.toml`.
