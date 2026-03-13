@@ -36,27 +36,31 @@ Validate skill name, description quality, and token budget.
 | SK003 | warning | **yes** | Skill description is missing or empty |
 | SK004 | warning | no | Skill description is very short (< 20 chars); may not trigger auto-invocation |
 | SK005 | warning | no | Skill description lacks trigger phrases ("Use when...", keywords); Claude may not auto-invoke |
-| SK006 | warning | no | Skill is approaching token limit (~3800 tokens); consider moving content to `references/` |
-| SK007 | error | no | Skill exceeds token limit (~4000 tokens); must split or extract content to `references/` |
+| SK006 | warning | no | (Legacy) Skill is approaching token limit; see AS005 for current thresholds |
+| SK007 | error | no | (Legacy) Skill exceeds token limit; see AS005 for current thresholds |
 | SK008 | info | no | Skill has no `argument-hint` but appears to accept arguments based on `$ARGUMENTS` usage |
 | SK009 | info | no | Token count report (informational; always emitted with `--verbose`) |
 
-**SK006/SK007 fix:** Move large sections to `skills/<name>/references/<file>.md` and add a link from SKILL.md. Do not auto-fix — requires judgment about what to extract.
+**Token limit fix (AS005):** Move large sections to `skills/<name>/references/<file>.md` and add a link from SKILL.md. Warning at 4400 tokens, error at 8800 tokens (body text only).
 
 ---
 
 ## AS — AgentSkills Open Standard Rules
 
-Cross-platform compliance with the [agentskills.io](https://agentskills.io) specification. These fire regardless of `--platform`.
+Cross-platform compliance with the [agentskills.io](https://agentskills.io) specification.
+These are the rules documented in the `skilllint rule` system — use `skilllint rule AS001` etc. for full details.
 
 | Rule | Severity | Auto-fix | Description |
 |------|----------|----------|-------------|
-| AS001 | error | no | `name` field is missing (required by agentskills spec) |
-| AS002 | error | **yes** | `name` field does not match the directory name |
-| AS003 | warning | no | `description` field is missing (recommended by spec) |
-| AS004 | warning | no | `allowed-tools` uses non-standard tool names not in the agentskills spec's approved list |
-| AS005 | info | no | `compatibility` field is missing (optional but recommended for cross-agent portability) |
-| AS006 | info | no | `metadata` field is missing (optional; for extended skill metadata) |
+| AS001 | error | no | Invalid skill name format — must be lowercase alphanumeric with hyphens, 1–64 chars, no consecutive hyphens, start/end with letter or digit |
+| AS002 | error | **yes** | Skill `name` field does not match the parent directory name |
+| AS003 | error | no | `description` field is missing or empty |
+| AS004 | error | no | `description` contains HTML tags (not allowed) |
+| AS005 | warning | no | SKILL.md body exceeds token threshold — warning at 4400 tokens, error at 8800 tokens (body only, frontmatter excluded); split or move content to `references/` |
+| AS006 | info | no | No evaluation queries file found (optional but recommended) |
+
+**Full detail:** `skilllint rule AS001` through `skilllint rule AS006`
+**List all:** `skilllint rules` or `skilllint rules --category skill`
 
 ---
 
@@ -79,7 +83,7 @@ Validate the `references/` directory structure for progressive disclosure.
 
 | Rule | Severity | Auto-fix | Description |
 |------|----------|----------|-------------|
-| PD001 | warning | no | Large skill (approaching SK006) has no `references/` directory; consider adding one |
+| PD001 | warning | no | Large skill (approaching AS005 threshold) has no `references/` directory; consider adding one |
 | PD002 | warning | no | `references/` directory exists but is not linked from SKILL.md |
 | PD003 | info | no | Files in `references/` are never referenced in SKILL.md |
 
@@ -173,10 +177,10 @@ Run `skilllint --fix <path>` to automatically fix:
 - **FM007** — allowed-tools as YAML array
 - **FM008** — other comma-separated fields as YAML array
 - **FM009** — unquoted colon in string field
-- **FM010 / AS002** — name/directory mismatch
+- **FM010 / AS002** — name/directory mismatch (auto-fixed by `skilllint check --fix`)
 - **SK001** — skill name case/format
 - **SK002** — skill name too long (truncated)
 - **SK003** — missing description (adds placeholder)
 - **SL001** — symlink outside plugin directory
 
-All other rules require manual fixes.
+All other rules (including AS005 token size, PD, LK, HK series) require manual fixes.
