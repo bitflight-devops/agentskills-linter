@@ -217,7 +217,7 @@ def _run_fix_scenario() -> dict[str, float]:
     start = time.perf_counter()
     for _ in range(_ITERATIONS):
         post = loads_frontmatter(document)
-        # Apply in-memory fixes using the same path as `skilllint --fix`.
+        # Apply in-memory fixes using the same path as `skilllint check --fix`.
         _fixed_content, _fixes = validator._apply_fixes(document, FileType.SKILL)  # noqa: SLF001
         # Guard to prevent the loop being optimised away.
         if post is None:
