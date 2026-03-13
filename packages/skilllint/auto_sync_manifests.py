@@ -30,7 +30,6 @@ import argparse
 import shutil
 import subprocess
 import sys
-import tempfile
 from io import TextIOWrapper
 
 import msgspec.json
@@ -484,8 +483,7 @@ def update_plugin_json(plugin_name: str, changes: ComponentChanges) -> tuple[boo
     if not plugin_json_path.exists():
         return False, "0.0.0"
 
-    with plugin_json_path.open(encoding="utf-8") as f:
-        data: dict[str, list[str] | str] = msgspec.json.decode(f.read())
+    data: dict[str, list[str] | str] = msgspec.json.decode(plugin_json_path.read_bytes())
 
     current_version = cast("str", data.get("version", "0.0.0"))
 
@@ -541,8 +539,7 @@ def _read_plugin_name(plugin_dir_name: str) -> str:
     plugin_json_path = Path(f"plugins/{plugin_dir_name}/.claude-plugin/plugin.json")
     if plugin_json_path.exists():
         try:
-            with plugin_json_path.open(encoding="utf-8") as f:
-                data = msgspec.json.decode(f.read())
+            data = msgspec.json.decode(plugin_json_path.read_bytes())
             name = data.get("name")
             if name and isinstance(name, str):
                 return name
@@ -610,8 +607,7 @@ def update_marketplace_json(plugin_changes: MarketplaceChanges) -> bool:
         print("Warning: marketplace.json not found")
         return False
 
-    with marketplace_json_path.open(encoding="utf-8") as f:
-        data: dict[str, dict[str, str] | list[dict[str, str]]] = msgspec.json.decode(f.read())
+    data: dict[str, dict[str, str] | list[dict[str, str]]] = msgspec.json.decode(marketplace_json_path.read_bytes())
 
     metadata = cast("dict[str, str]", data.get("metadata", {}))
     current_version = metadata.get("version", "0.0.0")
@@ -974,8 +970,7 @@ def _reconcile_one_plugin(plugin_name: str, plugins_root: Path, *, dry_run: bool
     if not plugin_json_path.exists():
         return False
 
-    with plugin_json_path.open(encoding="utf-8") as f:
-        data: dict[str, list[str] | str] = msgspec.json.decode(f.read())
+    data: dict[str, list[str] | str] = msgspec.json.decode(plugin_json_path.read_bytes())
 
     disk_skills = _discover_skills(plugin_dir)
     disk_agents = _discover_agents(plugin_dir)
@@ -1154,8 +1149,7 @@ def _reconcile_marketplace(plugins_root: Path, *, dry_run: bool) -> bool:
         print("Warning: marketplace.json not found")
         return False
 
-    with marketplace_path.open(encoding="utf-8") as f:
-        data: dict[str, dict[str, str] | list[dict[str, str]]] = msgspec.json.decode(f.read())
+    data: dict[str, dict[str, str] | list[dict[str, str]]] = msgspec.json.decode(marketplace_path.read_bytes())
 
     plugins_list = cast("list[dict[str, str]]", data.get("plugins", []))
     registered_names = {p["name"] for p in plugins_list}
@@ -1301,9 +1295,8 @@ def _precommit_sync() -> int:
         if marketplace_updated:
             _git_stage_file(".claude-plugin/marketplace.json")
 
-            with Path(".claude-plugin/marketplace.json").open(encoding="utf-8") as f:
-                data = msgspec.json.decode(f.read())
-                new_version = data["metadata"]["version"]
+            data = msgspec.json.decode(Path(".claude-plugin/marketplace.json").read_bytes())
+            new_version = data["metadata"]["version"]
 
             print(f"Updated marketplace -> {new_version}")
 
