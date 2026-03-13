@@ -37,13 +37,14 @@ def _build_large_yaml_document(num_keys: int = 50, value_length: int = 100) -> s
     repeated_value = (value_template * ((value_length // len(value_template)) + 1))[:value_length]
 
     lines = ["---"]
-    for i in range(num_keys):
-        lines.append(f"key_{i:03d}: {repeated_value}")
-    lines.append("---")
-    lines.append("")
-    lines.append("# Benchmark skill content")
-    lines.append("")
-    lines.append("This is the body of the synthetic skill document used for CPU benchmarks.")
+    lines.extend(f"key_{i:03d}: {repeated_value}" for i in range(num_keys))
+    lines.extend((
+        "---",
+        "",
+        "# Benchmark skill content",
+        "",
+        "This is the body of the synthetic skill document used for CPU benchmarks.",
+    ))
     return "\n".join(lines)
 
 
@@ -59,15 +60,17 @@ def test_cpu_linting_large_yaml() -> None:
     start = time.perf_counter()
     for _ in range(_ITERATIONS):
         post = loads_frontmatter(document)
-        # Minimal assertion to prevent the loop being optimised away.
-        assert post is not None
+        # Guard to prevent the loop being optimised away.
+        if post is None:
+            raise RuntimeError("loads_frontmatter returned None for a non-empty document")
     elapsed = time.perf_counter() - start
 
     mean_ms = (elapsed / _ITERATIONS) * 1000.0
 
     print(f"\nCPU BENCHMARK: {_ITERATIONS} iterations in {elapsed:.3f}s (mean {mean_ms:.3f} ms/iter)")
 
-    assert elapsed < _TIME_LIMIT_SECONDS, (
-        f"CPU benchmark exceeded {_TIME_LIMIT_SECONDS}s time limit: {elapsed:.3f}s "
-        f"({_ITERATIONS} iterations, mean {mean_ms:.3f} ms/iter)"
-    )
+    if elapsed >= _TIME_LIMIT_SECONDS:
+        raise AssertionError(
+            f"CPU benchmark exceeded {_TIME_LIMIT_SECONDS}s time limit: {elapsed:.3f}s "
+            f"({_ITERATIONS} iterations, mean {mean_ms:.3f} ms/iter)"
+        )

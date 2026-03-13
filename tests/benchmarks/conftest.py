@@ -4,12 +4,8 @@ from __future__ import annotations
 
 import zipfile
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
-
-if TYPE_CHECKING:
-    pass
 
 _FIXTURE_ZIP_NAME = "benchmark-plugin-1000-skills.zip"
 
@@ -52,7 +48,7 @@ def extracted_plugin_dir(tmp_path_factory: pytest.TempPathFactory, benchmark_plu
     return extract_root
 
 
-@pytest.fixture()
+@pytest.fixture
 def plugin_file_count(extracted_plugin_dir: Path) -> int:
     """Return the number of SKILL.md files inside the extracted plugin directory.
 

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -43,17 +44,19 @@ def _run_once(plugin_dir: Path) -> float:
         Elapsed wall-clock time in seconds.
 
     Raises:
+        FileNotFoundError: If the ``skilllint`` executable cannot be located on PATH.
         subprocess.CalledProcessError: If skilllint exits with a non-zero code
             that is not an expected lint-result code (1 = lint errors found).
     """
+    skilllint_exe = shutil.which("skilllint")
+    if skilllint_exe is None:
+        raise FileNotFoundError("'skilllint' executable not found on PATH")
     start = time.perf_counter()
-    result = subprocess.run(  # noqa: S603
-        ["skilllint", str(plugin_dir)], capture_output=True, text=True
-    )
+    result = subprocess.run([skilllint_exe, str(plugin_dir)], capture_output=True, text=True, check=False)
     elapsed = time.perf_counter() - start
     # skilllint exits 0 (clean) or 1 (lint errors found) — both are valid.
     # Any other exit code is an unexpected failure.
-    if result.returncode not in (0, 1):
+    if result.returncode not in {0, 1}:
         raise subprocess.CalledProcessError(result.returncode, "skilllint", result.stdout, result.stderr)
     return elapsed
 

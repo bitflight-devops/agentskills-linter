@@ -20,14 +20,14 @@ def _get_git_info() -> tuple[str, str]:
         strings if git is not available or the repository has no commits.
     """
     try:
-        sha = subprocess.check_output(  # noqa: S603
+        sha = subprocess.check_output(
             ["git", "rev-parse", "--short", "HEAD"], text=True, stderr=subprocess.DEVNULL
         ).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
         sha = "unknown"
 
     try:
-        branch = subprocess.check_output(  # noqa: S603
+        branch = subprocess.check_output(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"], text=True, stderr=subprocess.DEVNULL
         ).strip()
     except (subprocess.CalledProcessError, FileNotFoundError):
@@ -79,8 +79,8 @@ def test_io_scan_1000_skills_timing(extracted_plugin_dir: Path, plugin_file_coun
         plugin_file_count: Number of ``SKILL.md`` files found (from fixture).
     """
     start = time.perf_counter()
-    result = subprocess.run(  # noqa: S603
-        ["skilllint", str(extracted_plugin_dir)], capture_output=True, text=True
+    result = subprocess.run(
+        ["skilllint", str(extracted_plugin_dir)], capture_output=True, text=True, check=False
     )
     duration = time.perf_counter() - start
 
