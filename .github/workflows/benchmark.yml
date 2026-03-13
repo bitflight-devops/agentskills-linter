@@ -65,12 +65,13 @@ jobs:
           python scripts/bench_io.py /tmp/bench-plugin --output scripts/results/bench_io_gh.json
 
       - name: Store I/O benchmark result
+        if: github.ref == 'refs/heads/main'
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: customSmallerIsBetter
           output-file-path: scripts/results/bench_io_gh.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: ${{ github.ref == 'refs/heads/main' }}
+          auto-push: true
           alert-threshold: '130%'
           comment-on-alert: true
           fail-on-alert: false
@@ -178,12 +179,13 @@ jobs:
           python scripts/bench_cpu.py --output scripts/results/bench_cpu_gh.json
 
       - name: Store CPU benchmark result
+        if: github.ref == 'refs/heads/main'
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: customSmallerIsBetter
           output-file-path: scripts/results/bench_cpu_gh.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: ${{ github.ref == 'refs/heads/main' }}
+          auto-push: true
           alert-threshold: '130%'
           comment-on-alert: true
           fail-on-alert: false
