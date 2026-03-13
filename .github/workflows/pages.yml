@@ -4,7 +4,7 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "dev/bench/**"
+      - "docs/bench/**"
   workflow_dispatch:
 
 permissions:
@@ -33,7 +33,7 @@ jobs:
       - name: Upload benchmark site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dev/bench/
+          path: docs/bench/
 
       - name: Deploy to GitHub Pages
         id: deployment
