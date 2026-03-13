@@ -27,6 +27,8 @@ permissions:
   contents: write
   deployments: write
   pull-requests: write
+  pages: write
+  id-token: write
 
 jobs:
   benchmark-io:
@@ -74,15 +76,6 @@ jobs:
           fi
           python "$BENCH_IO" /tmp/bench-plugin --output scripts/results/bench_io_gh.json | tee scripts/results/benchmark_results.json
 
-      - name: Ensure gh-pages branch exists
-        run: |
-          git fetch origin gh-pages:gh-pages 2>/dev/null || \
-            git checkout --orphan gh-pages && \
-            git reset --hard && \
-            git commit --allow-empty -m "init gh-pages for benchmark graphs" && \
-            git push origin gh-pages && \
-            git checkout -
-
       - name: Store I/O benchmark result
         if: github.ref == 'refs/heads/main'
         uses: benchmark-action/github-action-benchmark@v1
@@ -90,7 +83,8 @@ jobs:
           tool: customSmallerIsBetter
           output-file-path: scripts/results/bench_io_gh.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
+          auto-push: false
+          save-data-file: true
           alert-threshold: '130%'
           comment-on-alert: true
           fail-on-alert: false
@@ -201,7 +195,8 @@ jobs:
           tool: customSmallerIsBetter
           output-file-path: scripts/results/bench_cpu_gh.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
+          auto-push: false
+          save-data-file: true
           alert-threshold: '130%'
           comment-on-alert: true
           fail-on-alert: false
@@ -294,22 +289,14 @@ jobs:
             --compare scripts/results/benchmark_results.json \
             --base scripts/results/benchmark_results_base.json
 
-      - name: Ensure gh-pages branch exists
-        run: |
-          git fetch origin gh-pages:gh-pages 2>/dev/null || \
-            git checkout --orphan gh-pages && \
-            git reset --hard && \
-            git commit --allow-empty -m "init gh-pages for benchmark graphs" && \
-            git push origin gh-pages && \
-            git checkout -
-
       - name: Store I/O benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
           tool: customSmallerIsBetter
           output-file-path: scripts/results/bench_io_gh.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
+          auto-push: false
+          save-data-file: true
           alert-threshold: '130%'
           comment-on-alert: true
           fail-on-alert: false
@@ -321,3 +308,95 @@ jobs:
           name: release-benchmark-${{ github.ref_name }}
           path: scripts/results/
           retention-days: 90
+
+  pages-deploy:
+    name: Deploy Benchmark Pages
+    runs-on: ubuntu-latest
+    needs: [benchmark-io, benchmark-cpu]
+    if: github.event_name != 'release' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download benchmark artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: benchmark-results-*
+          merge-multiple: true
+          path: scripts/results/
+
+      - name: Commit updated benchmark data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dev/bench/
+          git diff --cached --quiet || git commit -m "chore: update benchmark data [skip ci]"
+          git push origin main
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload benchmark site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dev/bench/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+
+  pages-deploy-release:
+    name: Deploy Benchmark Pages (Release)
+    runs-on: ubuntu-latest
+    needs: [benchmark-release]
+    if: github.event_name == 'release'
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Download benchmark artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: benchmark-results-*
+          merge-multiple: true
+          path: scripts/results/
+
+      - name: Commit updated benchmark data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add dev/bench/
+          git diff --cached --quiet || git commit -m "chore: update benchmark data [skip ci]"
+          git push origin main
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload benchmark site artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dev/bench/
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
