@@ -11,7 +11,7 @@ Arguments received: `$ARGUMENTS`
 ## Argument Routing
 
 - **No arguments** → Run full workflow guide below
-- **Rule ID** (e.g. `AS001`, `AS005`, `FM004`) → Run `skilllint rule <ID>` for AS001–AS006; for other rule IDs, look up in [rule-catalog.md](./references/rule-catalog.md)
+- **Rule ID** (e.g. `AS001`, `AS005`, `FM004`) → Run `skilllint rule <ID>` for AS rules; for others look up in [rule-catalog.md](./references/rule-catalog.md)
 - **A path** (e.g. `./plugins/my-plugin`) → Run `skilllint check <path>` and interpret the output
 
 ---
@@ -134,6 +134,8 @@ skilllint check --check ./plugins/my-plugin
 skilllint check --fix ./plugins/my-plugin
 ```
 
+> **Note:** `--check` and `--fix` are mutually exclusive. Passing both flags at the same time is an error.
+
 **Auto-fixable rules:** FM004, FM007, FM008, FM009, FM010/AS002, SK001, SK002, SK003, SL001
 
 **Not auto-fixable:** AS005 (token size — requires manual refactoring), PD series, AS006, LK series, most PL/PR/HK rules.
@@ -184,6 +186,7 @@ Move large reference content to a `references/` subdirectory and link to it:
 For the full rule catalog, see [rule-catalog.md](./references/rule-catalog.md)
 ```
 Token thresholds: warning at **4400 tokens**, error at **8800 tokens** (body text only, frontmatter excluded).
+<!-- source: packages/skilllint/token_counter.py TOKEN_WARNING_THRESHOLD=4400, TOKEN_ERROR_THRESHOLD=8800 -->
 
 ### AS002 / FM010 — Name/directory mismatch
 
@@ -247,6 +250,7 @@ skilllint check --tokens-only ./plugins/my-plugin/skills/my-skill/SKILL.md
 ```
 
 AS005 fires at 4400 tokens (warning) and 8800 tokens (error), counting body text only (frontmatter is excluded from the count).
+<!-- source: packages/skilllint/token_counter.py TOKEN_WARNING_THRESHOLD=4400, TOKEN_ERROR_THRESHOLD=8800 -->
 
 ---
 
