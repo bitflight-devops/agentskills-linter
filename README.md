@@ -14,7 +14,7 @@ Static analysis linter for AI agent plugins, skills, and agents — for Claude C
 `skilllint` validates the structure and content of AI agent files: plugins, skills, agents, and commands. It catches broken references, missing frontmatter, oversized skills, invalid hook configurations, and more — before they cause silent failures at runtime.
 
 ```
-$ skilllint plugins/my-plugin
+$ skilllint check plugins/my-plugin
 
 plugins/my-plugin/skills/my-skill/SKILL.md
   SK006  Token count 14823 exceeds recommended limit of 8192
@@ -48,19 +48,19 @@ uv tool install skilllint # install as a global tool
 
 ```bash
 # Validate a plugin directory
-skilllint plugins/my-plugin
+skilllint check plugins/my-plugin
 
 # Validate a single skill file
-skilllint plugins/my-plugin/skills/my-skill/SKILL.md
+skilllint check plugins/my-plugin/skills/my-skill/SKILL.md
 
 # Validate everything and show a summary
-skilllint --show-summary plugins/
+skilllint check --show-summary plugins/
 
 # Auto-fix issues where possible
-skilllint --fix plugins/my-plugin
+skilllint check --fix plugins/my-plugin
 
 # Count tokens in any markdown file
-skilllint --tokens-only .claude/CLAUDE.md
+skilllint check --tokens-only .claude/CLAUDE.md
 ```
 
 Exit codes: `0` = all checks passed · `1` = validation errors · `2` = usage error
@@ -95,7 +95,7 @@ repos:
 Restrict validation to one platform:
 
 ```bash
-skilllint --platform claude-code plugins/my-plugin
+skilllint check --platform claude-code plugins/my-plugin
 ```
 
 ---
@@ -116,20 +116,61 @@ skilllint --platform claude-code plugins/my-plugin
 ## CLI reference
 
 ```
-Usage: skilllint [OPTIONS] [PATHS]...
+Usage: skilllint [OPTIONS] COMMAND [ARGS]...
+
+Commands:
+  check   Validate Claude Code plugins, skills, agents, and commands.
+  rule    Show documentation for a validation rule.
+  rules   List all available validation rules.
+
+Options:
+  --help  Show this message and exit.
+```
+
+### check
+
+```
+Usage: skilllint check [OPTIONS] [PATHS]...
+
+Arguments:
+  paths              Paths to validate
 
 Options:
   --check            Validate only, don't auto-fix
   --fix              Auto-fix issues where possible
-  --verbose, -v      Show detailed output including info messages
-  --no-color         Disable colour output for CI
-  --tokens-only      Output only the integer token count
-  --show-progress    Show per-file PASSED/FAILED status
-  --show-summary     Show validation summary panel at the end
+  --verbose, -v      Show detailed output
+  --no-color         Disable color
+  --tokens-only      Output token count only
+  --show-progress    Show per-file status
+  --show-summary     Show summary panel
   --filter TEXT      Glob pattern to match files within a directory
-  --filter-type TEXT Shortcut: skills | agents | commands
-  --platform TEXT    Restrict to a specific platform adapter
+  --filter-type TEXT Filter type (skills | agents | commands)
+  --platform TEXT    Platform adapter
   --help             Show this message and exit
+```
+
+### rules
+
+```
+Usage: skilllint rules [OPTIONS]
+
+Options:
+  --platform, -p TEXT  Filter rules by platform
+  --category, -c TEXT  Filter rules by category
+  --severity, -s TEXT  Filter rules by severity (error, warning, info)
+  --help               Show this message and exit
+```
+
+### rule
+
+```
+Usage: skilllint rule [OPTIONS] RULE_ID
+
+Arguments:
+  rule_id  Rule identifier (e.g., "SK001", "FM002", "AS001")  [required]
+
+Options:
+  --help   Show this message and exit
 ```
 
 All four command names are aliases for the same tool:
