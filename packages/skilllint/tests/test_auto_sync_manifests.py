@@ -25,7 +25,7 @@ Test isolation strategy:
 from __future__ import annotations
 
 import importlib.util
-import json
+import msgspec.json
 import shutil
 import sys
 from pathlib import Path
@@ -73,7 +73,7 @@ def _make_plugin_json(base: Path, plugin_name: str, data: Mapping[str, Any]) -> 
     plugin_dir = base / "plugins" / plugin_name / ".claude-plugin"
     plugin_dir.mkdir(parents=True, exist_ok=True)
     plugin_json = plugin_dir / "plugin.json"
-    plugin_json.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    plugin_json.write_text(msgspec.json.format(msgspec.json.encode(data), indent=2).decode() + "\n", encoding="utf-8")
     return plugin_json
 
 
@@ -85,7 +85,7 @@ def _make_marketplace_json(base: Path, data: Mapping[str, Any]) -> Path:
     claude_dir = base / ".claude-plugin"
     claude_dir.mkdir(parents=True, exist_ok=True)
     marketplace_json = claude_dir / "marketplace.json"
-    marketplace_json.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    marketplace_json.write_text(msgspec.json.format(msgspec.json.encode(data), indent=2).decode() + "\n", encoding="utf-8")
     return marketplace_json
 
 
@@ -134,7 +134,7 @@ class TestJsonFormattingConflict:
         data = {"name": "test-plugin", "version": "1.0.0", "skills": ["./skills/test-skill/"]}
 
         # Act
-        output = json.dumps(data, indent=2) + "\n"
+        output = msgspec.json.format(msgspec.json.encode(data), indent=2).decode() + "\n"
 
         # Assert -- json.dump writes the array across 3 lines
         assert '"skills": [\n    "./skills/test-skill/"\n  ]' in output
@@ -148,7 +148,7 @@ class TestJsonFormattingConflict:
         """
         # Arrange
         data = {"name": "test-plugin", "version": "1.0.0", "skills": ["./skills/test-skill/"]}
-        json_dump_output = json.dumps(data, indent=2) + "\n"
+        json_dump_output = msgspec.json.format(msgspec.json.encode(data), indent=2).decode() + "\n"
 
         # The format prettier produces for the same data
         prettier_output = (
@@ -158,7 +158,7 @@ class TestJsonFormattingConflict:
         # Act & Assert -- the two formats differ
         assert json_dump_output != prettier_output
         # But they parse to the same data
-        assert json.loads(json_dump_output) == json.loads(prettier_output)
+        assert msgspec.json.decode(json_dump_output) == msgspec.json.decode(prettier_output)
 
     def test_update_plugin_json_writes_prettier_compatible_format(self, tmp_path: Path, monkeypatch: Any) -> None:
         """Verify update_plugin_json writes prettier-compatible JSON format.
@@ -187,7 +187,7 @@ class TestJsonFormattingConflict:
         written_content = plugin_json.read_text(encoding="utf-8")
 
         # Verify the data is still correct
-        data = json.loads(written_content)
+        data = msgspec.json.decode(written_content)
         assert data["version"] == "1.0.1"
         assert data["skills"] == ["./skills/existing-skill/"]
 
@@ -228,7 +228,7 @@ class TestJsonFormattingConflict:
         assert '{ "version": "1.0.1" }' in written or '"version": "1.0.1"' in written
 
         # Verify the data is still correct
-        data = json.loads(written)
+        data = msgspec.json.decode(written)
         assert data["metadata"]["version"] == "1.0.1"
 
 
@@ -280,7 +280,7 @@ class TestIdempotency:
 
         plugin_name = "test-plugin"
         original_data = {"name": "test-plugin", "version": "1.0.0", "skills": ["./skills/existing/"]}
-        original_content = json.dumps(original_data, indent=2) + "\n"
+        original_content = msgspec.json.format(msgspec.json.encode(original_data), indent=2).decode() + "\n"
         plugin_json = _make_plugin_json(tmp_path, plugin_name, original_data)
 
         changes = _changes_with_modified_skill()
@@ -369,7 +369,7 @@ class TestIdempotency:
         assert updated_2 is False
 
         marketplace_json = tmp_path / ".claude-plugin" / "marketplace.json"
-        final_data = json.loads(marketplace_json.read_text(encoding="utf-8"))
+        final_data = msgspec.json.decode(marketplace_json.read_text(encoding="utf-8"))
         assert final_data["metadata"]["version"] == "1.0.1"
 
     def test_bump_version_handles_invalid_input_gracefully(self) -> None:
@@ -440,7 +440,7 @@ class TestVersionComparisonGuard:
         assert version == "1.5.0"
 
         # File was NOT modified
-        assert json.loads(plugin_json.read_text(encoding="utf-8"))["version"] == "1.5.0"
+        assert msgspec.json.decode(plugin_json.read_text(encoding="utf-8"))["version"] == "1.5.0"
 
     def test_update_marketplace_json_skips_when_version_already_bumped(self, tmp_path: Path, monkeypatch: Any) -> None:
         """Verify update_marketplace_json skips when version already > HEAD.
@@ -465,7 +465,7 @@ class TestVersionComparisonGuard:
 
         # Assert -- guard triggered, no modifications
         assert updated is False
-        loaded = json.loads(marketplace_json.read_text(encoding="utf-8"))
+        loaded = msgspec.json.decode(marketplace_json.read_text(encoding="utf-8"))
         assert loaded["metadata"]["version"] == "2.1.0"
 
     def test_guard_returns_current_version_not_zero(self, tmp_path: Path, monkeypatch: Any) -> None:
@@ -1077,7 +1077,7 @@ class TestVersionAlreadyBumped:
         """
         monkeypatch.chdir(tmp_path)
         plugin_json = tmp_path / "plugin.json"
-        plugin_json.write_text(json.dumps({"version": "1.1.0"}))
+        plugin_json.write_text(msgspec.json.encode({"version": "1.1.0"}).decode())
 
         monkeypatch.setattr(auto_sync, "_read_head_json", lambda _fp: {"version": "1.0.0"})
 
@@ -1092,7 +1092,7 @@ class TestVersionAlreadyBumped:
         """
         monkeypatch.chdir(tmp_path)
         plugin_json = tmp_path / "plugin.json"
-        plugin_json.write_text(json.dumps({"version": "1.0.0"}))
+        plugin_json.write_text(msgspec.json.encode({"version": "1.0.0"}).decode())
 
         monkeypatch.setattr(auto_sync, "_read_head_json", lambda _fp: {"version": "1.0.0"})
 
@@ -1107,7 +1107,7 @@ class TestVersionAlreadyBumped:
         """
         monkeypatch.chdir(tmp_path)
         plugin_json = tmp_path / "plugin.json"
-        plugin_json.write_text(json.dumps({"version": "1.0.0"}))
+        plugin_json.write_text(msgspec.json.encode({"version": "1.0.0"}).decode())
 
         monkeypatch.setattr(auto_sync, "_read_head_json", lambda _fp: None)
 
@@ -1133,7 +1133,7 @@ class TestVersionAlreadyBumped:
         """
         monkeypatch.chdir(tmp_path)
         marketplace_json = tmp_path / "marketplace.json"
-        marketplace_json.write_text(json.dumps({"metadata": {"version": "2.1.0"}}))
+        marketplace_json.write_text(msgspec.json.encode({"metadata": {"version": "2.1.0"}}).decode())
 
         monkeypatch.setattr(auto_sync, "_read_head_json", lambda _fp: {"metadata": {"version": "2.0.0"}})
 
@@ -1217,7 +1217,7 @@ class TestIdempotentWrites:
 
         # Verify version was only bumped once
         marketplace_json = tmp_path / ".claude-plugin" / "marketplace.json"
-        final_data = json.loads(marketplace_json.read_text(encoding="utf-8"))
+        final_data = msgspec.json.decode(marketplace_json.read_text(encoding="utf-8"))
         assert final_data["metadata"]["version"] == "1.0.1"
 
     def test_update_plugin_json_version_stays_at_single_bump(self, tmp_path: Path, monkeypatch: Any) -> None:
@@ -1245,7 +1245,7 @@ class TestIdempotentWrites:
         auto_sync.update_plugin_json(plugin_name, changes)
 
         # Final version should be 1.0.1, not 1.0.3
-        final_data = json.loads(plugin_json.read_text(encoding="utf-8"))
+        final_data = msgspec.json.decode(plugin_json.read_text(encoding="utf-8"))
         assert final_data["version"] == "1.0.1"
 
 

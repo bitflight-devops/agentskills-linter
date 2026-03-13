@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import json
+import msgspec.json
 from importlib.resources import files
 
 
@@ -17,4 +17,4 @@ def load_bundled_schema(platform: str, version: str = "v1") -> dict:
         Parsed JSON schema as a dict
     """
     ref = files(f"skilllint.schemas.{platform}").joinpath(f"{version}.json")
-    return json.loads(ref.read_bytes())
+    return msgspec.json.decode(ref.read_bytes())
