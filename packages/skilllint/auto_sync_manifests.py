@@ -540,9 +540,10 @@ def _read_plugin_name(plugin_dir_name: str) -> str:
     if plugin_json_path.exists():
         try:
             data = msgspec.json.decode(plugin_json_path.read_bytes())
-            name = data.get("name")
-            if name and isinstance(name, str):
-                return name
+            if isinstance(data, dict):
+                name = data.get("name")
+                if name and isinstance(name, str):
+                    return name
         except (OSError, msgspec.DecodeError):
             pass
     return plugin_dir_name
