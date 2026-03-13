@@ -1976,9 +1976,11 @@ class FrontmatterValidator:
         # Validate hook script file-path references declared in frontmatter ``hooks:`` field.
         # The ``hooks:`` field in SKILL.md / agent / command frontmatter uses the same
         # structure as the root ``"hooks"`` key in hooks.json.
-        if isinstance(data, dict) and isinstance(data.get("hooks"), dict):
-            hook_validator = HookValidator()
-            hook_validator.validate_hook_script_references_in_hooks_dict(data["hooks"], path.parent, errors)
+        if isinstance(data, dict):
+            hooks_value = data.get("hooks")
+            if isinstance(hooks_value, dict):
+                hook_validator = HookValidator()
+                hook_validator.validate_hook_script_references_in_hooks_dict(hooks_value, path.parent, errors)
 
         passed = len(errors) == 0
         return ValidationResult(passed=passed, errors=errors, warnings=warnings, info=info)
@@ -3021,7 +3023,7 @@ def _parse_registered_paths(plugin_config: dict[str, YamlValue], plugin_dir: Pat
         else:
             registered.add(Path(value.lstrip("./")))
     elif isinstance(value, list):
-        registered.update(Path(item.lstrip("./")) for item in value)
+        registered.update(Path(item.lstrip("./")) for item in value if isinstance(item, str))
 
     return registered
 
@@ -3076,8 +3078,7 @@ class PluginRegistrationValidator:
             return ValidationResult(passed=True, errors=errors, warnings=warnings, info=info)
 
         try:
-            with plugin_json_path.open() as f:
-                plugin_config = msgspec.json.decode(f.read())
+            plugin_config = msgspec.json.decode(plugin_json_path.read_bytes())
         except msgspec.DecodeError as e:
             errors.append(
                 ValidationIssue(
@@ -3490,8 +3491,7 @@ class PluginStructureValidator:
             None if valid; otherwise human-readable error message string.
         """
         try:
-            with Path(plugin_json_path).open(encoding="utf-8") as f:
-                msgspec.json.decode(f.read())
+            msgspec.json.decode(Path(plugin_json_path).read_bytes())
         except msgspec.DecodeError as e:
             return f"Invalid JSON syntax in plugin.json: {e}"
         except OSError as e:
@@ -4060,9 +4060,11 @@ class HookValidator:
             for group in groups:
                 if not isinstance(group, dict):
                     continue
-                for entry in group.get("hooks", []):
-                    if isinstance(entry, dict):
-                        self._validate_command_script_references([entry], base_dir, errors)
+                hooks_entries = group.get("hooks", [])
+                if isinstance(hooks_entries, list):
+                    for entry in hooks_entries:
+                        if isinstance(entry, dict):
+                            self._validate_command_script_references([entry], base_dir, errors)
 
 
 # ============================================================================
