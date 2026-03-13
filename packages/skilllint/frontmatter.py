@@ -56,8 +56,6 @@ def process_markdown_file(file_path: str) -> None:
                 return  # Fast exit! Lint passed, do nothing.
 
             # 3. The "Zero-Copy Body" Write
-            if new_yaml_bytes is None:
-                raise RuntimeError("lint_and_fix requested a fix but returned no content for " + str(file_path))
             temp_path = path.with_suffix(path.suffix + ".tmp")
             try:
                 with temp_path.open("wb") as temp_file:
@@ -78,11 +76,8 @@ def process_markdown_file(file_path: str) -> None:
                 raise
 
 
-def lint_and_fix(raw_yaml: bytes) -> tuple[bool, bytes | None]:
+def lint_and_fix(raw_yaml: bytes) -> tuple[bool, bytes]:
     """Lint raw YAML frontmatter bytes and return a corrected version if needed.
-
-    This is a stub implementation intended to be replaced with actual YAML
-    loading, validation, and re-serialization logic.
 
     Args:
         raw_yaml: Raw bytes of the YAML frontmatter block, without delimiters.
@@ -90,9 +85,13 @@ def lint_and_fix(raw_yaml: bytes) -> tuple[bool, bytes | None]:
     Returns:
         A two-element tuple ``(needs_fix, fixed_bytes)`` where ``needs_fix`` is
         ``True`` when the frontmatter requires correction and ``fixed_bytes``
-        contains the replacement bytes, or ``(False, None)`` when the
+        contains the replacement bytes, or ``(False, raw_yaml)`` when the
         frontmatter is already valid.
+
+    Raises:
+        NotImplementedError: This function is a scaffold pending integration
+            with the skilllint validation and fix pipeline.
     """
-    # Dummy implementation: Replace with actual YAML loading/dumping
-    # Return (True, fixed_bytes) if errors found, else (False, None)
-    return False, None
+    raise NotImplementedError(
+        "lint_and_fix is not yet implemented. Integrate with skilllint's FrontmatterValidator and fixers."
+    )
