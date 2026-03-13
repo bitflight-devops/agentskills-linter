@@ -53,7 +53,7 @@ def _run_once(plugin_dir: Path, skilllint_exe: str, fix: bool = False) -> float:
         subprocess.CalledProcessError: If skilllint exits with a non-zero code
             that is not an expected lint-result code (1 = lint errors found).
     """
-    cmd = [skilllint_exe]
+    cmd = [skilllint_exe, "check"]
     if fix:
         cmd.append("--fix")
     cmd.append(str(plugin_dir))
@@ -173,7 +173,7 @@ def main() -> None:
         choices=["scan", "fix"],
         default="scan",
         metavar="MODE",
-        help="Benchmark mode: 'scan' (default) runs skilllint <dir>; 'fix' runs skilllint --fix <dir>",
+        help="Benchmark mode: 'scan' (default) runs skilllint check <dir>; 'fix' runs skilllint check --fix <dir>",
     )
     args = parser.parse_args()
 

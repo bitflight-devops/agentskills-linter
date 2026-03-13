@@ -75,7 +75,12 @@ def test_io_scan_1000_skills_timing(extracted_plugin_dir: Path, plugin_file_coun
         plugin_file_count: Number of ``SKILL.md`` files found (from fixture).
     """
     start = time.perf_counter()
-    result = subprocess.run(["skilllint", str(extracted_plugin_dir)], capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        ["skilllint", "check", str(extracted_plugin_dir)],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     duration = time.perf_counter() - start
 
     # skilllint exits 0 (no issues) or 1 (lint issues found) — both are valid.
