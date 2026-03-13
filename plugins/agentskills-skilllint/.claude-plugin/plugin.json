@@ -1,0 +1,12 @@
+{
+  "name": "agentskills-skilllint",
+  "version": "1.0.0",
+  "description": "Guide Claude agents through using the skilllint CLI to validate, fix, and understand linting violations in Claude Code plugins, skills, agents, and commands.",
+  "author": {
+    "name": "bitflight-devops",
+    "url": "https://github.com/bitflight-devops/agentskills-linter"
+  },
+  "repository": "https://github.com/bitflight-devops/agentskills-linter",
+  "license": "MIT",
+  "keywords": ["skilllint", "linting", "validation", "plugins", "skills", "agentskills", "claude-code"]
+}
