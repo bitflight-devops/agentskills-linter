@@ -19,6 +19,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING
 
+from skilllint.rule_registry import skilllint_rule
 from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
 
 if TYPE_CHECKING:
@@ -99,11 +100,27 @@ def _violation(code: str, severity: str, message: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
+@skilllint_rule("AS001", severity="error", category="skill")
 def _check_as001(name: str | None) -> dict | None:
-    """AS001: name format — lowercase alphanumeric + hyphens, 1-64 chars, no consecutive hyphens.
+    """AS001 — Invalid skill name format.
+
+    Skill names must be lowercase alphanumeric with hyphens only, between
+    1-64 characters, with no consecutive hyphens. The name must start and
+    end with a letter or digit.
+
+    Args:
+        name: The skill name from frontmatter, or None if missing.
 
     Returns:
         Violation dict if invalid, None otherwise.
+
+    Fix:
+        Rename the skill to use lowercase letters, digits, and hyphens only.
+        For example, change ``My_Skill`` to ``my-skill``.
+
+    Examples:
+        Valid: ``my-skill``, ``skill-123``, ``a``
+        Invalid: ``MySkill``, ``my_skill``, ``skill--name``, ``-skill``
     """
     if name is None:
         return _violation("AS001", "error", "name field is missing")
@@ -126,11 +143,24 @@ def _check_as001(name: str | None) -> dict | None:
     return None
 
 
+@skilllint_rule("AS002", severity="error", category="skill")
 def _check_as002(name: str | None, path: pathlib.Path) -> dict | None:
-    """AS002: name must equal the parent directory name.
+    """AS002 — Skill name does not match directory name.
+
+    The skill's ``name`` field in frontmatter must match the parent
+    directory name. This ensures consistency and makes skills easier
+    to locate.
+
+    Args:
+        name: The skill name from frontmatter, or None if missing.
+        path: Path to the SKILL.md file being validated.
 
     Returns:
         Violation dict if invalid, None otherwise.
+
+    Fix:
+        Either rename the directory to match the ``name`` field, or update
+        the ``name`` field to match the directory name.
     """
     if name is None:
         return None  # AS001 already covers missing name
@@ -142,11 +172,23 @@ def _check_as002(name: str | None, path: pathlib.Path) -> dict | None:
     return None
 
 
+@skilllint_rule("AS003", severity="error", category="skill")
 def _check_as003(description: str | None) -> dict | None:
-    """AS003: description must be present and non-empty.
+    """AS003 — Missing or empty description field.
+
+    Every SKILL.md must have a ``description`` field in its frontmatter.
+    The description helps AI agents understand when to use this skill
+    and provides context for users.
+
+    Args:
+        description: The description from frontmatter, or None if missing.
 
     Returns:
         Violation dict if invalid, None otherwise.
+
+    Fix:
+        Add a ``description`` field to the frontmatter with a brief
+        explanation of what this skill does.
     """
     if description is None or not description.strip():
         return _violation("AS003", "error", "description field must be present and non-empty")
@@ -154,11 +196,23 @@ def _check_as003(description: str | None) -> dict | None:
     return None
 
 
+@skilllint_rule("AS004", severity="error", category="skill")
 def _check_as004(description: str | None) -> dict | None:
-    """AS004: description must not contain HTML tags (< or >).
+    """AS004 — Description contains HTML tags.
+
+    The ``description`` field should not contain HTML tags (``<`` or ``>``).
+    These characters can cause parsing issues and are not appropriate for
+    a plain text description field.
+
+    Args:
+        description: The description from frontmatter, or None if missing.
 
     Returns:
         Violation dict if invalid, None otherwise.
+
+    Fix:
+        Remove HTML tags from the description. Use plain text formatting
+        instead.
     """
     if description is None:
         return None  # AS003 already covers missing description
@@ -169,17 +223,27 @@ def _check_as004(description: str | None) -> dict | None:
     return None
 
 
+@skilllint_rule("AS005", severity="warning", category="skill")
 def _check_as005(body_lines: list[str]) -> dict | None:
-    """AS005: body token count exceeds TOKEN_WARNING_THRESHOLD or TOKEN_ERROR_THRESHOLD.
+    """AS005 — SKILL.md body exceeds token threshold.
 
     Counts tokens in the body text (frontmatter excluded) using tiktoken
-    cl100k_base encoding. Emits a warning when the count exceeds
-    TOKEN_WARNING_THRESHOLD (4400) and an error when it exceeds
-    TOKEN_ERROR_THRESHOLD (8800), matching the SK006/SK007 semantics in
-    ComplexityValidator.
+    cl100k_base encoding. Large skills can degrade AI agent performance
+    and increase API costs.
+
+    Args:
+        body_lines: List of content lines from the SKILL.md body.
 
     Returns:
         Violation dict if threshold exceeded, None otherwise.
+
+    Thresholds:
+        - Warning at 4400 tokens — consider splitting
+        - Error at 8800 tokens — must split
+
+    Fix:
+        Split the skill into smaller sub-skills or move detailed content
+        to reference files in a ``references/`` directory.
     """
     body_text = "\n".join(body_lines)
     token_count = count_tokens(body_text)
@@ -201,11 +265,28 @@ def _check_as005(body_lines: list[str]) -> dict | None:
     return None
 
 
+@skilllint_rule("AS006", severity="info", category="skill")
 def _check_as006(path: pathlib.Path) -> dict | None:
-    """AS006: no eval_queries.json (or *eval*.json / *queries*.json) in skill directory.
+    """AS006 — No evaluation queries file found.
+
+    Recommends adding an ``eval_queries.json`` file to the skill directory
+    to enable automated quality assessment. The file should contain test
+    queries that exercise the skill's functionality.
+
+    Args:
+        path: Path to the SKILL.md file being validated.
 
     Returns:
-        Violation dict if invalid, None otherwise.
+        Violation dict if no eval file found, None otherwise.
+
+    Fix:
+        Create ``eval_queries.json`` in the skill directory with test queries
+        in JSON format.
+
+    Note:
+        This is an informational message, not an error. Skills work
+        without evaluation queries, but they're recommended for quality
+        assurance.
     """
     parent = path.parent
 
