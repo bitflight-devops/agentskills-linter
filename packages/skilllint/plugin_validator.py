@@ -1945,17 +1945,18 @@ class FrontmatterValidator:
         if not model_class:
             return ValidationResult(passed=True, errors=errors, warnings=warnings, info=info)
 
-        self._validate_pydantic_model(model_class, data, file_type, path, errors, warnings)
+        self._validate_pydantic_model(model_class, data, file_type, path, errors=errors, warnings=warnings)
 
         passed = len(errors) == 0
         return ValidationResult(passed=passed, errors=errors, warnings=warnings, info=info)
 
     def _validate_pydantic_model(
         self,
-        model_class: type,
+        model_class: type[SkillFrontmatter | CommandFrontmatter | AgentFrontmatter],
         data: dict[str, YamlValue],
         file_type: FileType,
         path: Path,
+        *,
         errors: list[ValidationIssue],
         warnings: list[ValidationIssue],
     ) -> None:
