@@ -5,6 +5,11 @@
   "description": "Bundled schema snapshot for Codex platform files (.rules prefix_rule, host_executable, AGENTS.md, SKILL.md). Accessed via importlib.resources.files() at runtime.",
   "version": "1.0.0",
   "platform": "codex",
+  "provenance": {
+    "authority_url": "https://github.com/openai/codex",
+    "last_verified": "2026-03-14",
+    "provider_id": "codex"
+  },
   "file_types": {
     "prefix_rule": {
       "x-experimental": true,
@@ -16,6 +21,7 @@
       "fields": {
         "pattern": {
           "required": true,
+          "constraint_scope": "provider_specific",
           "x-audited": {
             "date": "2026-03-10",
             "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
@@ -23,6 +29,7 @@
         },
         "decision": {
           "required": false,
+          "constraint_scope": "provider_specific",
           "x-audited": {
             "date": "2026-03-10",
             "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
@@ -30,6 +37,7 @@
         },
         "justification": {
           "required": false,
+          "constraint_scope": "provider_specific",
           "x-audited": {
             "date": "2026-03-10",
             "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
@@ -37,6 +45,7 @@
         },
         "match": {
           "required": false,
+          "constraint_scope": "provider_specific",
           "x-audited": {
             "date": "2026-03-10",
             "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
@@ -44,6 +53,7 @@
         },
         "not_match": {
           "required": false,
+          "constraint_scope": "provider_specific",
           "x-audited": {
             "date": "2026-03-10",
             "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
@@ -60,6 +70,7 @@
       "fields": {
         "name": {
           "required": true,
+          "constraint_scope": "shared",
           "x-audited": {
             "date": "2026-03-10",
             "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
@@ -67,6 +78,7 @@
         },
         "paths": {
           "required": false,
+          "constraint_scope": "provider_specific",
           "x-audited": {
             "date": "2026-03-10",
             "source": ".claude/vendor/codex/codex-rs/execpolicy/README.md"
@@ -90,6 +102,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 64,
+          "constraint_scope": "shared",
           "x-audited": {
             "date": "2026-03-10",
             "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
@@ -99,6 +112,7 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 1024,
+          "constraint_scope": "shared",
           "x-audited": {
             "date": "2026-03-10",
             "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
@@ -106,6 +120,7 @@
         },
         "license": {
           "type": "string",
+          "constraint_scope": "shared",
           "x-audited": {
             "date": "2026-03-10",
             "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"
@@ -113,6 +128,7 @@
         },
         "metadata": {
           "type": "object",
+          "constraint_scope": "provider_specific",
           "x-audited": {
             "date": "2026-03-10",
             "source": ".planning/phases/02-platform-adapters/02-RESEARCH.md"

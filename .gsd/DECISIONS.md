@@ -1,9 +1,11 @@
-# Decisions
+# Decisions Register
 
-- 2026-03-14: Structural constraints should move toward versioned schema artifacts with explicit provenance instead of a Python `limits.py` constant file.
-- 2026-03-14: Upstream truth should be sourced in this order: official schema, then official parser/validator source, then structured first-party examples, then prose docs as a last resort.
-- 2026-03-14: Rule metadata must expose provenance and authority level so users can understand why a rule applies and justify disabling it when appropriate.
-- 2026-03-14: GSD planning for schema migration should use an RT-ICA-style completeness pass: reverse prerequisites from the goal, classify inputs as available/derivable/missing, and create explicit unblock or discovery tasks instead of inventing requirements.
-- 2026-03-14: The monolithic validator is a decomposition target, not a permanent compatibility center. Each slice should move owned logic out of the monolith into the new schema/rule structure where the boundary is understood and verified.
-- 2026-03-14: Lint failures in migration work are design signals, not suppression opportunities. `# noqa`, `# type: ignore`, and linter-config weakening are banned for this restructuring work; fix the ownership, abstraction, or API shape instead.
-- 2026-03-14: Redesign work must improve modularity, type safety, and extensibility. Favor Python 3.12+ patterns, explicit protocols/types, and SOLID-style boundary separation so future provider/schema expansion fits the architecture without re-centralizing logic.
+<!-- Append-only. Never edit or remove existing rows.
+     To reverse a decision, add a new row that supersedes it.
+     Read this file at the start of any planning or research phase. -->
+
+| # | When | Scope | Decision | Choice | Rationale | Revisable? |
+|---|------|-------|----------|--------|-----------|------------|
+| D001 | M001 | arch | Provider contract packaging | Keep provider schemas as versioned bundled artifacts under `packages/skilllint/schemas/<provider>/vN.json` | Matches current brownfield packaging pattern and preserves `importlib.resources` runtime loading while enabling evolution | Yes — if a manifest-based loader replaces per-provider versioned files later |
+| D002 | M001 | convention | Rule authority metadata | Normalize rule/schema provenance into structured metadata rather than freeform source strings only | Downstream CLI output, tests, and refresh tooling need machine-readable authority tracing | No |
+| D003 | M001 | scope | Final proof shape | Include an explicit integration slice proving refresh → bundled resource load → CLI validation end-to-end | Milestone crosses repo tooling, packaged resources, and runtime CLI boundaries; contract proof alone would be insufficient | No |

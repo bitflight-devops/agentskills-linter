@@ -7,6 +7,7 @@ Each validator function is decorated with @skilllint_rule:
         severity="error",
         category="skill",
         platforms=["agentskills"],
+        authority={"origin": "agent-skills.io", "reference": "/rules/SK001"},
     )
     def check_name_field(frontmatter: dict, path: Path) -> list[ValidationIssue]:
         \"\"\"
@@ -30,6 +31,18 @@ if TYPE_CHECKING:
 
 
 @dataclass
+class RuleAuthority:
+    """Structured authority metadata for a validation rule.
+
+    Captures where a rule originates and where its documentation lives.
+    This enables tracing any validation back to its source authority.
+    """
+
+    origin: str  # e.g., "agent-skills.io", "anthropic.com"
+    reference: str | None = None  # URL or doc path, e.g., "/rules/SK001"
+
+
+@dataclass
 class RuleEntry:
     """Registry entry for a single validation rule."""
 
@@ -39,6 +52,7 @@ class RuleEntry:
     category: str  # "frontmatter", "skill", "plugin", "hook", etc.
     platforms: list[str]  # ["agentskills"] = all platforms, or specific like ["claude-code"]
     docstring: str
+    authority: RuleAuthority | None = None
 
 
 # Global registry: rule ID → RuleEntry
@@ -46,7 +60,12 @@ RULE_REGISTRY: dict[str, RuleEntry] = {}
 
 
 def skilllint_rule(
-    rule_id: str, *, severity: str, category: str, platforms: list[str] | None = None
+    rule_id: str,
+    *,
+    severity: str,
+    category: str,
+    platforms: list[str] | None = None,
+    authority: dict | None = None,
 ) -> Callable[[Callable], Callable]:
     """Decorator to register a validator function as a rule.
 
@@ -56,12 +75,19 @@ def skilllint_rule(
         category: Rule category (e.g., "frontmatter", "skill", "plugin")
         platforms: List of platforms this rule applies to. ["agentskills"] means all platforms.
                    Defaults to ["agentskills"].
+        authority: Optional authority metadata dict with 'origin' and optional 'reference' keys.
+                   Converted to RuleAuthority dataclass.
 
     Returns:
         Decorated function (unchanged) that's registered in RULE_REGISTRY.
 
     Example:
-        @skilllint_rule("SK001", severity="error", category="skill")
+        @skilllint_rule(
+            "SK001",
+            severity="error",
+            category="skill",
+            authority={"origin": "agent-skills.io", "reference": "/rules/SK001"},
+        )
         def check_name(frontmatter: dict) -> list[ValidationIssue]:
             '''## SK001 — Missing name field
 
@@ -72,6 +98,14 @@ def skilllint_rule(
     if platforms is None:
         platforms = ["agentskills"]
 
+    # Convert authority dict to RuleAuthority if provided
+    rule_authority: RuleAuthority | None = None
+    if authority is not None:
+        rule_authority = RuleAuthority(
+            origin=authority.get("origin", ""),
+            reference=authority.get("reference"),
+        )
+
     def decorator(fn: Callable) -> Callable:
         entry = RuleEntry(
             id=rule_id.upper(),
@@ -80,6 +114,7 @@ def skilllint_rule(
             category=category,
             platforms=platforms,
             docstring=fn.__doc__ or f"Rule {rule_id}",
+            authority=rule_authority,
         )
         RULE_REGISTRY[rule_id.upper()] = entry
         return fn
@@ -126,4 +161,4 @@ def list_rules(
     return sorted(rules, key=lambda r: r.id)
 
 
-__all__ = ["RULE_REGISTRY", "RuleEntry", "get_rule", "list_rules", "skilllint_rule"]
+__all__ = ["RULE_REGISTRY", "RuleAuthority", "RuleEntry", "get_rule", "list_rules", "skilllint_rule"]
