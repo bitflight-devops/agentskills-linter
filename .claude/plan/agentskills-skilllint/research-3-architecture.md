@@ -34,8 +34,8 @@ Rationale:
     "name": "Jamie Nelson",
     "url": "https://github.com/bitflight-devops"
   },
-  "homepage": "https://github.com/bitflight-devops/agentskills-linter",
-  "repository": "https://github.com/bitflight-devops/agentskills-linter",
+  "homepage": "https://github.com/bitflight-devops/skilllint",
+  "repository": "https://github.com/bitflight-devops/skilllint",
   "license": "MIT",
   "keywords": [
     "skilllint",
@@ -176,7 +176,7 @@ Yes, a `references/rule-catalog.md` is strongly recommended. Rationale:
 A `marketplace.json` is NOT needed at this stage. Reasons:
 
 - `marketplace.json` goes in `.claude-plugin/marketplace.json` and is for repositories that host MULTIPLE plugins for distribution as a catalog.
-- This plugin lives inside the agentskills-linter repo alongside the tool it wraps.
+- This plugin lives inside the skilllint repo alongside the tool it wraps.
 - For initial distribution, users install via `--plugin-dir` or by adding the repo as a marketplace source.
 - A marketplace.json becomes relevant when:
   - The repo hosts multiple plugins (currently just one)
@@ -187,7 +187,7 @@ If a marketplace is desired later, the minimal structure would be:
 
 ```json
 {
-  "name": "agentskills-linter",
+  "name": "skilllint",
   "owner": {
     "name": "Jamie Nelson",
     "email": "jamie@bitflight.io"

@@ -16,7 +16,7 @@
 
 - [ ] Append vendor and official_sources directories to `.gitignore`
 
-**File:** `/home/ubuntulinuxqa2/repos/agentskills-linter/.gitignore`
+**File:** `/home/ubuntulinuxqa2/repos/skilllint/.gitignore`
 
 **Append these lines** (after existing content):
 
@@ -34,7 +34,7 @@ official_sources/
 
 - [ ] Add `official_sources` to ruff config so linting never touches fetched docs
 
-**File:** `/home/ubuntulinuxqa2/repos/agentskills-linter/pyproject.toml`
+**File:** `/home/ubuntulinuxqa2/repos/skilllint/pyproject.toml`
 
 **Add** under the existing `[tool.ruff]` section (after `target-version = "py311"`):
 
@@ -61,7 +61,7 @@ exclude = ["official_sources"]
 **Command:**
 
 ```bash
-cd /home/ubuntulinuxqa2/repos/agentskills-linter
+cd /home/ubuntulinuxqa2/repos/skilllint
 uv add --dev httpx rich
 ```
 
@@ -77,7 +77,7 @@ Note: `typer` is already a production dependency. `rich` is already an indirect 
 
 - [ ] Create `scripts/fetch_platform_docs.py` with full implementation
 
-**File:** `/home/ubuntulinuxqa2/repos/agentskills-linter/scripts/fetch_platform_docs.py`
+**File:** `/home/ubuntulinuxqa2/repos/skilllint/scripts/fetch_platform_docs.py`
 
 ```python
 #!/usr/bin/env -S uv --quiet run --active --script
@@ -613,7 +613,7 @@ Expected: Typer help output showing the `--dry-run` option.
 **Command:**
 
 ```bash
-cd /home/ubuntulinuxqa2/repos/agentskills-linter
+cd /home/ubuntulinuxqa2/repos/skilllint
 uv run scripts/fetch_platform_docs.py --dry-run
 ```
 

@@ -18,7 +18,7 @@
 
 ## Summary
 
-Phase 1 starts from a strong position: a `feature/initial-packaging` git worktree at `/home/ubuntulinuxqa2/repos/agentskills-linter/.worktrees/initial-packaging` has already completed most of the packaging work. The worktree has a working `pyproject.toml` with hatchling build backend, `__init__.py`, `version.py`, `py.typed`, removed PEP 723 shebang from `plugin_validator.py`, fixed test import paths, and built a `.whl`. All 521 of 522 tests pass (1 skipped). This work must be merged into `main` or rebased before planning further phases.
+Phase 1 starts from a strong position: a `feature/initial-packaging` git worktree at `/home/ubuntulinuxqa2/repos/skilllint/.worktrees/initial-packaging` has already completed most of the packaging work. The worktree has a working `pyproject.toml` with hatchling build backend, `__init__.py`, `version.py`, `py.typed`, removed PEP 723 shebang from `plugin_validator.py`, fixed test import paths, and built a `.whl`. All 521 of 522 tests pass (1 skipped). This work must be merged into `main` or rebased before planning further phases.
 
 Three gaps remain between the worktree state and full PKG-01 through PKG-05 compliance. First, `pluginlint` is missing from `[project.scripts]` — the worktree has `skilllint`, `agentlint`, and `skillint` but not `pluginlint` (PKG-03). Second, no platform schema JSON files exist and the wheel contains no `schemas/` directory (PKG-04). Third, no `.pre-commit-hooks.yaml` exists and there is no documentation for migrating from `uv run plugin_validator.py` to the packaged entry point (PKG-05).
 
@@ -155,7 +155,7 @@ Note: `pluginlint` is the MISSING entry point in the current worktree (has 3 of 
 Users' `.pre-commit-config.yaml` would reference:
 ```yaml
 repos:
-  - repo: https://github.com/bitflight-devops/agentskills-linter
+  - repo: https://github.com/bitflight-devops/skilllint
     rev: v0.1.0
     hooks:
       - id: skilllint

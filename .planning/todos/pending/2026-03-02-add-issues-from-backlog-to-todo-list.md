@@ -16,12 +16,12 @@ files:
 
 ## Problem
 
-The agentskills-linter repo has 9 open GitHub issues (migrated from Jamie-BitFlight/claude_skills)
+The skilllint repo has 9 open GitHub issues (migrated from Jamie-BitFlight/claude_skills)
 and a 25-task implementation plan (22 tasks not-started) but no GSD-style .planning/todos
 tracking them. Future sessions have no structured entry point — just raw issue numbers and
 task files to hunt through.
 
-Issues in bitflight-devops/agentskills-linter:
+Issues in bitflight-devops/skilllint:
 - #3  plugin-validator: UX and coverage gaps (from claude_skills#131)
 - #4  plugin-validator: pre-commit output is too noisy (from claude_skills#130)
 - #5  Configurable Token Thresholds (from claude_skills#119)

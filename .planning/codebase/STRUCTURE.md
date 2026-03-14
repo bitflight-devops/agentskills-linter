@@ -5,7 +5,7 @@
 ## Directory Layout
 
 ```
-agentskills-linter/
+skilllint/
 ├── packages/
 │   └── skilllint/              # Main package - plugin/skill validator
 │       ├── plugin_validator.py # Primary CLI script (PEP 723, ~3000 lines)

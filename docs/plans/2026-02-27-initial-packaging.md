@@ -180,9 +180,9 @@ skillint = "skilllint.plugin_validator:app"
 skilllint = "skilllint.plugin_validator:app"
 
 [project.urls]
-Homepage = "https://github.com/bitflight-devops/agentskills-linter"
-Issues = "https://github.com/bitflight-devops/agentskills-linter/issues"
-Repository = "https://github.com/bitflight-devops/agentskills-linter"
+Homepage = "https://github.com/bitflight-devops/skilllint"
+Issues = "https://github.com/bitflight-devops/skilllint/issues"
+Repository = "https://github.com/bitflight-devops/skilllint"
 
 [build-system]
 requires = ["hatchling", "hatch-vcs"]
@@ -400,7 +400,7 @@ All three commands are aliases for the same tool:
 **Step 2: Copy LICENSE from mcp-json-yaml-toml**
 
 ```bash
-cp /home/ubuntulinuxqa2/repos/mcp-json-yaml-toml/LICENSE /home/ubuntulinuxqa2/repos/agentskills-linter/LICENSE
+cp /home/ubuntulinuxqa2/repos/mcp-json-yaml-toml/LICENSE /home/ubuntulinuxqa2/repos/skilllint/LICENSE
 ```
 
 **Step 3: Commit**

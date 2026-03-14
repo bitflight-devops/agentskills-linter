@@ -14,7 +14,7 @@ Usage::
       --scenario cpu:scripts/results/bench_cpu_gh.json:scripts/results/bench_cpu_base_gh.json \\
       --output /tmp/bench_comment.md \\
       --threshold 1.30 \\
-      --pages-url https://bitflight-devops.github.io/agentskills-linter/
+      --pages-url https://bitflight-devops.github.io/skilllint/
 """
 
 from __future__ import annotations

@@ -231,6 +231,6 @@ The skill body should handle three invocation patterns:
 
 - Skill specification: `claude-skills-overview-2026` (loaded via plugin-creator skill)
 - Plugin specification: `claude-plugins-reference-2026` (loaded via plugin-creator skill)
-- Project context: `/home/user/agentskills-linter/.claude/plan/agentskills-skilllint/discuss-CONTEXT.md`
+- Project context: `/home/user/skilllint/.claude/plan/agentskills-skilllint/discuss-CONTEXT.md`
 - CLI help: `skilllint --help` output
-- Rule codes: extracted from test files in `/home/user/agentskills-linter/packages/skilllint/tests/`
+- Rule codes: extracted from test files in `/home/user/skilllint/packages/skilllint/tests/`

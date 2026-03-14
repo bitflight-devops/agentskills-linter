@@ -45,7 +45,7 @@ An AI agent or developer who creates a plugin/skill/agent gets instant, actionab
 
 The `packages/skilllint/` directory contains the existing validator implementation: `plugin_validator.py` (CLI + validation framework), `frontmatter_core.py` (Pydantic models), `frontmatter_utils.py` (YAML I/O), and `auto_sync_manifests.py` (manifest sync tool). There are 9 open GitHub issues (#3–#11) and a 25-task implementation plan at `docs/plans/tasks-1-plugin-linter/`. Tasks 12–14 are already fixed. The package currently has no `pyproject.toml` and is run as PEP 723 standalone scripts.
 
-The tool is named after the `agentskills-linter` repo but the package and CLI are `skilllint`. Aliases `agentlint`, `pluginlint`, `skillint` should all invoke the same binary.
+The tool is the `skilllint` repo and package/CLI. Aliases `agentlint`, `pluginlint`, `skillint` should all invoke the same binary.
 
 ## Constraints
 

@@ -1,21 +1,21 @@
-# agentskills-linter — Claude Development Notes
+# skilllint — Claude Development Notes
 
 ## After pushing to a branch
 
-1. **Check CI pipelines** — use `gh run list --repo bitflight-devops/agentskills-linter --limit 10` to see recent runs. If the benchmark or test workflow hasn't triggered (e.g. the workflow file only exists on the branch, not yet on `main`), open a PR to get it running.
+1. **Check CI pipelines** — use `gh run list --repo bitflight-devops/skilllint --limit 10` to see recent runs. If the benchmark or test workflow hasn't triggered (e.g. the workflow file only exists on the branch, not yet on `main`), open a PR to get it running.
 
 2. **Trigger workflow_dispatch manually** — only works if the workflow exists on the default branch. Use:
    ```
-   gh workflow run <workflow-file>.yml --repo bitflight-devops/agentskills-linter --ref <branch>
+   gh workflow run <workflow-file>.yml --repo bitflight-devops/skilllint --ref <branch>
    ```
 
 3. **Check for PR review comments** — after a PR is open, poll with:
    ```
-   gh pr checks --repo bitflight-devops/agentskills-linter <pr-number>
-   gh api repos/bitflight-devops/agentskills-linter/pulls/<pr-number>/comments
+   gh pr checks --repo bitflight-devops/skilllint <pr-number>
+   gh api repos/bitflight-devops/skilllint/pulls/<pr-number>/comments
    ```
 
-4. **Always use `--repo bitflight-devops/agentskills-linter`** with `gh` commands — the git remote points to a local proxy (`127.0.0.1`) which `gh` cannot auto-detect as GitHub.
+4. **Always use `--repo bitflight-devops/skilllint`** with `gh` commands — the git remote points to a local proxy (`127.0.0.1`) which `gh` cannot auto-detect as GitHub.
 
 ## Benchmark workflow
 

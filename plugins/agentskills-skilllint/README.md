@@ -18,7 +18,7 @@ The skill teaches Claude how to:
 Install this plugin from the repository:
 
 ```bash
-claude plugin install agentskills-skilllint@agentskills-linter
+claude plugin install agentskills-skilllint@skilllint
 ```
 
 Or load it for a single session:

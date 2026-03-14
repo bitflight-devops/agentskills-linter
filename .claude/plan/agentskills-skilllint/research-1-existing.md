@@ -1,4 +1,4 @@
-# Research: Existing Plugin/Skill Structures in agentskills-linter
+# Research: Existing Plugin/Skill Structures in skilllint
 
 Date: 2026-03-13
 
@@ -55,7 +55,7 @@ No skilllint-specific plugin exists in any installed plugin cache.
 
 - No skill in `.claude/skills/` mentions skilllint, linting, or validation
 - No command in `.claude/commands/` relates to skilllint
-- No installed plugin in `/root/.claude/plugins/cache/` references skilllint or agentskills-linter
+- No installed plugin in `/root/.claude/plugins/cache/` references skilllint
 - The `schema-drift-auditor` agent is related (it audits schema drift from vendor docs) but does not use `skilllint` -- it is a manual cross-referencing agent
 
 The only validation-adjacent capability is `schema-drift-auditor.md`, which detects whether vendor documentation changes affect schema field definitions. This is complementary to but distinct from what a skilllint guide skill would do.

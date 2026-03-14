@@ -223,7 +223,7 @@ class ClaudeCodeAdapter:
         return ["skills/*/SKILL.md", "agents/*.md", ".claude/commands/*.md", "plugin.json"]
 
     def docs_url(self, error_code: str) -> str:
-        return f"https://docs.agentskills-linter.dev/rules/{error_code.lower()}"
+        return f"https://docs.skilllint.dev/rules/{error_code.lower()}"
 ```
 
 ### Pattern 4: Bundled Schema Snapshots via importlib.resources

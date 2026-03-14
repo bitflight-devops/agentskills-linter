@@ -6,7 +6,7 @@
 
 **Runner:**
 - pytest (configured via standard pytest discovery conventions)
-- Config file: `conftest.py` in `/home/ubuntulinuxqa2/repos/agentskills-linter/packages/skilllint/tests/`
+- Config file: `conftest.py` in `/home/ubuntulinuxqa2/repos/skilllint/packages/skilllint/tests/`
 
 **Assertion Library:**
 - pytest's built-in assertions (`assert` statements)
@@ -24,8 +24,8 @@ pytest -xvs packages/skilllint/tests/test_file.py   # Run single file, stop on f
 ## Test File Organization
 
 **Location:**
-- Tests co-located with source: `/home/ubuntulinuxqa2/repos/agentskills-linter/packages/skilllint/tests/`
-- Source in: `/home/ubuntulinuxqa2/repos/agentskills-linter/packages/skilllint/`
+- Tests co-located with source: `/home/ubuntulinuxqa2/repos/skilllint/packages/skilllint/tests/`
+- Source in: `/home/ubuntulinuxqa2/repos/skilllint/packages/skilllint/`
 - Tests import source via sys.path insertion or direct module import
 
 **Naming:**
@@ -185,7 +185,7 @@ This is a test skill with valid frontmatter.
     return skill_dir
 ```
 
-**Available Fixtures (from `/home/ubuntulinuxqa2/repos/agentskills-linter/packages/skilllint/tests/conftest.py`):**
+**Available Fixtures (from `/home/ubuntulinuxqa2/repos/skilllint/packages/skilllint/tests/conftest.py`):**
 
 1. **CLI Runner:**
    - `cli_runner: CliRunner` — Returns `_PlainCliRunner` that strips ANSI escape codes from output
@@ -203,7 +203,7 @@ This is a test skill with valid frontmatter.
 4. **Environment Fixtures:**
    - `no_color_env() -> Generator` — Context manager setting NO_COLOR=1 during test
 
-**Location:** `/home/ubuntulinuxqa2/repos/agentskills-linter/packages/skilllint/tests/conftest.py`
+**Location:** `/home/ubuntulinuxqa2/repos/skilllint/packages/skilllint/tests/conftest.py`
 
 ## Coverage
 

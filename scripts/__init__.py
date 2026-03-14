@@ -1,1 +1,1 @@
-"""Scripts for agentskills-linter development and documentation tasks."""
+"""Scripts for skilllint development and documentation tasks."""
