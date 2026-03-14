@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from skilllint._schema_loader import load_bundled_schema
+from skilllint.schemas import load_bundled_schema
 from skilllint.version import __version__
 
 __all__ = ["__version__", "load_bundled_schema"]

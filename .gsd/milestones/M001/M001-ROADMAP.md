@@ -53,7 +53,7 @@ This milestone is complete only when all are true:
 - [x] **S02: Provider-aware CLI validation on real fixtures** `risk:high` `depends:[S01]`
   > After this: `skilllint check` can run against representative Claude Code, Cursor, and Codex fixtures through the new provider-aware contract path and produce truthful provider-specific validation results.
 
-- [ ] **S03: Refreshable schema ingestion and brownfield migration** `risk:medium` `depends:[S01]`
+- [x] **S03: Refreshable schema ingestion and brownfield migration** `risk:medium` `depends:[S01]`
   > After this: maintainers can refresh or regenerate bundled provider schema artifacts through a supported repo workflow, and the brownfield codebase consumes the new artifact layout without hand-maintained duplication.
 
 - [ ] **S04: End-to-end packaged integration proof** `risk:medium` `depends:[S02,S03]`

@@ -14,4 +14,6 @@ The project is moving toward a schema-driven validation architecture:
 
 ## Immediate Focus
 
-Build the schema registry and provenance system so structural rules can be sourced from versioned schemas, refreshed from authoritative upstream sources, and pinned by users when needed.
+**S03 complete (refreshable schema ingestion):** Delivered schema refresh script with --bump/--dry-run/--provider/--verbose flags, eliminated duplicate _schema_loader.py brownfield loader, and added comprehensive test coverage (72 tests) for refresh roundtrip and multi-provider packaging.
+
+**Next: S04** will prove end-to-end packaged integration: refresh → bundled artifact load → CLI validation through the real runtime path.

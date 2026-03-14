@@ -66,4 +66,22 @@ def get_provider_ids() -> list[str]:
         return ["claude_code", "cursor", "codex"]
 
 
-__all__ = ["load_provider_schema", "get_provider_ids"]
+__all__ = ["load_provider_schema", "load_bundled_schema", "get_provider_ids"]
+
+
+# Backwards-compatible alias for the brownfield loader migration.
+# This matches the old _schema_loader.load_bundled_schema signature.
+def load_bundled_schema(platform: str, version: str = "v1") -> dict[str, Any]:
+    """Load a bundled platform schema snapshot.
+
+    This is a backwards-compatible alias for load_provider_schema.
+    The 'platform' parameter is equivalent to 'provider'.
+
+    Args:
+        platform: Platform identifier, e.g., 'claude_code', 'cursor', 'codex'.
+        version: Schema version string, defaults to 'v1'.
+
+    Returns:
+        Parsed schema dict with top-level 'provenance' key.
+    """
+    return load_provider_schema(platform, version)
