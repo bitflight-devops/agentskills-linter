@@ -74,7 +74,7 @@ Add to `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/bitflight-devops/agentskills-linter
-    rev: v0.1.0
+    rev: v1.0.0
     hooks:
       - id: skilllint
 ```
@@ -106,10 +106,14 @@ skilllint check --platform claude-code plugins/my-plugin
 |---|---|---|
 | FM001–FM010 | Frontmatter | Required fields, valid values, schema compliance |
 | SK001–SK009 | Skill | Description quality, token limits, complexity, internal links |
-| PL001–PL005 | Plugin | Structure, registration, subprocess safety |
+| AS001–AS006 | AgentSkills | Cross-platform open standard compliance |
+| LK001–LK002 | Links | Markdown link validity and broken reference detection |
+| PD001–PD003 | Progressive disclosure | Directory structure for references/, examples/, scripts/ |
+| PL001–PL005 | Plugin | Structure, manifest correctness, subprocess safety |
 | HK001–HK005 | Hook | Script existence, configuration validity |
 | NR001–NR002 | Namespace refs | Cross-plugin skill/agent/command references |
-| PR001–PR005 | Registration | Plugin manifest correctness |
+| SL001 | Symlinks | Symlink hygiene within plugin directory |
+| TC001 | Token count | Token count reporting and threshold enforcement |
 
 ---
 

@@ -41,7 +41,7 @@ Validate skill name, description quality, and token budget.
 | SK008 | info | no | Skill has no `argument-hint` but appears to accept arguments based on `$ARGUMENTS` usage |
 | SK009 | info | no | Token count report (informational; always emitted with `--verbose`) |
 
-**Token limit fix (AS005):** Move large sections to `skills/<name>/references/<file>.md` and add a link from SKILL.md. Warning at 4400 tokens, error at 8800 tokens (body text only).
+**Token limit fix (AS005):** Move large sections to `skills/<name>/references/<file>.md` and add a link from SKILL.md. Thresholds are `TOKEN_WARNING_THRESHOLD` (warning) and `TOKEN_ERROR_THRESHOLD` (error) — body text only, frontmatter excluded. Run `skilllint rules` to see current values.
 
 ---
 
@@ -56,7 +56,7 @@ Use `skilllint check --filter <ID> --verbose <path>` to see detailed output for 
 | AS002 | error | **yes** | Skill `name` field does not match the parent directory name |
 | AS003 | error | no | `description` field is missing or empty |
 | AS004 | error | no | `description` contains HTML tags (not allowed) |
-| AS005 | warning | no | SKILL.md body exceeds token threshold — warning at 4400 tokens, error at 8800 tokens (body only, frontmatter excluded); split or move content to `references/` |
+| AS005 | warning | no | SKILL.md body exceeds token threshold (`TOKEN_WARNING_THRESHOLD` warning, `TOKEN_ERROR_THRESHOLD` error — body only, frontmatter excluded); split or move content to `references/` |
 | AS006 | info | no | No evaluation queries file found (optional but recommended) |
 
 **Full detail:** Use `skilllint check --filter <ID> --verbose <path>` (e.g. `skilllint check --filter AS001 --verbose <path>`) to see detailed output for any AS rule.
@@ -99,20 +99,6 @@ Validate `plugin.json` structure.
 | PL003 | error | no | Required `name` field is missing from `plugin.json` |
 | PL004 | error | no | A path in `plugin.json` does not start with `./` |
 | PL005 | error | no | Referenced file in `plugin.json` does not exist |
-
----
-
-## PR — Plugin Registration Rules
-
-Validate that plugin components declared in `plugin.json` actually exist.
-
-| Rule | Severity | Auto-fix | Description |
-|------|----------|----------|-------------|
-| PR001 | error | no | A skill path in `plugin.json` points to a directory that does not exist |
-| PR002 | error | no | A skill directory exists but contains no `SKILL.md` file |
-| PR003 | error | no | An agent file listed in `plugin.json` does not exist |
-| PR004 | warning | no | A `commands` path in `plugin.json` does not exist |
-| PR005 | info | no | `plugin.json` `skills` field is omitted; skills will still be auto-discovered from `skills/` |
 
 ---
 

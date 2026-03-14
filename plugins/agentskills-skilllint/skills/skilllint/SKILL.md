@@ -94,7 +94,7 @@ Example:
 ```
 skills/my-skill/SKILL.md:3  error  Description uses YAML multiline block scalar (>-); use a single-line string  [FM004]
 skills/my-skill/SKILL.md:5  error  allowed-tools must be a comma-separated string, not a YAML array  [FM007]
-skills/my-skill/SKILL.md:1  warning  SKILL.md body exceeds token threshold (4800/4400 tokens)  [AS005]
+skills/my-skill/SKILL.md:1  warning  SKILL.md body exceeds token threshold  [AS005]
 ```
 
 Severity levels:
@@ -117,7 +117,7 @@ skilllint rules --severity error
 skilllint rules --category skill
 ```
 
-For FM, SK, LK, PD, PL, PR, HK, NR, SL rule IDs, use [rule-catalog.md](./references/rule-catalog.md) — these are emitted by `skilllint check --verbose` but not yet in the `rule` documentation system.
+For FM, SK, LK, PD, PL, HK, NR, SL, TC rule IDs, use [rule-catalog.md](./references/rule-catalog.md) — these are emitted by `skilllint check --verbose` but not yet in the `rule` documentation system.
 
 ---
 
@@ -138,7 +138,7 @@ skilllint check --fix ./plugins/my-plugin
 
 **Auto-fixable rules:** FM004, FM007, FM008, FM009, FM010/AS002, SK001, SK002, SK003, SL001
 
-**Not auto-fixable:** AS005 (token size — requires manual refactoring), PD series, AS006, LK series, most PL/PR/HK rules.
+**Not auto-fixable:** AS005 (token size — requires manual refactoring), PD series, AS006, LK series, most PL/HK rules.
 
 ---
 
@@ -185,8 +185,7 @@ Move large reference content to a `references/` subdirectory and link to it:
 ```markdown
 For the full rule catalog, see [rule-catalog.md](./references/rule-catalog.md)
 ```
-Token thresholds: warning at **4400 tokens**, error at **8800 tokens** (body text only, frontmatter excluded).
-<!-- source: packages/skilllint/token_counter.py TOKEN_WARNING_THRESHOLD=4400, TOKEN_ERROR_THRESHOLD=8800 -->
+Token thresholds are defined by `TOKEN_WARNING_THRESHOLD` (warning) and `TOKEN_ERROR_THRESHOLD` (error) in the skilllint source. Run `skilllint rules` to see current threshold values. Body text only — frontmatter is excluded from the count.
 
 ### AS002 / FM010 — Name/directory mismatch
 
@@ -249,8 +248,7 @@ skilllint rules --platform agentskills
 skilllint check --tokens-only ./plugins/my-plugin/skills/my-skill/SKILL.md
 ```
 
-AS005 fires at 4400 tokens (warning) and 8800 tokens (error), counting body text only (frontmatter is excluded from the count).
-<!-- source: packages/skilllint/token_counter.py TOKEN_WARNING_THRESHOLD=4400, TOKEN_ERROR_THRESHOLD=8800 -->
+AS005 fires when body token count exceeds `TOKEN_WARNING_THRESHOLD` (warning) or `TOKEN_ERROR_THRESHOLD` (error) — frontmatter excluded. Run `skilllint rules` to see current values.
 
 ---
 
