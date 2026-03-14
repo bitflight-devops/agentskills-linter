@@ -46,9 +46,9 @@ skillint = "skilllint.plugin_validator:app"
 skilllint = "skilllint.plugin_validator:app"
 
 [project.urls]
-Homepage = "https://github.com/bitflight-devops/agentskills-linter"
-Issues = "https://github.com/bitflight-devops/agentskills-linter/issues"
-Repository = "https://github.com/bitflight-devops/agentskills-linter"
+Homepage = "https://github.com/bitflight-devops/skilllint"
+Issues = "https://github.com/bitflight-devops/skilllint/issues"
+Repository = "https://github.com/bitflight-devops/skilllint"
 
 [build-system]
 requires = ["hatch-vcs", "hatchling"]

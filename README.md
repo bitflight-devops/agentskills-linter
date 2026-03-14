@@ -2,8 +2,8 @@
 
 [![PyPI version](https://img.shields.io/pypi/v/skilllint.svg)](https://pypi.org/project/skilllint/)
 [![Python versions](https://img.shields.io/pypi/pyversions/skilllint.svg)](https://pypi.org/project/skilllint/)
-[![License](https://img.shields.io/pypi/l/skilllint.svg)](https://github.com/bitflight-devops/agentskills-linter/blob/main/LICENSE)
-[![CI](https://github.com/bitflight-devops/agentskills-linter/actions/workflows/test.yml/badge.svg)](https://github.com/bitflight-devops/agentskills-linter/actions/workflows/test.yml)
+[![License](https://img.shields.io/pypi/l/skilllint.svg)](https://github.com/bitflight-devops/skilllint/blob/main/LICENSE)
+[![CI](https://github.com/bitflight-devops/skilllint/actions/workflows/test.yml/badge.svg)](https://github.com/bitflight-devops/skilllint/actions/workflows/test.yml)
 
 Static analysis linter for AI agent plugins, skills, and agents — for Claude Code, Cursor, Codex, and any [agentskills.io](https://agentskills.io)-compatible platform.
 
@@ -73,7 +73,7 @@ Add to `.pre-commit-config.yaml`:
 
 ```yaml
 repos:
-  - repo: https://github.com/bitflight-devops/agentskills-linter
+  - repo: https://github.com/bitflight-devops/skilllint
     rev: v1.0.0
     hooks:
       - id: skilllint
@@ -203,8 +203,8 @@ Your adapter must implement the `AdapterProtocol` interface from `skilllint.adap
 
 ## Links
 
-- [GitHub repository](https://github.com/bitflight-devops/agentskills-linter)
-- [Issue tracker](https://github.com/bitflight-devops/agentskills-linter/issues)
+- [GitHub repository](https://github.com/bitflight-devops/skilllint)
+- [Issue tracker](https://github.com/bitflight-devops/skilllint/issues)
 - [PyPI](https://pypi.org/project/skilllint/)
 - [agentskills.io](https://agentskills.io)
 
