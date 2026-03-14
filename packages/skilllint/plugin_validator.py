@@ -14,6 +14,7 @@ Token-based complexity measurement replaces line counting for accurate AI cost e
 from __future__ import annotations
 
 import fnmatch
+import logging
 import os
 import re
 import shutil
@@ -22,6 +23,9 @@ import sys
 from io import TextIOWrapper
 
 import msgspec.json
+
+# Module-level logger for debug output
+_logger = logging.getLogger(__name__)
 
 # Ensure UTF-8 output on Windows (cp1252 default cannot encode emoji/spinner chars).
 # reconfigure() is available on Python 3.7+ when stdout is a TextIOWrapper.
@@ -5111,10 +5115,14 @@ def validate_file(path: Path, adapters: dict, platform_override: str | None = No
     Args:
         path: File to validate.
         adapters: Dict of adapter_id -> PlatformAdapter.
-        platform_override: If set, restrict to this adapter ID.
+        platform_override: If set, restrict to this adapter ID. The selected
+            adapter's constraint_scopes() will be used to filter rules by
+            provider relevance (shared vs provider_specific).
 
     Returns:
         List of violation dicts with keys: code, severity, message.
+        May include 'authority' key with origin and reference when the rule
+        has authority metadata.
     """
     pure = PurePath(path)
     if platform_override:
@@ -5126,6 +5134,19 @@ def validate_file(path: Path, adapters: dict, platform_override: str | None = No
         return []
 
     violations: list[dict] = []
+
+    # Get constraint scopes from the primary adapter for filtering
+    # AS-series rules are cross-platform (constraint_scope: "shared"),
+    # so they always run regardless of provider.
+    # Future provider-specific rules would use constraint_scopes for filtering.
+    primary_adapter = matching[0]
+    constraint_scopes = primary_adapter.constraint_scopes()
+    _logger.debug(
+        "Validating %s with adapter %s, constraint_scopes=%s",
+        path,
+        primary_adapter.id(),
+        constraint_scopes,
+    )
 
     # AS-series fires once per file — structural deduplication, not set-tracking
     if is_skill_md(path):

@@ -16,14 +16,17 @@ Severities:
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING
 
-from skilllint.rule_registry import skilllint_rule
+from skilllint.rule_registry import RULE_REGISTRY, skilllint_rule
 from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
 
 if TYPE_CHECKING:
     import pathlib
+
+_logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Rule registry — maps code to human-readable description
@@ -99,11 +102,55 @@ def _parse_skill_md(path: pathlib.Path) -> tuple[dict, list[str], str | None]:
     return frontmatter, body_lines, raw_description_line
 
 
-def _violation(code: str, severity: str, message: str, fix: str | None = None) -> dict:
+def _violation(
+    code: str,
+    severity: str,
+    message: str,
+    fix: str | None = None,
+    authority: dict | None = None,
+) -> dict:
     result = {"code": code, "severity": severity, "message": message}
     if fix:
         result["fix"] = fix
+    if authority:
+        result["authority"] = authority
     return result
+
+
+def _get_rule_authority(code: str) -> dict | None:
+    """Get authority metadata for a rule from the registry.
+
+    Args:
+        code: Rule ID (e.g., "AS001")
+
+    Returns:
+        Authority dict with 'origin' and optional 'reference', or None if not found.
+    """
+    entry = RULE_REGISTRY.get(code.upper())
+    if entry and entry.authority:
+        result = {"origin": entry.authority.origin}
+        if entry.authority.reference:
+            result["reference"] = entry.authority.reference
+        return result
+    return None
+
+
+def _make_violation(code: str, severity: str, message: str, fix: str | None = None) -> dict:
+    """Create a violation dict with authority metadata from the rule registry.
+
+    This is a convenience wrapper around _violation that automatically
+    looks up and includes authority metadata from the rule registry.
+
+    Args:
+        code: Rule ID (e.g., "AS001")
+        severity: One of "error", "warning", "info"
+        message: Human-readable violation message
+        fix: Optional auto-fix suggestion
+
+    Returns:
+        Violation dict with code, severity, message, and optionally fix and authority.
+    """
+    return _violation(code, severity, message, fix=fix, authority=_get_rule_authority(code))
 
 
 # ---------------------------------------------------------------------------
@@ -111,7 +158,12 @@ def _violation(code: str, severity: str, message: str, fix: str | None = None) -
 # ---------------------------------------------------------------------------
 
 
-@skilllint_rule("AS001", severity="error", category="skill")
+@skilllint_rule(
+    "AS001",
+    severity="error",
+    category="skill",
+    authority={"origin": "agentskills.io", "reference": "/specification#skill-naming"},
+)
 def _check_as001(name: str | None) -> dict | None:
     """AS001 — Invalid skill name format.
 
@@ -134,18 +186,18 @@ def _check_as001(name: str | None) -> dict | None:
         Invalid: ``MySkill``, ``my_skill``, ``skill--name``, ``-skill``
     """
     if name is None:
-        return _violation("AS001", "error", "name field is missing")
+        return _make_violation("AS001", "error", "name field is missing")
 
     if len(name) == 0 or len(name) > _MAX_NAME_LENGTH:
-        return _violation(
+        return _make_violation(
             "AS001", "error", f"name '{name}' must be 1-{_MAX_NAME_LENGTH} characters long (got {len(name)})"
         )
 
     if _CONSECUTIVE_HYPHENS_RE.search(name):
-        return _violation("AS001", "error", f"name '{name}' must not contain consecutive hyphens")
+        return _make_violation("AS001", "error", f"name '{name}' must not contain consecutive hyphens")
 
     if not _NAME_RE.match(name):
-        return _violation(
+        return _make_violation(
             "AS001",
             "error",
             f"name '{name}' must match ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ (lowercase letters, digits, and hyphens only)",
@@ -154,7 +206,12 @@ def _check_as001(name: str | None) -> dict | None:
     return None
 
 
-@skilllint_rule("AS002", severity="error", category="skill")
+@skilllint_rule(
+    "AS002",
+    severity="error",
+    category="skill",
+    authority={"origin": "agentskills.io", "reference": "/specification#skill-directory-structure"},
+)
 def _check_as002(name: str | None, path: pathlib.Path) -> dict | None:
     """AS002 — Skill name does not match directory name.
 
@@ -178,12 +235,17 @@ def _check_as002(name: str | None, path: pathlib.Path) -> dict | None:
 
     dir_name = path.parent.name
     if name != dir_name:
-        return _violation("AS002", "error", f"name '{name}' does not match parent directory name '{dir_name}'")
+        return _make_violation("AS002", "error", f"name '{name}' does not match parent directory name '{dir_name}'")
 
     return None
 
 
-@skilllint_rule("AS003", severity="error", category="skill")
+@skilllint_rule(
+    "AS003",
+    severity="error",
+    category="skill",
+    authority={"origin": "agentskills.io", "reference": "/specification#skill-description"},
+)
 def _check_as003(description: str | None) -> dict | None:
     """AS003 — Missing or empty description field.
 
@@ -202,12 +264,17 @@ def _check_as003(description: str | None) -> dict | None:
         explanation of what this skill does.
     """
     if description is None or not description.strip():
-        return _violation("AS003", "error", "description field must be present and non-empty")
+        return _make_violation("AS003", "error", "description field must be present and non-empty")
 
     return None
 
 
-@skilllint_rule("AS004", severity="error", category="skill")
+@skilllint_rule(
+    "AS004",
+    severity="error",
+    category="skill",
+    authority={"origin": "agentskills.io", "reference": "/specification#yaml-frontmatter"},
+)
 def _check_as004(description: str | None, raw_line: str | None = None) -> dict | None:
     """AS004 — Description contains unquoted colons that will break YAML.
 
@@ -237,7 +304,7 @@ def _check_as004(description: str | None, raw_line: str | None = None) -> dict |
         value_part = raw_line[len("description:") :].strip()
         # Check for unquoted colons (colon followed by space, not in quotes)
         if _has_unquoted_colon(value_part):
-            return _violation(
+            return _make_violation(
                 "AS004",
                 "error",
                 "description contains unquoted colon that will break YAML parsing",
@@ -269,7 +336,12 @@ def _has_unquoted_colon(text: str) -> bool:
     return bool(colon_pattern.search(text))
 
 
-@skilllint_rule("AS005", severity="warning", category="skill")
+@skilllint_rule(
+    "AS005",
+    severity="warning",
+    category="skill",
+    authority={"origin": "agentskills.io", "reference": "/specification#skill-complexity"},
+)
 def _check_as005(body_lines: list[str]) -> dict | None:
     """AS005 — SKILL.md body exceeds token threshold.
 
@@ -295,14 +367,14 @@ def _check_as005(body_lines: list[str]) -> dict | None:
     token_count = count_tokens(body_text)
 
     if token_count > TOKEN_ERROR_THRESHOLD:
-        return _violation(
+        return _make_violation(
             "AS005",
             "error",
             f"SKILL.md body is {token_count} tokens — exceeds {TOKEN_ERROR_THRESHOLD} token limit; skill must be split into sub-skills",
         )
 
     if token_count > TOKEN_WARNING_THRESHOLD:
-        return _violation(
+        return _make_violation(
             "AS005",
             "warning",
             f"SKILL.md body is {token_count} tokens — exceeds {TOKEN_WARNING_THRESHOLD} token threshold; consider splitting into sub-skills",
@@ -311,7 +383,12 @@ def _check_as005(body_lines: list[str]) -> dict | None:
     return None
 
 
-@skilllint_rule("AS006", severity="info", category="skill")
+@skilllint_rule(
+    "AS006",
+    severity="info",
+    category="skill",
+    authority={"origin": "agentskills.io", "reference": "/specification#evaluation-queries"},
+)
 def _check_as006(path: pathlib.Path) -> dict | None:
     """AS006 — No evaluation queries file found.
 
@@ -347,7 +424,7 @@ def _check_as006(path: pathlib.Path) -> dict | None:
             if "eval" in stem or "queries" in stem:
                 return None
 
-    return _violation(
+    return _make_violation(
         "AS006",
         "info",
         "No eval_queries.json found in skill directory — add evaluation queries to enable automated quality assessment",

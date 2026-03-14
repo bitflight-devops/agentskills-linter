@@ -4,41 +4,49 @@
   "title": "Agent Skills Specification v1",
   "description": "JSON Schema for agentskills.io skill frontmatter. Generated from https://agentskills.io/specification",
   "version": "1.0.0",
+  "platform": "agentskills_io",
+  "provenance": {
+    "authority_url": "https://agentskills.io/specification",
+    "last_verified": "2026-03-14",
+    "provider_id": "agentskills_io"
+  },
   "type": "object",
   "properties": {
     "name": {
       "type": "string",
       "maxLength": 64,
-      "description": "(Required) Max 64 chars"
+      "description": "(Required) Max 64 chars",
+      "constraint_scope": "shared"
     },
     "description": {
       "type": "string",
       "maxLength": 1024,
       "minLength": 1,
-      "description": "(Required) Max 1024 chars"
+      "description": "(Required) Max 1024 chars",
+      "constraint_scope": "shared"
     },
     "license": {
       "type": "string",
-      "description": "(Optional)"
+      "description": "(Optional)",
+      "constraint_scope": "shared"
     },
     "compatibility": {
       "type": "string",
       "maxLength": 500,
-      "description": "(Optional) Max 500 chars"
+      "description": "(Optional) Max 500 chars",
+      "constraint_scope": "shared"
     },
     "metadata": {
       "type": "string",
-      "description": "(Optional)"
+      "description": "(Optional)",
+      "constraint_scope": "shared"
     },
     "allowed-tools": {
       "type": "string",
-      "description": "(Optional)"
+      "description": "(Optional)",
+      "constraint_scope": "shared"
     }
   },
   "required": ["name", "description"],
-  "additionalProperties": true,
-  "x-source": {
-    "url": "https://agentskills.io/specification",
-    "fetched_at": "2026-03-14"
-  }
+  "additionalProperties": true
 }

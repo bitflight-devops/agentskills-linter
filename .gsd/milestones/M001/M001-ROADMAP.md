@@ -50,7 +50,7 @@ This milestone is complete only when all are true:
 - [x] **S01: Provider schema contracts and authority metadata** `risk:high` `depends:[]`
   > After this: maintainers can inspect versioned provider contract artifacts and rule metadata that clearly distinguish shared vs provider-specific constraints and cite their source authority.
 
-- [ ] **S02: Provider-aware CLI validation on real fixtures** `risk:high` `depends:[S01]`
+- [x] **S02: Provider-aware CLI validation on real fixtures** `risk:high` `depends:[S01]`
   > After this: `skilllint check` can run against representative Claude Code, Cursor, and Codex fixtures through the new provider-aware contract path and produce truthful provider-specific validation results.
 
 - [ ] **S03: Refreshable schema ingestion and brownfield migration** `risk:medium` `depends:[S01]`

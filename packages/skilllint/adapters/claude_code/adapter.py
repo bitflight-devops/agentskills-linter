@@ -1,20 +1,23 @@
 """Claude Code platform adapter.
 
 Data provider for Claude Code platform files. Returns platform metadata
-and delegates schema loading to load_bundled_schema(). No validation
+and delegates schema loading to load_provider_schema(). No validation
 logic lives here — the core validator (plan 02-05) runs the checks.
 """
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 import msgspec.json
 
-from skilllint import load_bundled_schema
+from skilllint.schemas import load_provider_schema
 
 if TYPE_CHECKING:
     import pathlib
+
+_logger = logging.getLogger(__name__)
 
 
 class ClaudeCodeAdapter:
@@ -32,9 +35,33 @@ class ClaudeCodeAdapter:
         """Return the set of rule prefixes applicable to this adapter."""
         return {"SK", "PR", "HK", "AS"}
 
+    def constraint_scopes(self) -> set[str]:
+        """Return the set of constraint_scope values from the provider schema.
+
+        These are extracted from the field-level constraint_scope annotations
+        in the loaded schema (values: 'shared' or 'provider_specific').
+
+        Returns:
+            Set of constraint_scope strings, defaulting to {'shared'} if schema
+            cannot be loaded or has no constraint_scope annotations.
+        """
+        try:
+            schema = load_provider_schema("claude_code")
+        except FileNotFoundError:
+            _logger.debug("Schema not found for claude_code, defaulting to 'shared' scope")
+            return {"shared"}
+
+        scopes: set[str] = set()
+        for file_type_data in schema.get("file_types", {}).values():
+            for field_meta in file_type_data.get("fields", {}).values():
+                scope = field_meta.get("constraint_scope")
+                if scope:
+                    scopes.add(scope)
+        return scopes or {"shared"}
+
     def get_schema(self, file_type: str) -> dict | None:
-        """Return the bundled schema for the given file_type, or None if unrecognized."""
-        schema = load_bundled_schema("claude_code", "v1")
+        """Return the provider schema for the given file_type, or None if unrecognized."""
+        schema = load_provider_schema("claude_code")
         file_types = schema.get("file_types", {})
         if file_type in file_types:
             return file_types[file_type]

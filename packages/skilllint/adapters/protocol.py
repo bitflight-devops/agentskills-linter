@@ -1,8 +1,8 @@
 """PlatformAdapter Protocol definition.
 
 Defines the @runtime_checkable Protocol that all platform adapters must satisfy.
-Any object implementing the four methods (id, path_patterns, applicable_rules,
-validate) passes isinstance(obj, PlatformAdapter) without inheritance.
+Any object implementing the five methods (id, path_patterns, applicable_rules,
+constraint_scopes, validate) passes isinstance(obj, PlatformAdapter) without inheritance.
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 class PlatformAdapter(Protocol):
     """Protocol for platform-specific skill/plugin adapters.
 
-    Any class implementing all four methods satisfies this Protocol.
+    Any class implementing all five methods satisfies this Protocol.
     No inheritance required — structural subtyping only.
     """
 
@@ -31,6 +31,14 @@ class PlatformAdapter(Protocol):
 
     def applicable_rules(self) -> set[str]:
         """Return the set of rule-series codes this adapter applies (e.g. {'AS', 'CC'})."""
+        ...
+
+    def constraint_scopes(self) -> set[str]:
+        """Return the set of constraint_scope values from the provider schema.
+
+        Values are extracted from field-level constraint_scope annotations
+        in the loaded schema (values: 'shared' or 'provider_specific').
+        """
         ...
 
     def validate(self, path: pathlib.Path) -> list[dict]:

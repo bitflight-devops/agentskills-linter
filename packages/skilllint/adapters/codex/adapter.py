@@ -2,19 +2,22 @@
 
 Data provider and file-type validator for Codex platform files.
 Validates AGENTS.md non-empty and .rules prefix_rule() field names
-against the bundled codex v1.json fields object.
+against the provider codex v1.json fields object.
 No rule-series logic lives here — rule series fire from the core validator.
 """
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import TYPE_CHECKING
 
-from skilllint import load_bundled_schema
+from skilllint.schemas import load_provider_schema
 
 if TYPE_CHECKING:
     import pathlib
+
+_logger = logging.getLogger(__name__)
 
 # Matches: prefix_rule(\n    key = value,\n    ...\n)
 # Captures the body between the outer parentheses.
@@ -38,9 +41,33 @@ class CodexAdapter:
         """Return the set of rule prefixes applicable to this adapter."""
         return {"AS"}
 
+    def constraint_scopes(self) -> set[str]:
+        """Return the set of constraint_scope values from the provider schema.
+
+        These are extracted from the field-level constraint_scope annotations
+        in the loaded schema (values: 'shared' or 'provider_specific').
+
+        Returns:
+            Set of constraint_scope strings, defaulting to {'shared'} if schema
+            cannot be loaded or has no constraint_scope annotations.
+        """
+        try:
+            schema = load_provider_schema("codex")
+        except FileNotFoundError:
+            _logger.debug("Schema not found for codex, defaulting to 'shared' scope")
+            return {"shared"}
+
+        scopes: set[str] = set()
+        for file_type_data in schema.get("file_types", {}).values():
+            for field_meta in file_type_data.get("fields", {}).values():
+                scope = field_meta.get("constraint_scope")
+                if scope:
+                    scopes.add(scope)
+        return scopes or {"shared"}
+
     def get_schema(self, file_type: str) -> dict | None:
-        """Return the bundled schema sub-object for the given file_type."""
-        schema = load_bundled_schema("codex", "v1")
+        """Return the provider schema sub-object for the given file_type."""
+        schema = load_provider_schema("codex")
         return schema.get("file_types", {}).get(file_type)
 
     # ------------------------------------------------------------------
