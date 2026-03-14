@@ -106,6 +106,9 @@ python_files = ["test_*.py"]
 python_functions = ["test_*"]
 pythonpath = [".", "packages/", "tests/"]
 testpaths = ["**/tests"]
+markers = [
+    "slow: tests that build wheels or create venvs (skip with -m 'not slow')",
+]
 
 [tool.coverage.report]
 exclude_lines = [

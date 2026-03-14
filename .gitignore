@@ -57,3 +57,5 @@ walkthrough/
 
 # ── GSD baseline (auto-generated) ──
 .gsd/completed-units.json
+*.pyc
+__pycache__

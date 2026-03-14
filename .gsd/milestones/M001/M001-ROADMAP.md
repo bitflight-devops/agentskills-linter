@@ -56,7 +56,7 @@ This milestone is complete only when all are true:
 - [x] **S03: Refreshable schema ingestion and brownfield migration** `risk:medium` `depends:[S01]`
   > After this: maintainers can refresh or regenerate bundled provider schema artifacts through a supported repo workflow, and the brownfield codebase consumes the new artifact layout without hand-maintained duplication.
 
-- [ ] **S04: End-to-end packaged integration proof** `risk:medium` `depends:[S02,S03]`
+- [x] **S04: End-to-end packaged integration proof** `risk:medium` `depends:[S02,S03]`
   > After this: the assembled refresh → bundled artifact load → CLI validation flow is proven through the real runtime path, showing installed-style resource loading and cross-provider validation working together end-to-end.
 
 ## Boundary Map

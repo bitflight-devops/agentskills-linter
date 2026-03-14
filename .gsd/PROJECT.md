@@ -14,6 +14,6 @@ The project is moving toward a schema-driven validation architecture:
 
 ## Immediate Focus
 
-**S03 complete (refreshable schema ingestion):** Delivered schema refresh script with --bump/--dry-run/--provider/--verbose flags, eliminated duplicate _schema_loader.py brownfield loader, and added comprehensive test coverage (72 tests) for refresh roundtrip and multi-provider packaging.
+**S04 complete (end-to-end packaged integration):** Delivered E2E test suite (`test_e2e_packaging.py`) with 10 tests proving the full refresh → build → install → CLI validation chain works with packaged resources. All tests pass.
 
-**Next: S04** will prove end-to-end packaged integration: refresh → bundled artifact load → CLI validation through the real runtime path.
+**M001 milestone complete:** All four slices (S01-S04) finished. The versioned provider schema and rule authority pipeline is fully operational.

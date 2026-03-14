@@ -1,0 +1,65 @@
+---
+id: T01
+parent: S04
+milestone: M001
+provides:
+  - E2E packaging integration test proving refresh → build → install → CLI validation chain works
+key_files:
+  - packages/skilllint/tests/test_e2e_packaging.py
+key_decisions:
+  - Used module-scoped fixture for wheel build to avoid rebuild on every test
+  - Cleared PYTHONPATH in subprocess tests to ensure installed package is used, not repo checkout
+patterns_established:
+  - @pytest.mark.slow for tests that build wheels/create venvs
+  - Subprocess isolation pattern for testing installed packages
+observability_surfaces:
+  - Wheel contents listing via zipfile.ZipFile().namelist()
+  - Subprocess stdout/stderr for CLI invocation failures
+  - JSON output from validation API for structured verification
+duration: 45min
+verification_result: passed
+completed_at: 2026-03-14
+blocker_discovered: false
+---
+
+# T01: Write E2E packaging integration test and fix any packaging gaps
+
+**Added E2E packaging tests proving the full refresh → build → install → CLI validation chain works with packaged resources.**
+
+## What Happened
+
+1. **Verified wheel packaging** — Inspected built wheel with zipfile, confirmed all schema JSON files (`claude_code/v1.json`, `codex/v1.json`, `cursor/v1.json`) are included. No changes to `pyproject.toml` needed — hatchling already packages the schemas correctly.
+
+2. **Wrote `test_e2e_packaging.py`** with 10 tests across 3 test classes:
+   - `TestWheelContainsSchemas` — 4 tests verifying schema JSON files are in the wheel and are valid JSON
+   - `TestInstalledCLIValidatesFixtures` — 4 tests verifying installed CLI runs against fixtures via subprocess
+   - `TestViolationAuthorityInInstalledOutput` — 2 tests verifying authority metadata flows through installed package
+
+3. **Fixed subprocess isolation** — Initial tests failed because subprocess used dev venv's Python instead of temp venv's Python. Added `_get_python_path()` helper and passed explicit `--python` flag to `uv pip install`. Cleared `PYTHONPATH` in subprocess environment to ensure installed package is used.
+
+4. **Registered `slow` marker** — Added `markers` config to `pyproject.toml` to suppress PytestUnknownMarkWarning.
+
+## Verification
+
+- `cd packages/skilllint && uv run python -m pytest tests/test_e2e_packaging.py -v` — **10 passed**
+- `cd packages/skilllint && uv run python -m pytest tests/ -v --ignore=tests/test_e2e_packaging.py` — **639 passed, 1 skipped**
+- Wheel build verified: `skilllint/schemas/claude_code/v1.json` present in wheel zip
+
+## Diagnostics
+
+- **Wheel contents**: `python -c "import zipfile; print(zipfile.ZipFile('dist/*.whl').namelist())"`
+- **Installed CLI test**: Run with `-v --no-cov` to see subprocess output on failure
+- **Authority verification**: Test `test_authority_in_violation_output` prints violation JSON on assertion failure
+
+## Deviations
+
+- None — task executed exactly as planned. Packaging required no fixes.
+
+## Known Issues
+
+- None discovered.
+
+## Files Created/Modified
+
+- `packages/skilllint/tests/test_e2e_packaging.py` — New E2E test file with 10 tests proving packaged integration works
+- `pyproject.toml` — Added `markers` config for `slow` test marker (not a packaging fix, just warning suppression)
