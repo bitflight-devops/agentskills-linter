@@ -100,6 +100,25 @@ def _safe_load_yaml(text: str) -> YamlValue:
     return _yaml_safe.load(text)
 
 
+def find_plugin_dir(path: Path) -> Path | None:
+    """Find the plugin directory containing .claude-plugin/plugin.json.
+
+    Walks up the directory tree from *path* (or its parent, if *path* is a
+    file) looking for a ``.claude-plugin/plugin.json`` marker.
+
+    Args:
+        path: Path to start searching from.
+
+    Returns:
+        Plugin directory path, or None if not found.
+    """
+    search_path = path.parent if path.is_file() else path
+    for parent in [search_path, *search_path.parents]:
+        if (parent / ".claude-plugin" / "plugin.json").exists():
+            return parent
+    return None
+
+
 def _dump_yaml(data: dict[str, YamlValue]) -> str:
     """Serialize a dict to YAML using the round-trip handler.
 
@@ -3205,13 +3224,13 @@ def _find_actual_capabilities(plugin_dir: Path) -> tuple[set[Path], set[Path], s
     agents_dir = plugin_dir / "agents"
     if agents_dir.is_dir():
         actual_agents = {
-            f.relative_to(plugin_dir) for f in agents_dir.glob("*.md") if f.name not in {"CLAUDE.md", "README.md"}
+            f.relative_to(plugin_dir) for f in agents_dir.glob("*.md") if f.name not in FRONTMATTER_EXEMPT_FILENAMES
         }
 
     commands_dir = plugin_dir / "commands"
     if commands_dir.is_dir():
         actual_commands = {
-            f.relative_to(plugin_dir) for f in commands_dir.glob("*.md") if f.name not in {"CLAUDE.md", "README.md"}
+            f.relative_to(plugin_dir) for f in commands_dir.glob("*.md") if f.name not in FRONTMATTER_EXEMPT_FILENAMES
         }
 
     return actual_skills, actual_agents, actual_commands
@@ -3239,7 +3258,7 @@ def _parse_registered_paths(plugin_config: dict[str, YamlValue], plugin_dir: Pat
         value_path = plugin_dir / value.lstrip("./")
         if value_path.is_dir():
             registered.update(
-                f.relative_to(plugin_dir) for f in value_path.glob("*.md") if f.name not in {"CLAUDE.md", "README.md"}
+                f.relative_to(plugin_dir) for f in value_path.glob("*.md") if f.name not in FRONTMATTER_EXEMPT_FILENAMES
             )
         else:
             registered.add(Path(value.lstrip("./")))
@@ -3497,17 +3516,15 @@ class PluginRegistrationValidator:
     def _find_plugin_dir(self, path: Path) -> Path | None:
         """Find the plugin directory containing .claude-plugin/plugin.json.
 
+        Delegates to the module-level :func:`find_plugin_dir`.
+
         Args:
             path: Path to start searching from.
 
         Returns:
             Plugin directory path, or None if not found.
         """
-        search_path = path.parent if path.is_file() else path
-        for parent in [search_path, *search_path.parents]:
-            if (parent / ".claude-plugin" / "plugin.json").exists():
-                return parent
-        return None
+        return find_plugin_dir(path)
 
 
 # ============================================================================
@@ -3695,22 +3712,15 @@ class PluginStructureValidator:
     def _find_plugin_directory(self, path: Path) -> Path | None:
         """Find plugin directory containing .claude-plugin/plugin.json.
 
+        Delegates to the module-level :func:`find_plugin_dir`.
+
         Args:
             path: Path to file or directory within plugin
 
         Returns:
             Path to plugin directory, or None if not found
         """
-        # If path is a file, start from parent directory
-        search_path = path.parent if path.is_file() else path
-
-        # Search up the directory tree for .claude-plugin/plugin.json
-        for parent in [search_path, *search_path.parents]:
-            plugin_json = parent / ".claude-plugin" / "plugin.json"
-            if plugin_json.exists():
-                return parent
-
-        return None
+        return find_plugin_dir(path)
 
     def _validate_plugin_json_syntax(self, plugin_json_path: Path) -> str | None:
         """Validate plugin.json is parseable JSON. Catches syntax/encoding issues.

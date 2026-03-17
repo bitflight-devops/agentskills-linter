@@ -22,8 +22,6 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from ruamel.yaml import YAML
-
 from skilllint.frontmatter_core import extract_frontmatter
 from skilllint.rule_registry import skilllint_rule
 
@@ -34,35 +32,6 @@ if TYPE_CHECKING:
 
 
 _DOCS_URL = "https://docs.anthropic.com/en/docs/claude-code/sub-agents"
-
-
-def _find_plugin_dir(path: Path) -> Path | None:
-    """Find the plugin directory containing .claude-plugin/plugin.json.
-
-    Args:
-        path: Path to start searching from.
-
-    Returns:
-        Plugin directory path, or None if not found.
-    """
-    search_path = path.parent if path.is_file() else path
-    for parent in [search_path, *search_path.parents]:
-        if (parent / ".claude-plugin" / "plugin.json").exists():
-            return parent
-    return None
-
-
-def _safe_load_yaml(text: str) -> object:
-    """Load YAML text safely using ruamel.yaml.
-
-    Args:
-        text: YAML text to parse.
-
-    Returns:
-        Parsed YAML value.
-    """
-    yaml_loader = YAML(typ="safe")
-    return yaml_loader.load(text)
 
 
 def _load_json_file(path: Path) -> dict | None:
@@ -139,14 +108,14 @@ def _is_inline_mcp_definition(entry: object) -> bool:
 
 
 def _check_hooks(
-    parsed: dict, rel_path: str, plugin_dir: Path, code: ErrorCode, issue_cls: type[ValidationIssue]
+    parsed: dict, rel_path: str, plugin_events: set[str], code: ErrorCode, issue_cls: type[ValidationIssue]
 ) -> list[ValidationIssue]:
     """Check hooks field — always warns, varies guidance based on plugin hooks.json coverage.
 
     Args:
         parsed: Parsed frontmatter dict.
         rel_path: Relative path of the agent file.
-        plugin_dir: Plugin root directory.
+        plugin_events: Hook event names from plugin-level hooks/hooks.json.
         code: The PA001 error code.
         issue_cls: ValidationIssue class.
 
@@ -163,7 +132,6 @@ def _check_hooks(
         agent_events = set(hooks_value.keys())
 
     # Check if plugin-level hooks.json covers the same events
-    plugin_events = _get_plugin_level_hooks_events(plugin_dir)
     if agent_events and agent_events <= plugin_events:
         # All agent hook events are covered by plugin hooks.json — warn with coverage note
         suggestion = "This field is ignored — plugin-level hooks at `hooks/hooks.json` already cover these events"
@@ -183,14 +151,14 @@ def _check_hooks(
 
 
 def _check_mcp_servers(
-    parsed: dict, rel_path: str, plugin_dir: Path, code: ErrorCode, issue_cls: type[ValidationIssue]
+    parsed: dict, rel_path: str, plugin_servers: set[str], code: ErrorCode, issue_cls: type[ValidationIssue]
 ) -> list[ValidationIssue]:
     """Check mcpServers field — warning severity with cross-checking.
 
     Args:
         parsed: Parsed frontmatter dict.
         rel_path: Relative path of the agent file.
-        plugin_dir: Plugin root directory.
+        plugin_servers: MCP server names from plugin-level config.
         code: The PA001 error code.
         issue_cls: ValidationIssue class.
 
@@ -200,8 +168,6 @@ def _check_mcp_servers(
     mcp_value = parsed.get("mcpServers")
     if mcp_value is None:
         return []
-
-    plugin_servers = _get_plugin_level_mcp_servers(plugin_dir)
     issues: list[ValidationIssue] = []
 
     # mcpServers can be a list or a dict
@@ -319,16 +285,19 @@ def check_pa001(path: Path) -> ValidationResult:
     - ``permissionMode`` → copy agent to ``.claude/agents/`` if needed
     """
     from skilllint.plugin_validator import (  # noqa: PLC0415 — deferred to break circular import
+        FRONTMATTER_EXEMPT_FILENAMES,
         PA001 as PA001_CODE,
         ValidationIssue,
         ValidationResult,
+        _safe_load_yaml,
+        find_plugin_dir,
     )
 
     errors: list[ValidationIssue] = []
     warnings: list[ValidationIssue] = []
     info: list[ValidationIssue] = []
 
-    plugin_dir = _find_plugin_dir(path)
+    plugin_dir = find_plugin_dir(path)
     if plugin_dir is None:
         return ValidationResult(passed=True, errors=errors, warnings=warnings, info=info)
 
@@ -336,7 +305,13 @@ def check_pa001(path: Path) -> ValidationResult:
     if not agents_dir.is_dir():
         return ValidationResult(passed=True, errors=errors, warnings=warnings, info=info)
 
+    # Hoist plugin-level JSON reads above the loop to avoid N+1 I/O
+    plugin_hooks_events = _get_plugin_level_hooks_events(plugin_dir)
+    plugin_mcp_servers = _get_plugin_level_mcp_servers(plugin_dir)
+
     for agent_md in sorted(agents_dir.glob("*.md")):
+        if agent_md.name in FRONTMATTER_EXEMPT_FILENAMES:
+            continue
         content = agent_md.read_text(encoding="utf-8")
         fm_text, _start, _end = extract_frontmatter(content)
         if fm_text is None:
@@ -352,10 +327,10 @@ def check_pa001(path: Path) -> ValidationResult:
         errors.extend(_check_permission_mode(parsed, rel_path, PA001_CODE, ValidationIssue))
 
         # hooks — warning, silenced if plugin hooks.json covers same events
-        warnings.extend(_check_hooks(parsed, rel_path, plugin_dir, PA001_CODE, ValidationIssue))
+        warnings.extend(_check_hooks(parsed, rel_path, plugin_hooks_events, PA001_CODE, ValidationIssue))
 
         # mcpServers — warning with cross-checking
-        warnings.extend(_check_mcp_servers(parsed, rel_path, plugin_dir, PA001_CODE, ValidationIssue))
+        warnings.extend(_check_mcp_servers(parsed, rel_path, plugin_mcp_servers, PA001_CODE, ValidationIssue))
 
     return ValidationResult(passed=len(errors) == 0, errors=errors, warnings=warnings, info=info)
 
