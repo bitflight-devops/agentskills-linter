@@ -13,7 +13,6 @@ Token-based complexity measurement replaces line counting for accurate AI cost e
 
 from __future__ import annotations
 
-import fnmatch
 import logging
 import os
 import re
@@ -69,7 +68,7 @@ from .frontmatter_core import (
     fix_skill_name_field,
     get_frontmatter_model,
 )
-from .reporting import CIReporter, ConsoleReporter, Reporter
+from .scan_runtime import _resolve_filter_and_expand_paths, run_validation_loop
 
 if TYPE_CHECKING:
     from pydantic_core import ErrorDetails
@@ -84,7 +83,7 @@ _rt_yaml.width = 10000  # prevent line wrapping
 
 # Platform adapter registry — loaded once at module level.
 # Keys are adapter IDs (e.g. "claude_code", "cursor", "codex").
-_ADAPTERS: dict[str, object] = {a.id(): a for a in load_adapters()}
+ADAPTERS: dict[str, object] = {a.id(): a for a in load_adapters()}
 
 
 def _safe_load_yaml(text: str) -> YamlValue:
@@ -177,14 +176,8 @@ ERROR_CODE_BASE_URL = (
 PLUGIN_MANIFEST_SCHEMA_URL = "https://code.claude.com/docs/en/plugins-reference.md#plugin-manifest-schema"
 SKILL_FRONTMATTER_SCHEMA_URL = "https://code.claude.com/docs/en/skills.md#frontmatter-reference"
 
-# Scan runtime imports - re-export for backwards compatibility
-from skilllint.scan_runtime import (
-    DEFAULT_SCAN_PATTERNS,
-    FILTER_TYPE_MAP,
-    compute_summary,
-    discover_validatable_paths,
-    resolve_filter_and_expand_paths,
-)
+# FILTER_TYPE_MAP and DEFAULT_SCAN_PATTERNS live in scan_runtime.py
+# and are re-imported at the top of this module.
 
 # Description requirements (Architecture lines 349-350)
 MIN_DESCRIPTION_LENGTH = 20
@@ -2037,9 +2030,9 @@ def _validate_frontmatter_yaml(
                 warnings.append(
                     ValidationIssue(
                         field="description",
-                        severity="warning",
-                        message="Frontmatter contains unquoted colons that break YAML parsing — auto-fixable by quoting",
-                        code="AS004",
+                        severity="error",
+                        message="Frontmatter contains unquoted colons that break YAML parsing",
+                        code=ErrorCode.FM009,
                         docs_url="https://github.com/bitflight-devops/skilllint/blob/main/plugins/agentskills-skilllint/skills/skilllint/references/rule-catalog.md#as004",
                         suggestion=f"Quote the following field values: {', '.join(colon_fields)}",
                     )
@@ -4523,56 +4516,7 @@ def get_staged_files() -> list[Path]:
 # ============================================================================
 
 
-def _load_ignore_patterns() -> list[str]:
-    """Load glob patterns from .pluginvalidatorignore file.
-
-    Searches for the ignore file in the following order:
-    1. Current working directory (.pluginvalidatorignore)
-    2. .claude/.pluginvalidatorignore
-
-    Each line is a gitignore-style glob pattern. Lines starting with '#' are
-    comments, blank lines are ignored.
-
-    Returns:
-        List of glob patterns to match against file paths.
-    """
-    candidates = [Path.cwd() / ".pluginvalidatorignore", Path.cwd() / ".claude" / ".pluginvalidatorignore"]
-    for candidate in candidates:
-        if candidate.is_file():
-            lines = candidate.read_text(encoding="utf-8").splitlines()
-            return [line.strip() for line in lines if line.strip() and not line.strip().startswith("#")]
-    return []
-
-
-def _is_ignored(path: Path, patterns: list[str]) -> bool:
-    """Check whether a path matches any ignore pattern.
-
-    Patterns follow gitignore-style glob semantics:
-    - ``**/templates/*.md`` matches any ``templates`` directory at any depth
-    - ``plugins/foo/bar.md`` matches that exact relative path
-
-    The path is tested as a POSIX string (forward slashes) so patterns work
-    consistently across platforms.
-
-    Args:
-        path: File path to check (absolute or relative).
-        patterns: Glob patterns loaded from .pluginvalidatorignore.
-
-    Returns:
-        True if the path matches any pattern and should be skipped.
-    """
-    path_str = path.as_posix()
-    for pattern in patterns:
-        if fnmatch.fnmatch(path_str, pattern):
-            return True
-        # Also match against just the relative-to-cwd representation
-        try:
-            rel = path.resolve().relative_to(Path.cwd().resolve()).as_posix()
-        except ValueError:
-            rel = path_str
-        if fnmatch.fnmatch(rel, pattern):
-            return True
-    return False
+# _load_ignore_patterns and _is_ignored moved to scan_runtime.py
 
 
 # ============================================================================
@@ -4677,7 +4621,7 @@ def _get_validators_for_path(path: Path) -> list[Validator]:
         if file_type == FileType.SKILL:
             validators.extend([ComplexityValidator(), InternalLinkValidator(), ProgressiveDisclosureValidator()])
     elif file_type == FileType.PLUGIN:
-        validators.append(PluginStructureValidator())
+        validators.extend((PluginStructureValidator(), PluginAgentFrontmatterValidator()))
     elif file_type == FileType.HOOK_CONFIG:
         validators.append(HookValidator())
     elif file_type == FileType.HOOK_SCRIPT:
@@ -4686,7 +4630,7 @@ def _get_validators_for_path(path: Path) -> list[Validator]:
         validators.append(MarkdownTokenCounter())
     else:
         # Unknown file type — return empty list.  The CLI entry point
-        # (_validate_single_path) checks for this and emits a user-facing
+        # (validate_single_path) checks for this and emits a user-facing
         # error; library callers (run_platform_checks) receive an empty
         # validator list and can proceed without exceptions.
         return []
@@ -4717,7 +4661,7 @@ def _collect_validator_results(
     return results
 
 
-def _validate_single_path(path: Path, *, check: bool, fix: bool, verbose: bool) -> FileResults:
+def validate_single_path(path: Path, *, check: bool, fix: bool, verbose: bool) -> FileResults:
     """Validate a single path and return results grouped by file.
 
     Args:
@@ -4818,10 +4762,8 @@ def _handle_tokens_only(paths: list[Path], *, batch: bool = False) -> None:
     raise typer.Exit(0) from None
 
 
-# Aliases for backwards compatibility - functions now live in scan_runtime
-_discover_validatable_paths = discover_validatable_paths
-_resolve_filter_and_expand_paths = resolve_filter_and_expand_paths
-_compute_summary = compute_summary
+# _discover_validatable_paths, _resolve_filter_and_expand_paths,
+# and _compute_summary moved to scan_runtime.py
 
 
 def _show_help_and_exit(ctx: typer.Context, code: int = 0) -> NoReturn:
@@ -4896,7 +4838,7 @@ def run_platform_checks(path: Path, adapter: PlatformAdapter) -> list[dict]:
         if not sk_validators:
             return list(adapter.validate(path))
 
-        file_results = _validate_single_path(path, check=True, fix=False, verbose=False)
+        file_results = validate_single_path(path, check=True, fix=False, verbose=False)
 
         violations: list[dict] = []
         for validator_results in file_results.values():
@@ -4978,16 +4920,16 @@ def _resolve_platform_override(platform: str | None) -> str | None:
     if platform is None:
         return None
     platform_key = platform.replace("-", "_")
-    if platform_key not in _ADAPTERS:
+    if platform_key not in ADAPTERS:
         typer.echo(
-            f"Unknown platform: {platform!r}. Valid choices: {', '.join(k.replace('_', '-') for k in _ADAPTERS)}",
+            f"Unknown platform: {platform!r}. Valid choices: {', '.join(k.replace('_', '-') for k in ADAPTERS)}",
             err=True,
         )
         raise typer.Exit(2) from None
     return platform_key
 
 
-def _violations_to_result(violations: list[dict]) -> ValidationResult:
+def violations_to_result(violations: list[dict]) -> ValidationResult:
     """Convert a list of violation dicts into a ValidationResult.
 
     Args:
@@ -5011,60 +4953,6 @@ def _violations_to_result(violations: list[dict]) -> ValidationResult:
     warnings = [i for i in issues if i.severity == "warning"]
     info = [i for i in issues if i.severity == "info"]
     return ValidationResult(passed=len(errors) == 0, errors=errors, warnings=warnings, info=info)
-
-
-def _run_validation_loop(
-    *,
-    expanded_paths: list[Path],
-    check: bool,
-    fix: bool,
-    verbose: bool,
-    no_color: bool,
-    show_progress: bool,
-    show_summary: bool,
-    platform_override: str | None,
-) -> NoReturn:
-    """Execute the validation loop, report results, and exit.
-
-    Args:
-        expanded_paths: Resolved file paths to validate.
-        check: Validate only, don't auto-fix.
-        fix: Auto-fix issues where possible.
-        verbose: Show detailed output.
-        no_color: Disable color output.
-        show_progress: Show per-file status.
-        show_summary: Show summary panel.
-        platform_override: Restrict to this adapter ID.
-
-    Raises:
-        typer.Exit: Always exits with appropriate code.
-    """
-    ignore_patterns = _load_ignore_patterns()
-    all_results: FileResults = {}
-    for path in expanded_paths:
-        if ignore_patterns and _is_ignored(path, ignore_patterns):
-            continue
-        if platform_override is not None:
-            violations = validate_file(path, _ADAPTERS, platform_override)
-            all_results[path] = [("platform", _violations_to_result(violations))]
-        else:
-            file_results = _validate_single_path(path, check=check, fix=fix, verbose=verbose)
-            for file_path, validator_results in file_results.items():
-                if file_path in all_results:
-                    all_results[file_path].extend(validator_results)
-                else:
-                    all_results[file_path] = list(validator_results)
-
-    reporter: Reporter = CIReporter() if no_color else ConsoleReporter(no_color=no_color)
-    reporter.report(all_results, verbose=verbose, show_progress=show_progress)
-
-    total_files, passed, failed, warnings = _compute_summary(all_results)
-    if show_summary:
-        reporter.summarize(total_files, passed, failed, warnings)
-
-    if failed > 0:
-        raise typer.Exit(1) from None
-    raise typer.Exit(0) from None
 
 
 def main(
@@ -5153,7 +5041,7 @@ def main(
             typer.echo("Error: Cannot use both --check and --fix flags", err=True)
             raise typer.Exit(2) from None
 
-        _run_validation_loop(
+        run_validation_loop(
             expanded_paths=expanded_paths,
             check=check,
             fix=fix,
@@ -5162,6 +5050,10 @@ def main(
             show_progress=show_progress,
             show_summary=show_summary,
             platform_override=platform_override,
+            validate_single_path=validate_single_path,
+            validate_file=validate_file,
+            violations_to_result=violations_to_result,
+            adapters=ADAPTERS,
         )
 
     except KeyboardInterrupt:
