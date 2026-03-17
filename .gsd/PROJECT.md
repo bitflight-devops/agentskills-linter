@@ -11,11 +11,9 @@ The one thing that must work is trustworthy detection: `skilllint` should discov
 ## Current State
 
 - M001 is complete: `skilllint` validates provider-specific skill content using versioned bundled schemas and rule authority metadata.
-- M002 is complete: scan orchestration, ownership routing, discovery behavior, rule-truth classification, maintainer docs, and external CLI proof are all in place.
 - The repo is primarily Python/CLI/test oriented, with the main package under `packages/skilllint/`.
-- `packages/skilllint/scan_runtime.py` now owns explicit scan/discovery seams, while `plugin_validator.py` still contains some deeper validation-loop and reporting coupling left for later cleanup.
-- Real-world scans against external Claude ecosystem repos now correctly distinguish genuine schema violations (FM003, FM005) from runtime-accepted patterns (FM004, FM007, AS004). Exit codes reflect only genuine errors.
-- Maintainers now have `docs/maintainer-extension-guide.md` as the authoritative extension-path reference.
+- Brownfield validator logic still retains too much responsibility in `plugin_validator.py`, especially around scan orchestration, rule layering, and discovery behavior.
+- Real-world scans against external Claude ecosystem repos currently surface a mix of likely real issues, likely compatibility gaps, and possibly hallucinated or legacy constraints.
 - Requirements are tracked explicitly in `.gsd/REQUIREMENTS.md`.
 
 ## Architecture / Key Patterns
@@ -33,10 +31,4 @@ See `.gsd/REQUIREMENTS.md` for the explicit capability contract, requirement sta
 ## Milestone Sequence
 
 - [x] M001: Versioned Provider Schema and Rule Authority Pipeline — Provider-aware validation with versioned bundled schemas, provenance, and packaged runtime proof.
-- [x] M002: Validator Decomposition and Scan-Truth Hardening — Split remaining validator responsibilities, corrected scan/discovery behavior, classified disputed rule truth with evidence, added maintainer extension docs, and proved behavior through real external CLI scans.
-  - [x] S01: Validator seam map and boundary extraction
-  - [x] S02: Constraint ownership routing cleanup
-  - [x] S03: Scan target discovery contract
-  - [x] S04: Official-repo hard-failure truth pass
-  - [x] S05: Maintainer extension-path documentation
-  - [x] S06: External scan proof and findings report
+- [ ] M002: Validator Decomposition and Scan-Truth Hardening — Split remaining validator responsibilities, correct scan/discovery behavior, and prove detection truth against real external repos.

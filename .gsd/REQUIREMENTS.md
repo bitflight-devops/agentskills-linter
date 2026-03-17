@@ -16,157 +16,157 @@ Guidelines:
 
 ### R012 — Decompose remaining validator monolith into explicit layers
 - Class: quality-attribute
-- Status: validated
+- Status: active
 - Description: The remaining brownfield validator logic must be split into clearer internal modules so maintainers no longer default to editing one monolithic validator path.
 - Why it matters: Architectural drift back into one dominant validator file makes future rule and schema work harder to reason about and easier to break.
 - Source: user
 - Primary owning slice: M002/S01
 - Supporting slices: M002/S02, M002/S03
-- Validation: validated
-- Notes: Extracted scan_runtime.py with path discovery, filter expansion, summary computation seams.
+- Validation: mapped
+- Notes: This is about internal ownership and maintainability, not new end-user functionality.
 
 ### R013 — Separate schema validation from lint-rule validation cleanly
 - Class: core-capability
-- Status: validated
+- Status: active
 - Description: The system must clearly distinguish schema/frontmatter/shape validation from lint-style and semantic rule validation.
 - Why it matters: Without a hard boundary, detection behavior becomes muddy and false positives are hard to diagnose.
 - Source: user
 - Primary owning slice: M002/S02
 - Supporting slices: M002/S04, M002/S06
-- Validation: validated
-- Notes: Includes classification of hard failures versus second-level findings.
+- Validation: mapped
+- Notes: This includes classification of hard failures versus second-level findings.
 
 ### R014 — Clarify provider-specific vs shared rule ownership
 - Class: quality-attribute
-- Status: validated
+- Status: active
 - Description: The linter must make it obvious whether a constraint is shared across providers, provider-specific, schema-backed, or rule-backed.
 - Why it matters: Provider-specific behavior becomes hard to trace when ownership is implicit or mixed.
 - Source: user
 - Primary owning slice: M002/S02
 - Supporting slices: M002/S05
-- Validation: validated
+- Validation: mapped
 - Notes: Traceability matters both in code structure and in docs.
 
 ### R015 — Use manifest-driven scanning when plugin manifests explicitly enumerate components
 - Class: integration
-- Status: validated
+- Status: active
 - Description: When a plugin manifest explicitly lists agents, commands, skills, or hooks, `skilllint` must use that manifest as the source of truth for scan target selection.
 - Why it matters: Scan correctness depends on following the plugin's declared structure when that declaration exists.
 - Source: user
 - Primary owning slice: M002/S03
 - Supporting slices: M002/S04, M002/S06
-- Validation: validated
+- Validation: mapped
 - Notes: Detection correctness comes before autofix correctness.
 
 ### R016 — Use documented auto-discovery when plugin manifests omit component arrays
 - Class: integration
-- Status: validated
+- Status: active
 - Description: When plugin manifests do not explicitly enumerate components, `skilllint` must follow the documented plugin auto-discovery protocol to decide what to scan.
 - Why it matters: Real plugin repos rely on discovery behavior, and getting that wrong creates false positives and false negatives.
 - Source: user
 - Primary owning slice: M002/S03
 - Supporting slices: M002/S04, M002/S06
-- Validation: validated
+- Validation: mapped
 - Notes: The documented plugin behavior is part of the compatibility contract.
 
 ### R017 — Use structure-based discovery for unmanifested provider directories
 - Class: integration
-- Status: validated
+- Status: active
 - Description: When scanning `.claude/`, `.agent/`, `.agents/`, `.gemini/`, or `.cursor/` trees outside a plugin manifest context, `skilllint` must use provider-known directory structure rather than expecting a manifest.
 - Why it matters: These directory trees are valid scan roots but do not have plugin manifests to consult.
 - Source: user
 - Primary owning slice: M002/S03
 - Supporting slices: M002/S04, M002/S06
-- Validation: validated
+- Validation: mapped
 - Notes: This requirement is specifically about discovery and target selection.
 
 ### R018 — Detect official-repo content without unjustified schema/frontmatter hard failures
 - Class: launchability
-- Status: validated
+- Status: active
 - Description: Scans of official external repos must not produce schema/frontmatter hard failures unless those failures are supported by current authority or proven runtime behavior.
 - Why it matters: External repo scans are the proving ground for whether the linter is detecting reality or enforcing hallucinated constraints.
 - Source: user
 - Primary owning slice: M002/S04
 - Supporting slices: M002/S06
 - Validation: validated
-- Notes: Remaining hard failures may still be real findings and should stay visible.
+- Notes: FM004/FM007/AS004 downgraded to warnings; remaining hard failures (FM003/FM005) are genuine schema violations documented in S04-FINDINGS.md.
 
 ### R019 — Provide evidence-driven rule-truth evaluation for disputed constraints
 - Class: failure-visibility
-- Status: validated
+- Status: active
 - Description: For disputed rules, the project must gather evidence from provider docs, runtime behavior, and current implementation before deciding whether a rule is real, legacy, provider-specific, recommendation-only, or hallucinated.
 - Why it matters: The user wants the project to blame itself first and avoid hardening invented rules into architecture.
 - Source: user
 - Primary owning slice: M002/S04
 - Supporting slices: M002/S05, M002/S06
 - Validation: validated
-- Notes: Claude CLI probes are part of the evidence set, not the sole authority.
+- Notes: Classification documented in plugin_validator.py code comments and S04-FINDINGS.md with runtime evidence.
 
 ### R020 — Document how to add a schema update
 - Class: admin/support
-- Status: validated
+- Status: active
 - Description: Maintainer docs must show a concrete worked example of how to update or add schema-backed validation.
 - Why it matters: Docs should teach the correct extension path instead of forcing contributors to reverse-engineer the architecture.
 - Source: user
 - Primary owning slice: M002/S05
 - Supporting slices: none
-- Validation: validated
-- Notes: Example reflects the post-refactor structure.
+- Validation: mapped
+- Notes: Example should reflect the post-refactor structure, not the legacy monolith.
 
 ### R021 — Document how to add a provider overlay
 - Class: admin/support
-- Status: validated
+- Status: active
 - Description: Maintainer docs must show a concrete worked example of how to implement a provider-specific overlay.
 - Why it matters: Provider-specific behavior is one of the main areas the user wants to keep traceable.
 - Source: user
 - Primary owning slice: M002/S05
 - Supporting slices: none
-- Validation: validated
-- Notes: Example makes shared vs provider-specific responsibility obvious.
+- Validation: mapped
+- Notes: Example should make shared vs provider-specific responsibility obvious.
 
 ### R022 — Document how to add a new lint rule
 - Class: admin/support
-- Status: validated
+- Status: active
 - Description: Maintainer docs must show a concrete worked example of how to add a new lint rule in the correct layer.
 - Why it matters: Contributors need to know when something belongs in a lint rule rather than schema or provider overlay logic.
 - Source: user
 - Primary owning slice: M002/S05
 - Supporting slices: none
-- Validation: validated
-- Notes: Example is for detection behavior, not autofix behavior.
+- Validation: mapped
+- Notes: This is documentation for detection behavior, not autofix behavior.
 
 ### R023 — Document how to add provenance metadata
 - Class: admin/support
-- Status: validated
+- Status: active
 - Description: Maintainer docs must show how to attach and surface provenance metadata for schemas and rules.
 - Why it matters: Docs lagging behind architecture would cause people to guess wrong about traceability.
 - Source: user
 - Primary owning slice: M002/S05
 - Supporting slices: none
-- Validation: validated
-- Notes: Provenance remains explicit and machine-readable.
+- Validation: mapped
+- Notes: Provenance must remain explicit and machine-readable.
 
 ### R024 — Prove behavior through real CLI scans on external repos
 - Class: operability
-- Status: validated
+- Status: active
 - Description: The milestone must prove its detection behavior using real `uv run skilllint check ...` scans against external repos, not just synthetic internal fixtures.
 - Why it matters: The user explicitly wants confidence grounded in official ecosystem content.
 - Source: user
 - Primary owning slice: M002/S06
 - Supporting slices: M002/S04
-- Validation: validated
-- Notes: Proven by S06 — `verify-s06.sh` and regression tests pass against all three external repos.
+- Validation: mapped
+- Notes: Initial focus is `../skills`, `../claude-plugins-official`, and `../claude-code-plugins`.
 
 ### R025 — Preserve user-facing CLI scan behavior while refactoring internals
 - Class: continuity
-- Status: validated
+- Status: active
 - Description: Internal decomposition must not break the real `skilllint check` entrypoint or make scan behavior less predictable for users.
 - Why it matters: Architecture cleanup is only useful if the real tool remains dependable.
 - Source: inferred
 - Primary owning slice: M002/S06
 - Supporting slices: M002/S01, M002/S02, M002/S03
-- Validation: validated
-- Notes: Proven by S06 — exit codes match baseline and regression tests pass.
+- Validation: mapped
+- Notes: The milestone should prove this with real CLI verification rather than code inspection alone.
 
 ## Validated
 
@@ -255,20 +255,20 @@ Guidelines:
 
 | ID | Class | Status | Primary owner | Supporting | Proof |
 |---|---|---|---|---|---|
-| R012 | quality-attribute | validated | M002/S01 | M002/S02, M002/S03 | validated |
-| R013 | core-capability | validated | M002/S02 | M002/S04, M002/S06 | validated |
-| R014 | quality-attribute | validated | M002/S02 | M002/S05 | validated |
-| R015 | integration | validated | M002/S03 | M002/S04, M002/S06 | validated |
-| R016 | integration | validated | M002/S03 | M002/S04, M002/S06 | validated |
-| R017 | integration | validated | M002/S03 | M002/S04, M002/S06 | validated |
-| R018 | launchability | validated | M002/S04 | M002/S06 | validated |
-| R019 | failure-visibility | validated | M002/S04 | M002/S05, M002/S06 | validated |
-| R020 | admin/support | validated | M002/S05 | none | validated |
-| R021 | admin/support | validated | M002/S05 | none | validated |
-| R022 | admin/support | validated | M002/S05 | none | validated |
-| R023 | admin/support | validated | M002/S05 | none | validated |
-| R024 | operability | validated | M002/S06 | M002/S04 | validated |
-| R025 | continuity | validated | M002/S06 | M002/S01, M002/S02, M002/S03 | validated |
+| R012 | quality-attribute | active | M002/S01 | M002/S02, M002/S03 | mapped |
+| R013 | core-capability | active | M002/S02 | M002/S04, M002/S06 | mapped |
+| R014 | quality-attribute | active | M002/S02 | M002/S05 | mapped |
+| R015 | integration | active | M002/S03 | M002/S04, M002/S06 | mapped |
+| R016 | integration | active | M002/S03 | M002/S04, M002/S06 | mapped |
+| R017 | integration | active | M002/S03 | M002/S04, M002/S06 | mapped |
+| R018 | launchability | active | M002/S04 | M002/S06 | validated |
+| R019 | failure-visibility | active | M002/S04 | M002/S05, M002/S06 | validated |
+| R020 | admin/support | active | M002/S05 | none | mapped |
+| R021 | admin/support | active | M002/S05 | none | mapped |
+| R022 | admin/support | active | M002/S05 | none | mapped |
+| R023 | admin/support | active | M002/S05 | none | mapped |
+| R024 | operability | active | M002/S06 | M002/S04 | mapped |
+| R025 | continuity | active | M002/S06 | M002/S01, M002/S02, M002/S03 | mapped |
 | R011 | integration | validated | M001/S04 | M001/S01, M001/S02, M001/S03 | validated |
 | R026 | differentiator | deferred | none | none | unmapped |
 | R027 | differentiator | deferred | none | none | unmapped |
@@ -279,7 +279,7 @@ Guidelines:
 
 ## Coverage Summary
 
-- Active requirements: 0 (all M002 requirements now validated)
-- Mapped to slices: 0
-- Validated: 15 (R011, R012-R025)
+- Active requirements: 14
+- Mapped to slices: 14
+- Validated: 1
 - Unmapped active requirements: 0

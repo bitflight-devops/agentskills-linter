@@ -60,12 +60,7 @@ RULE_REGISTRY: dict[str, RuleEntry] = {}
 
 
 def skilllint_rule(
-    rule_id: str,
-    *,
-    severity: str,
-    category: str,
-    platforms: list[str] | None = None,
-    authority: dict | None = None,
+    rule_id: str, *, severity: str, category: str, platforms: list[str] | None = None, authority: dict | None = None
 ) -> Callable[[Callable], Callable]:
     """Decorator to register a validator function as a rule.
 
@@ -101,10 +96,7 @@ def skilllint_rule(
     # Convert authority dict to RuleAuthority if provided
     rule_authority: RuleAuthority | None = None
     if authority is not None:
-        rule_authority = RuleAuthority(
-            origin=authority.get("origin", ""),
-            reference=authority.get("reference"),
-        )
+        rule_authority = RuleAuthority(origin=authority.get("origin", ""), reference=authority.get("reference"))
 
     def decorator(fn: Callable) -> Callable:
         entry = RuleEntry(

@@ -1,33 +1,25 @@
 """Scan expansion and validation-loop orchestration.
 
-This module provides the runtime seams for:
-- Path discovery and expansion
-- Validation loop orchestration
-- Summary statistics computation
-
-The CLI entrypoint delegates through these functions to keep
-plugin_validator.py focused on validation logic rather than
-orchestration concerns.
+Extracted from ``plugin_validator`` so the CLI entrypoint can delegate
+path discovery, filtering, ignore-pattern handling, and the main
+validation loop to a dedicated module without changing user-facing behavior.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from enum import StrEnum
+import fnmatch
+from collections.abc import Callable
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable, NoReturn, Protocol
+from typing import Any, NoReturn
 
-import msgspec.json
 import typer
 
-if TYPE_CHECKING:
-    from skilllint.plugin_validator import (
-        FileResults,
-        Reporter,
-        ValidationResult,
-    )
+from .reporting import CIReporter, ConsoleReporter, FileResults, Reporter
 
-# Convenience glob patterns for --filter-type option
+# ---------------------------------------------------------------------------
+# Constants
+# ---------------------------------------------------------------------------
+
 FILTER_TYPE_MAP: dict[str, str] = {
     "skills": "**/skills/*/SKILL.md",
     "agents": "**/agents/*.md",
@@ -45,181 +37,12 @@ DEFAULT_SCAN_PATTERNS: tuple[str, ...] = (
 )
 
 
-# ============================================================================
-# SCAN DISCOVERY MODES (R015, R016, R017)
-# ============================================================================
+# ---------------------------------------------------------------------------
+# Path discovery and filtering
+# ---------------------------------------------------------------------------
 
 
-class ScanDiscoveryMode(StrEnum):
-    """Discovery mode for scan target selection.
-
-    - MANIFEST: plugin.json explicitly enumerates components (R015)
-    - AUTO: plugin.json exists but omits component arrays (R016)
-    - STRUCTURE: provider directories without manifest (R017)
-    """
-
-    MANIFEST = "manifest"
-    AUTO = "auto"
-    STRUCTURE = "structure"
-
-
-@dataclass(frozen=True)
-class PluginManifest:
-    """Parsed plugin.json with explicit component declarations."""
-
-    path: Path
-    name: str | None
-    agents: list[str]
-    commands: list[str]
-    skills: list[str]
-    hooks: list[str]
-
-    def has_explicit_components(self) -> bool:
-        """Return True if manifest declares explicit components."""
-        return bool(self.agents or self.commands or self.skills or self.hooks)
-
-
-# Provider directory names that indicate structure-based discovery
-PROVIDER_DIR_NAMES: frozenset[str] = frozenset({
-    ".claude",
-    ".agent",
-    ".agents", 
-    ".gemini",
-    ".cursor",
-})
-
-
-def read_plugin_manifest(plugin_dir: Path) -> PluginManifest | None:
-    """Read and parse plugin.json from a plugin directory.
-
-    Args:
-        plugin_dir: Directory containing .claude-plugin/plugin.json
-
-    Returns:
-        PluginManifest if valid plugin.json exists, None otherwise.
-    """
-    plugin_json = plugin_dir / ".claude-plugin" / "plugin.json"
-    if not plugin_json.is_file():
-        return None
-
-    try:
-        data = msgspec.json.decode(plugin_json.read_bytes())
-        if not isinstance(data, dict):
-            return None
-    except (OSError, msgspec.DecodeError):
-        return None
-
-    return PluginManifest(
-        path=plugin_dir,
-        name=data.get("name"),
-        agents=data.get("agents", []),
-        commands=data.get("commands", []),
-        skills=data.get("skills", []),
-        hooks=data.get("hooks", []),
-    )
-
-
-def detect_discovery_mode(path: Path) -> ScanDiscoveryMode:
-    """Detect the appropriate discovery mode for a scan path.
-
-    Args:
-        path: Directory to scan (may contain plugin.json or be a provider dir)
-
-    Returns:
-        ScanDiscoveryMode enum value.
-    """
-    # Check for plugin.json first
-    manifest = read_plugin_manifest(path)
-    if manifest is not None:
-        if manifest.has_explicit_components():
-            return ScanDiscoveryMode.MANIFEST
-        return ScanDiscoveryMode.AUTO
-
-    # Check if this is a provider directory
-    if path.name in PROVIDER_DIR_NAMES:
-        return ScanDiscoveryMode.STRUCTURE
-
-    # Check parent for provider directory
-    if path.parent.name in PROVIDER_DIR_NAMES:
-        return ScanDiscoveryMode.STRUCTURE
-
-    # Default to auto-discovery
-    return ScanDiscoveryMode.AUTO
-
-
-def get_manifest_discovery_paths(manifest: PluginManifest) -> list[Path]:
-    """Get scan paths from explicit manifest declarations.
-
-    Args:
-        manifest: Parsed plugin manifest with component lists
-
-    Returns:
-        List of paths to validate based on manifest declarations.
-    """
-    paths: list[Path] = []
-    root = manifest.path
-
-    for agent in manifest.agents:
-        agent_path = root / "agents" / f"{agent}.md"
-        if agent_path.exists():
-            paths.append(agent_path)
-
-    for command in manifest.commands:
-        command_path = root / "commands" / f"{command}.md"
-        if command_path.exists():
-            paths.append(command_path)
-
-    for skill in manifest.skills:
-        skill_path = root / "skills" / skill / "SKILL.md"
-        if skill_path.exists():
-            paths.append(skill_path)
-
-    for hook in manifest.hooks:
-        hook_path = root / "hooks" / f"{hook}.json"
-        if hook_path.exists():
-            paths.append(hook_path)
-
-    return paths
-
-
-def get_structure_discovery_paths(path: Path) -> list[Path]:
-    """Get scan paths for structure-based discovery.
-
-    Args:
-        path: Provider directory path (.claude, .agent, .agents, .gemini, .cursor)
-
-    Returns:
-        List of paths to validate based on directory structure.
-    """
-    patterns: tuple[str, ...]
-
-    if path.name == ".claude" or path.name == ".agent" or path.name == ".agents":
-        patterns = (
-            "**/*.md",
-            "**/hooks.json",
-        )
-    elif path.name == ".gemini":
-        patterns = (
-            "**/*.md",
-        )
-    elif path.name == ".cursor":
-        patterns = (
-            "**/*.md",
-            "**/*.yaml",
-            "**/*.yml",
-        )
-    else:
-        # Default for unknown provider directories
-        patterns = ("**/*.md",)
-
-    paths: list[Path] = []
-    for pattern in patterns:
-        paths.extend(sorted(path.glob(pattern)))
-
-    return paths
-
-
-def discover_validatable_paths(directory: Path) -> list[Path]:
+def _discover_validatable_paths(directory: Path) -> list[Path]:
     """Auto-discover validatable files in a bare directory.
 
     Globs ``DEFAULT_SCAN_PATTERNS`` against *directory* and returns
@@ -244,26 +67,19 @@ def discover_validatable_paths(directory: Path) -> list[Path]:
     return sorted(discovered)
 
 
-def resolve_filter_and_expand_paths(
-    paths: list[Path],
-    filter_glob: str | None,
-    filter_type: str | None,
+def _resolve_filter_and_expand_paths(
+    paths: list[Path], filter_glob: str | None, filter_type: str | None
 ) -> tuple[list[Path], bool]:
     """Resolve filter options and expand directory paths.
 
     Validates mutual exclusion of --filter and --filter-type, resolves
     filter_type to glob pattern, and expands directories.
 
-    Args:
-        paths: List of input paths to process.
-        filter_glob: Optional glob pattern from --filter option.
-        filter_type: Optional filter type from --filter-type option.
-
     Returns:
         Tuple of (expanded_paths, is_batch).
 
     Raises:
-        typer.Exit: On invalid filter options (exit code 2).
+        typer.Exit: On invalid filter options.
     """
     if filter_glob is not None and filter_type is not None:
         typer.echo("Error: --filter and --filter-type are mutually exclusive", err=True)
@@ -285,36 +101,82 @@ def resolve_filter_and_expand_paths(
             expanded_paths.extend(matched)
             is_batch = True
         elif resolved_glob is None and path.is_dir():
-            # Use discovery mode to determine scan targets
-            discovery_mode = detect_discovery_mode(path)
-
-            if discovery_mode == ScanDiscoveryMode.MANIFEST:
-                # Manifest-driven: use explicit component declarations
-                manifest = read_plugin_manifest(path)
-                if manifest:
-                    expanded_paths.extend(get_manifest_discovery_paths(manifest))
-                    is_batch = True
-
-            elif discovery_mode == ScanDiscoveryMode.AUTO:
-                # Auto-discovery: use DEFAULT_SCAN_PATTERNS
-                expanded_paths.extend(discover_validatable_paths(path))
+            if (path / ".claude-plugin/plugin.json").exists():
+                expanded_paths.append(path)
+                # Also validate SKILL.md files (InternalLinkValidator, etc.)
+                expanded_paths.extend(sorted(path.glob("**/skills/*/SKILL.md")))
+            else:
+                expanded_paths.extend(_discover_validatable_paths(path))
                 is_batch = True
-
-            elif discovery_mode == ScanDiscoveryMode.STRUCTURE:
-                # Structure-based: use provider directory patterns
-                expanded_paths.extend(get_structure_discovery_paths(path))
-                is_batch = True
-
         else:
             expanded_paths.append(path)
     return expanded_paths, is_batch
 
 
-def compute_summary(all_results: FileResults) -> tuple[int, int, int, int]:
-    """Compute validation summary statistics from file results.
+# ---------------------------------------------------------------------------
+# Ignore patterns
+# ---------------------------------------------------------------------------
+
+
+def _load_ignore_patterns() -> list[str]:
+    """Load glob patterns from .pluginvalidatorignore file.
+
+    Searches for the ignore file in the following order:
+    1. Current working directory (.pluginvalidatorignore)
+    2. .claude/.pluginvalidatorignore
+
+    Each line is a gitignore-style glob pattern. Lines starting with '#' are
+    comments, blank lines are ignored.
+
+    Returns:
+        List of glob patterns to match against file paths.
+    """
+    candidates = [Path.cwd() / ".pluginvalidatorignore", Path.cwd() / ".claude" / ".pluginvalidatorignore"]
+    for candidate in candidates:
+        if candidate.is_file():
+            lines = candidate.read_text(encoding="utf-8").splitlines()
+            return [line.strip() for line in lines if line.strip() and not line.strip().startswith("#")]
+    return []
+
+
+def _is_ignored(path: Path, patterns: list[str]) -> bool:
+    """Check whether a path matches any ignore pattern.
+
+    Patterns follow gitignore-style glob semantics:
+    - ``**/templates/*.md`` matches any ``templates`` directory at any depth
+    - ``plugins/foo/bar.md`` matches that exact relative path
+
+    The path is tested as a POSIX string (forward slashes) so patterns work
+    consistently across platforms.
 
     Args:
-        all_results: Mapping of file paths to validation results.
+        path: File path to check (absolute or relative).
+        patterns: Glob patterns loaded from .pluginvalidatorignore.
+
+    Returns:
+        True if the path matches any pattern and should be skipped.
+    """
+    path_str = path.as_posix()
+    for pattern in patterns:
+        if fnmatch.fnmatch(path_str, pattern):
+            return True
+        # Also match against just the relative-to-cwd representation
+        try:
+            rel = path.resolve().relative_to(Path.cwd().resolve()).as_posix()
+        except ValueError:
+            rel = path_str
+        if fnmatch.fnmatch(rel, pattern):
+            return True
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Summary computation
+# ---------------------------------------------------------------------------
+
+
+def _compute_summary(all_results: FileResults) -> tuple[int, int, int, int]:
+    """Compute validation summary statistics from file results.
 
     Returns:
         Tuple of (total_files, passed, failed, warnings).
@@ -330,85 +192,75 @@ def compute_summary(all_results: FileResults) -> tuple[int, int, int, int]:
     return total_files, passed, failed, warnings
 
 
-class ValidationLoopRunner(Protocol):
-    """Protocol for validation loop execution.
+# ---------------------------------------------------------------------------
+# Validation loop
+# ---------------------------------------------------------------------------
 
-    Allows different implementations to be injected for testing
-    or platform-specific behavior.
-    """
-
-    def run(
-        self,
-        expanded_paths: list[Path],
-        *,
-        check: bool,
-        fix: bool,
-        verbose: bool,
-        show_progress: bool,
-        show_summary: bool,
-    ) -> NoReturn:
-        """Execute validation loop and exit.
-
-        Args:
-            expanded_paths: Resolved file paths to validate.
-            check: Validate only, don't auto-fix.
-            fix: Auto-fix issues where possible.
-            verbose: Show detailed output.
-            show_progress: Show per-file status.
-            show_summary: Show summary panel.
-
-        Raises:
-            typer.Exit: Always exits with appropriate code.
-        """
-        ...
+# Callback type aliases for dependency injection from plugin_validator.
+# This avoids circular imports: plugin_validator imports scan_runtime,
+# and passes its own functions as callbacks when calling run_validation_loop.
+ValidateSinglePathFn = Callable[..., "FileResults"]
+ValidateFileFn = Callable[[Path, dict[str, object], str | None], list[dict]]
+ViolationsToResultFn = Callable[[list[dict]], Any]
 
 
 def run_validation_loop(
     *,
     expanded_paths: list[Path],
-    validate_single_path: Callable[[Path, bool, bool, bool], FileResults],
-    reporter: Reporter,
+    check: bool,
+    fix: bool,
     verbose: bool,
+    no_color: bool,
     show_progress: bool,
     show_summary: bool,
-    load_ignore_patterns: Callable[[], list[str]],
-    is_ignored: Callable[[Path, list[str]], bool],
+    platform_override: str | None,
+    validate_single_path: ValidateSinglePathFn,
+    validate_file: ValidateFileFn,
+    violations_to_result: ViolationsToResultFn,
+    adapters: dict[str, object],
 ) -> NoReturn:
     """Execute the validation loop, report results, and exit.
 
-    This is the core orchestration function that coordinates path iteration,
-    validation dispatch, and result reporting. It accepts its dependencies
-    as parameters to create a clean seam for testing and extension.
+    Dependencies from ``plugin_validator`` are injected as callbacks to
+    avoid circular imports at module level.
 
     Args:
         expanded_paths: Resolved file paths to validate.
-        validate_single_path: Function to validate a single path.
-        reporter: Reporter instance for output.
+        check: Validate only, don't auto-fix.
+        fix: Auto-fix issues where possible.
         verbose: Show detailed output.
+        no_color: Disable color output.
         show_progress: Show per-file status.
         show_summary: Show summary panel.
-        load_ignore_patterns: Function to load ignore patterns.
-        is_ignored: Function to check if a path is ignored.
+        platform_override: Restrict to this adapter ID.
+        validate_single_path: Callback to validate a single path.
+        validate_file: Callback to validate a file with platform adapters.
+        violations_to_result: Callback to convert violations to ValidationResult.
+        adapters: Platform adapter registry dict.
 
     Raises:
         typer.Exit: Always exits with appropriate code.
     """
-    ignore_patterns = load_ignore_patterns()
+    ignore_patterns = _load_ignore_patterns()
     all_results: FileResults = {}
-
     for path in expanded_paths:
-        if ignore_patterns and is_ignored(path, ignore_patterns):
+        if ignore_patterns and _is_ignored(path, ignore_patterns):
             continue
-        file_results = validate_single_path(path, check=True, fix=False, verbose=verbose)
-        for file_path, validator_results in file_results.items():
-            if file_path in all_results:
-                all_results[file_path].extend(validator_results)
-            else:
-                all_results[file_path] = list(validator_results)
+        if platform_override is not None:
+            violations = validate_file(path, adapters, platform_override)
+            all_results[path] = [("platform", violations_to_result(violations))]
+        else:
+            file_results = validate_single_path(path, check=check, fix=fix, verbose=verbose)
+            for file_path, validator_results in file_results.items():
+                if file_path in all_results:
+                    all_results[file_path].extend(validator_results)
+                else:
+                    all_results[file_path] = list(validator_results)
 
+    reporter: Reporter = CIReporter() if no_color else ConsoleReporter(no_color=no_color)
     reporter.report(all_results, verbose=verbose, show_progress=show_progress)
 
-    total_files, passed, failed, warnings = compute_summary(all_results)
+    total_files, passed, failed, warnings = _compute_summary(all_results)
     if show_summary:
         reporter.summarize(total_files, passed, failed, warnings)
 

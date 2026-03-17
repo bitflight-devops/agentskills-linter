@@ -54,22 +54,22 @@ This milestone is complete only when all are true:
 
 ## Slices
 
-- [x] **S01: Validator seam map and boundary extraction** `risk:high` `depends:[]`
+- [ ] **S01: Validator seam map and boundary extraction** `risk:high` `depends:[]`
   > After this: the repo has explicit internal validator boundaries and the monolith no longer owns every major responsibility by default.
 
-- [x] **S02: Constraint ownership routing cleanup** `risk:high` `depends:[S01]`
+- [ ] **S02: Constraint ownership routing cleanup** `risk:high` `depends:[S01]`
   > After this: schema-backed constraints, provider overlays, and lint rules follow a clear ownership model in code and tests.
 
-- [x] **S03: Scan target discovery contract** `risk:high` `depends:[S01]`
+- [ ] **S03: Scan target discovery contract** `risk:high` `depends:[S01]`
   > After this: directory scans correctly select files using manifest enumeration, documented auto-discovery, or provider-known structure depending on context.
 
-- [x] **S04: Official-repo hard-failure truth pass** `risk:high` `depends:[S02,S03]`
+- [ ] **S04: Official-repo hard-failure truth pass** `risk:high` `depends:[S02,S03]`
   > After this: disputed hard failures from official-repo scans are classified as justified constraint, provider-specific constraint, legacy rule, recommendation-only rule, or likely hallucinated rule with evidence.
 
-- [x] **S05: Maintainer extension-path documentation** `risk:medium` `depends:[S02,S03,S04]`
+- [ ] **S05: Maintainer extension-path documentation** `risk:medium` `depends:[S02,S03,S04]`
   > After this: maintainers have worked examples showing how to add a schema update, provider overlay, lint rule, and provenance metadata in the post-refactor structure.
 
-- [x] **S06: External scan proof and findings report** `risk:medium` `depends:[S04,S05]`
+- [ ] **S06: External scan proof and findings report** `risk:medium` `depends:[S04,S05]`
   > After this: real CLI scans against external repos act as regression proof for correct detection, and any remaining real official-repo failures are clearly reported for review.
 
 ## Boundary Map

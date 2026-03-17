@@ -10,12 +10,9 @@ Test IDs map to T02 requirements for traceability.
 
 from __future__ import annotations
 
-import json
 import pathlib
 import subprocess
 import sys
-
-import pytest
 
 from skilllint.adapters import load_adapters
 from skilllint.adapters.claude_code import ClaudeCodeAdapter
@@ -220,9 +217,7 @@ class TestConstraintScopeFiltering:
         """
         for adapter in load_adapters():
             scopes = adapter.constraint_scopes()
-            assert "shared" in scopes, (
-                f"Adapter {adapter.id()} missing 'shared' in constraint_scopes: {scopes}"
-            )
+            assert "shared" in scopes, f"Adapter {adapter.id()} missing 'shared' in constraint_scopes: {scopes}"
 
 
 # ---------------------------------------------------------------------------
@@ -243,23 +238,17 @@ class TestProviderAdapterAlignment:
         adapter_ids = {a.id() for a in load_adapters()}
 
         # All adapter IDs should be in provider IDs
-        assert adapter_ids.issubset(provider_ids), (
-            f"Adapter IDs {adapter_ids} not all in provider IDs {provider_ids}"
-        )
+        assert adapter_ids.issubset(provider_ids), f"Adapter IDs {adapter_ids} not all in provider IDs {provider_ids}"
 
         # Base schema directory should also be present
-        assert "agentskills_io" in provider_ids, (
-            f"Expected 'agentskills_io' in provider IDs, got: {provider_ids}"
-        )
+        assert "agentskills_io" in provider_ids, f"Expected 'agentskills_io' in provider IDs, got: {provider_ids}"
 
     def test_adapter_ids_match_schema_directories(self) -> None:
         """Each adapter ID should have a corresponding schema directory."""
         provider_ids = set(get_provider_ids())
 
         for adapter in load_adapters():
-            assert adapter.id() in provider_ids, (
-                f"Adapter {adapter.id()} has no corresponding schema directory"
-            )
+            assert adapter.id() in provider_ids, f"Adapter {adapter.id()} has no corresponding schema directory"
 
     def test_adapter_constraint_scopes_from_schema(self) -> None:
         """Adapter constraint_scopes() should reflect schema constraint_scope values."""
@@ -295,9 +284,18 @@ class TestCLIProviderIntegration:
     def test_cli_platform_claude_code_exits_success(self) -> None:
         """skilllint check --platform claude-code on valid fixtures exits 0."""
         result = subprocess.run(
-            [sys.executable, "-m", "skilllint.plugin_validator", "check", "--platform", "claude-code", str(CLAUDE_CODE_FIXTURES)],
+            [
+                sys.executable,
+                "-m",
+                "skilllint.plugin_validator",
+                "check",
+                "--platform",
+                "claude-code",
+                str(CLAUDE_CODE_FIXTURES),
+            ],
             capture_output=True,
             text=True,
+            check=False,
         )
 
         # Exit code 0 means validation passed (or only warnings/info)
@@ -311,6 +309,7 @@ class TestCLIProviderIntegration:
             [sys.executable, "-m", "skilllint.plugin_validator", "check", "--platform", "cursor", str(CURSOR_FIXTURES)],
             capture_output=True,
             text=True,
+            check=False,
         )
 
         assert result.returncode == 0, (
@@ -323,6 +322,7 @@ class TestCLIProviderIntegration:
             [sys.executable, "-m", "skilllint.plugin_validator", "check", "--platform", "codex", str(CODEX_FIXTURES)],
             capture_output=True,
             text=True,
+            check=False,
         )
 
         assert result.returncode == 0, (
@@ -332,9 +332,18 @@ class TestCLIProviderIntegration:
     def test_cli_platform_invalid_provider_exits_2(self) -> None:
         """skilllint check --platform invalid-provider exits with code 2."""
         result = subprocess.run(
-            [sys.executable, "-m", "skilllint.plugin_validator", "check", "--platform", "invalid-provider", str(CLAUDE_CODE_FIXTURES)],
+            [
+                sys.executable,
+                "-m",
+                "skilllint.plugin_validator",
+                "check",
+                "--platform",
+                "invalid-provider",
+                str(CLAUDE_CODE_FIXTURES),
+            ],
             capture_output=True,
             text=True,
+            check=False,
         )
 
         # Exit code 2 indicates usage error (unknown platform)
@@ -357,12 +366,14 @@ class TestCLIProviderIntegration:
             [sys.executable, "-m", "skilllint.plugin_validator", "check", "--platform", "claude-code", str(skill_file)],
             capture_output=True,
             text=True,
+            check=False,
         )
 
         result_cursor = subprocess.run(
             [sys.executable, "-m", "skilllint.plugin_validator", "check", "--platform", "cursor", str(skill_file)],
             capture_output=True,
             text=True,
+            check=False,
         )
 
         # Both should succeed (exit 0) for valid skill

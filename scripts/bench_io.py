@@ -136,7 +136,7 @@ def build_gh_benchmark_array(result: dict[str, float | int | str]) -> list[dict[
     min_ms = float(result[f"{mode}_min_ms"])
     mean_ms = float(result[f"{mode}_mean_ms"])
     max_ms = float(result[f"{mode}_max_ms"])
-    file_count = int(result["file_count"])  # type: ignore[arg-type]
+    file_count = int(result["file_count"])
     files_per_sec = file_count / (mean_ms / 1000.0) if mean_ms > 0 else 0.0
 
     fps_name = "files_per_second" if mode == "scan" else f"{mode}_files_per_second"
