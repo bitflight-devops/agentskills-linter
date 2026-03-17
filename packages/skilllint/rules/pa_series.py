@@ -22,8 +22,6 @@ from __future__ import annotations
 import json
 from typing import TYPE_CHECKING
 
-from ruamel.yaml import YAMLError
-
 from skilllint.frontmatter_core import extract_frontmatter
 from skilllint.rule_registry import skilllint_rule
 
@@ -271,48 +269,36 @@ def _try_parse_agent_yaml(fm_text: str, agent_md: Path, plugin_dir: Path, errors
         FM002,
         ErrorCode,
         ValidationIssue,
-        _fix_unquoted_colons,
-        _safe_load_yaml,
         generate_docs_url,
+        safe_load_yaml_with_colon_fix,
     )
 
-    try:
-        parsed = _safe_load_yaml(fm_text)
-    except YAMLError as exc:
-        # Attempt auto-fix for unquoted colons (AS004 pattern)
-        fixed_fm, colon_fixes, colon_fields = _fix_unquoted_colons(fm_text)
-        if colon_fixes:
-            try:
-                parsed = _safe_load_yaml(fixed_fm)
-            except YAMLError:
-                parsed = None
-            else:
-                rel = str(agent_md.relative_to(plugin_dir))
-                warnings.append(
-                    ValidationIssue(
-                        field="description",
-                        severity="warning",
-                        message=f"{rel}: Description contains unquoted colons that break YAML — quote the following fields: {', '.join(colon_fields)}",
-                        code=ErrorCode.AS004,
-                        docs_url="https://github.com/bitflight-devops/skilllint/blob/main/plugins/agentskills-skilllint/skills/skilllint/references/rule-catalog.md#as004",
-                    )
-                )
-                return parsed if isinstance(parsed, dict) else None
-        else:
-            parsed = None
+    parsed, yaml_err, colon_fields, _used_text = safe_load_yaml_with_colon_fix(fm_text)
 
-        if parsed is None:
-            rel = str(agent_md.relative_to(plugin_dir))
-            errors.append(
-                ValidationIssue(
-                    field="(yaml)",
-                    severity="error",
-                    message=f"{rel}: Invalid YAML frontmatter: {exc}",
-                    code=FM002,
-                    docs_url=generate_docs_url(FM002),
-                )
+    if colon_fields:
+        rel = str(agent_md.relative_to(plugin_dir))
+        warnings.append(
+            ValidationIssue(
+                field="description",
+                severity="warning",
+                message=f"{rel}: Description contains unquoted colons that break YAML — quote the following fields: {', '.join(colon_fields)}",
+                code=ErrorCode.AS004,
+                docs_url=generate_docs_url(ErrorCode.AS004),
             )
-            return None
+        )
+
+    if yaml_err is not None:
+        rel = str(agent_md.relative_to(plugin_dir))
+        errors.append(
+            ValidationIssue(
+                field="(yaml)",
+                severity="error",
+                message=f"{rel}: Invalid YAML frontmatter: {yaml_err}",
+                code=FM002,
+                docs_url=generate_docs_url(FM002),
+            )
+        )
+        return None
 
     return parsed if isinstance(parsed, dict) else None
 

@@ -54,7 +54,7 @@ from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
 from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
 from skilllint.adapters.claude_code import ClaudeCodeAdapter
-from skilllint.rules.as_series import _has_unquoted_colon, run_as_series
+from skilllint.rules.as_series import run_as_series
 from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
 from skilllint.version import __version__
 
@@ -184,6 +184,43 @@ def _fix_unquoted_colons(frontmatter_text: str) -> tuple[str, list[str], list[st
     if fixes:
         return "".join(new_lines), fixes, fixed_fields
     return frontmatter_text, [], []
+
+
+def safe_load_yaml_with_colon_fix(fm_text: str) -> tuple[dict | None, str | None, list[str], str]:
+    """Parse YAML frontmatter, attempting unquoted-colon auto-fix on failure.
+
+    Consolidates the try/except YAMLError -> _fix_unquoted_colons -> retry
+    pattern used in multiple call sites.
+
+    Args:
+        fm_text: Raw YAML frontmatter text (without ``---`` delimiters).
+
+    Returns:
+        Tuple of (parsed_dict, yaml_error_msg, colon_fixed_fields, used_text).
+        - parsed_dict: The parsed YAML dict, or None if parsing failed.
+        - yaml_error_msg: Error message string if YAML parsing failed
+          even after colon fix, or None on success.
+        - colon_fixed_fields: List of field names where unquoted colons
+          were detected and auto-fixed (empty if no fix was needed).
+        - used_text: The frontmatter text that was successfully parsed
+          (may be the colon-fixed version if auto-fix was applied).
+    """
+    try:
+        data = _safe_load_yaml(fm_text)
+    except YAMLError as exc:
+        fixed_fm, colon_fixes, colon_fields = _fix_unquoted_colons(fm_text)
+        if colon_fixes:
+            try:
+                data = _safe_load_yaml(fixed_fm)
+            except YAMLError:
+                pass
+            else:
+                parsed = dict(data) if isinstance(data, dict) else None
+                return parsed, None, colon_fields, fixed_fm
+        return None, str(exc), [], fm_text
+    else:
+        parsed = dict(data) if isinstance(data, dict) else None
+        return parsed, None, [], fm_text
 
 
 # Error code base URL for documentation links
@@ -2033,33 +2070,22 @@ def _validate_frontmatter_yaml(
             )
         )
 
-    try:
-        data = _safe_load_yaml(frontmatter_text)
-    except YAMLError as e:
-        fixed_fm, colon_fixes, colon_fields = _fix_unquoted_colons(frontmatter_text)
-        if colon_fixes:
-            try:
-                fixed_data = _safe_load_yaml(fixed_fm)
-            except YAMLError:
-                pass
-            else:
-                # AS004: Unquoted colons break YAML parsing, but auto-fixable.
-                # Emit warning and continue with fixed YAML (runtime accepts quoted values).
-                warnings.append(
-                    ValidationIssue(
-                        field="description",
-                        severity="error",
-                        message="Frontmatter contains unquoted colons that break YAML parsing",
-                        code=ErrorCode.FM009,
-                        docs_url="https://github.com/bitflight-devops/skilllint/blob/main/plugins/agentskills-skilllint/skills/skilllint/references/rule-catalog.md#as004",
-                        suggestion=f"Quote the following field values: {', '.join(colon_fields)}",
-                    )
-                )
-                # Continue validation with the fixed YAML data
-                if isinstance(fixed_data, dict):
-                    return fixed_data, None
-                # Fixed data is not a dict, fall through to error below
+    data, yaml_err, colon_fields, _used_text = safe_load_yaml_with_colon_fix(frontmatter_text)
+    if colon_fields:
+        # AS004: Unquoted colons break YAML parsing, but auto-fixable.
+        # Emit warning and continue with fixed YAML (runtime accepts quoted values).
+        warnings.append(
+            ValidationIssue(
+                field="description",
+                severity="warning",
+                message="Frontmatter contains unquoted colons that break YAML parsing",
+                code=ErrorCode.AS004,
+                docs_url=generate_docs_url(ErrorCode.AS004),
+                suggestion=f"Quote the following field values: {', '.join(colon_fields)}",
+            )
+        )
 
+    if yaml_err is not None:
         result = _validation_result_with_error(
             errors=errors,
             warnings=warnings,
@@ -2067,7 +2093,7 @@ def _validate_frontmatter_yaml(
             issue=ValidationIssue(
                 field="(yaml)",
                 severity="error",
-                message=f"Invalid YAML syntax: {e}",
+                message=f"Invalid YAML syntax: {yaml_err}",
                 code=FM002,
                 docs_url=generate_docs_url(FM002),
             ),
@@ -2219,24 +2245,8 @@ class FrontmatterValidator:
                         suggestion=f"Front-load critical information in first {RECOMMENDED_DESCRIPTION_LENGTH} characters. Run /plugin-creator:write-frontmatter-description to generate an optimized description",
                     )
                 )
-            # AS004: Unquoted colons in description — auto-fixable style warning.
-            # Colons in description values can break naive YAML parsers even when
-            # ruamel.yaml handles them. Quoting the value makes it universally safe.
-            if (
-                hasattr(validated, "description")
-                and validated.description
-                and _has_unquoted_colon(validated.description)
-            ):
-                warnings.append(
-                    ValidationIssue(
-                        field="description",
-                        severity="warning",
-                        message="description contains unquoted colons — quote the value for portable YAML",
-                        code=ErrorCode.AS004,
-                        docs_url="https://github.com/bitflight-devops/skilllint/blob/main/plugins/agentskills-skilllint/skills/skilllint/references/rule-catalog.md#as004",
-                        suggestion='Wrap description in quotes: description: "..."',
-                    )
-                )
+            # AS004 check removed — AS-series rules in as_series.py handle
+            # unquoted colon detection; emitting here would cause duplicates.
         except ValidationError as e:
             for err in e.errors():
                 issue = _pydantic_error_to_validation_issue(err)
@@ -2344,22 +2354,12 @@ class FrontmatterValidator:
             Tuple of (frontmatter_text, parsed_data, colon_fix_descriptions).
             parsed_data is None if parse failed even after colon fix.
         """
-        colon_fixes: list[str] = []
-        try:
-            original_data = _safe_load_yaml(frontmatter_text)
-        except YAMLError:
-            fixed_fm, colon_fixes, colon_fields = _fix_unquoted_colons(frontmatter_text)
-            if colon_fixes:
-                self._queue_fm009_info(colon_fields)
-                try:
-                    original_data = _safe_load_yaml(fixed_fm)
-                except YAMLError:
-                    pass
-                else:
-                    return (fixed_fm, cast("dict[str, YamlValue]", original_data), colon_fixes)
-            return frontmatter_text, None, colon_fixes
-        else:
-            return (frontmatter_text, cast("dict[str, YamlValue]", original_data), colon_fixes)
+        parsed, _yaml_err, colon_fields, used_text = safe_load_yaml_with_colon_fix(frontmatter_text)
+        if colon_fields:
+            self._queue_fm009_info(colon_fields)
+        # Build colon_fixes list (one description per fixed field) to match caller expectations
+        colon_fixes = ["Quoted description value containing unquoted colon"] * len(colon_fields)
+        return (used_text, cast("dict[str, YamlValue]", parsed), colon_fixes)
 
     def _normalize_tool_fields_and_detect_changes(
         self,
@@ -4743,25 +4743,10 @@ def parse_skill_md(path: Path) -> tuple[dict, list[str], str | None, list[str]]:
     fm_text, _start, end_line = extract_frontmatter(content)
     if fm_text is None:
         return {}, content.splitlines(), None, []
-    try:
-        parsed = _safe_load_yaml(fm_text)
-    except YAMLError as exc:
-        # Attempt auto-fix for unquoted colons (AS004 pattern)
-        fixed_fm, colon_fixes, colon_fields = _fix_unquoted_colons(fm_text)
-        if colon_fixes:
-            try:
-                parsed = _safe_load_yaml(fixed_fm)
-            except YAMLError:
-                pass
-            else:
-                # Colon fix succeeded — return fixed data with field list
-                frontmatter_dict = dict(parsed) if isinstance(parsed, dict) else {}
-                return frontmatter_dict, content.splitlines()[end_line:], None, colon_fields
-        # Unrecoverable YAML error
-        return {}, content.splitlines()[end_line:], str(exc), []
-    frontmatter_dict: dict = dict(parsed) if isinstance(parsed, dict) else {}
+    parsed, yaml_err, colon_fields, _used_text = safe_load_yaml_with_colon_fix(fm_text)
+    frontmatter_dict: dict = parsed if parsed is not None else {}
     body_lines = content.splitlines()[end_line:]
-    return frontmatter_dict, body_lines, None, []
+    return frontmatter_dict, body_lines, yaml_err, colon_fields
 
 
 def run_platform_checks(path: Path, adapter: PlatformAdapter) -> list[dict]:
