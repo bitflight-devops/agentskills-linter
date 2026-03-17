@@ -10,7 +10,6 @@
 
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OFFICIAL_REPO="/home/ubuntulinuxqa2/repos/claude-plugins-official"
 SKILLS_REPO="/home/ubuntulinuxqa2/repos/skills"
 PLUGINS_REPO="/home/ubuntulinuxqa2/repos/claude-code-plugins"
@@ -23,7 +22,7 @@ echo ""
 # Scan claude-plugins-official — expect exit code 1
 echo "Scanning claude-plugins-official..."
 set +e
-uv run python -m skilllint.plugin_validator check "$OFFICIAL_REPO" > /dev/null 2>&1
+uv run python -m skilllint.plugin_validator check "$OFFICIAL_REPO" >/dev/null 2>&1
 official_exit=$?
 set -e
 echo "  Exit code: $official_exit (expected: 1)"
@@ -38,7 +37,7 @@ echo ""
 # Scan skills — expect exit code 1
 echo "Scanning skills..."
 set +e
-uv run python -m skilllint.plugin_validator check "$SKILLS_REPO" > /dev/null 2>&1
+uv run python -m skilllint.plugin_validator check "$SKILLS_REPO" >/dev/null 2>&1
 skills_exit=$?
 set -e
 echo "  Exit code: $skills_exit (expected: 1)"
@@ -53,7 +52,7 @@ echo ""
 # Scan claude-code-plugins — expect exit code 0
 echo "Scanning claude-code-plugins..."
 set +e
-uv run python -m skilllint.plugin_validator check "$PLUGINS_REPO" > /dev/null 2>&1
+uv run python -m skilllint.plugin_validator check "$PLUGINS_REPO" >/dev/null 2>&1
 plugins_exit=$?
 set -e
 echo "  Exit code: $plugins_exit (expected: 0)"

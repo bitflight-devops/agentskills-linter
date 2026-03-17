@@ -71,6 +71,8 @@ from .frontmatter_core import (
 from .scan_runtime import _resolve_filter_and_expand_paths, run_validation_loop
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from pydantic_core import ErrorDetails
 
 # Module-level ruamel.yaml safe-mode instance (replaces yaml.safe_load)
@@ -501,7 +503,9 @@ def get_validator_constraint_scopes(class_name: str) -> set[str]:
     return VALIDATOR_CONSTRAINT_SCOPES.get(class_name, {"shared", "provider_specific"})
 
 
-def filter_validators_by_constraint_scopes(validators: list[Validator], constraint_scopes: set[str]) -> list[Validator]:
+def filter_validators_by_constraint_scopes(
+    validators: Sequence[Validator], constraint_scopes: set[str]
+) -> list[Validator]:
     """Filter validators based on provider constraint scopes.
 
     Validators are included if their applicable constraint scopes intersect
