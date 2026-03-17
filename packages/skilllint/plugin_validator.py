@@ -50,7 +50,6 @@ from git import Repo
 from git.exc import InvalidGitRepositoryError, NoSuchPathError
 from git.index.fun import entry_key
 from pydantic import ValidationError
-from rich.console import Console
 from ruamel.yaml import YAML, YAMLError
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 

@@ -17,14 +17,8 @@ import contextlib
 from io import StringIO
 from pathlib import Path
 
-from skilllint.plugin_validator import (
-    CIReporter,
-    ConsoleReporter,
-    ErrorCode,
-    SummaryReporter,
-    ValidationIssue,
-    ValidationResult,
-)
+from skilllint.reporting import CIReporter, ConsoleReporter, SummaryReporter
+from skilllint.plugin_validator import ErrorCode, ValidationIssue, ValidationResult
 
 
 def _make_passing_result() -> ValidationResult:

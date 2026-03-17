@@ -222,9 +222,7 @@ class TestCleanAgent:
         Why: Agents without prohibited fields should pass validation
         """
         plugin_dir = _make_plugin(tmp_path)
-        _add_agent_with_frontmatter(
-            plugin_dir, "my-agent", {"name": "my-agent", "description": "A well-behaved agent"}
-        )
+        _add_agent_with_frontmatter(plugin_dir, "my-agent", {"name": "my-agent", "description": "A well-behaved agent"})
 
         validator = PluginAgentFrontmatterValidator()
         result = validator.validate(plugin_dir)
