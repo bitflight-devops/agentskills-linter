@@ -50,9 +50,7 @@ from git import Repo
 from git.exc import InvalidGitRepositoryError, NoSuchPathError
 from git.index.fun import entry_key
 from pydantic import ValidationError
-from rich.console import Console, ConsoleRenderable, RichCast
-from rich.measure import Measurement
-from rich.panel import Panel
+from rich.console import Console
 from ruamel.yaml import YAML, YAMLError
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
@@ -72,6 +70,7 @@ from .frontmatter_core import (
     fix_skill_name_field,
     get_frontmatter_model,
 )
+from .reporting import CIReporter, ConsoleReporter, Reporter
 
 if TYPE_CHECKING:
     from pydantic_core import ErrorDetails
@@ -298,6 +297,9 @@ class ErrorCode(StrEnum):
     PR004 = "PR004"  # Plugin metadata repository URL mismatches git remote URL
     PR005 = "PR005"  # Registered command path is a skill directory (contains SKILL.md)
 
+    # Plugin Agent Frontmatter (PA001)
+    PA001 = "PA001"  # Plugin agent uses prohibited frontmatter field (hooks, mcpServers, permissionMode)
+
 
 # Aliases for backward compatibility and concise usage
 FM001, FM002, FM003, FM004, FM005, FM006, FM007, FM008, FM009, FM010 = (
@@ -349,6 +351,7 @@ PR001, PR002, PR003, PR004, PR005 = (
     ErrorCode.PR004,
     ErrorCode.PR005,
 )
+PA001 = ErrorCode.PA001
 
 # ============================================================================
 # VALIDATOR OWNERSHIP (Architecture lines 352a-352j)
@@ -3516,6 +3519,113 @@ class PluginRegistrationValidator:
 
 
 # ============================================================================
+# PLUGIN AGENT FRONTMATTER VALIDATOR
+# ============================================================================
+
+# Prohibited frontmatter fields for plugin agents.
+# Source: https://docs.anthropic.com/en/docs/claude-code/sub-agents
+# "For security reasons, plugin subagents do not support the `hooks`,
+# `mcpServers`, or `permissionMode` frontmatter fields."
+_PROHIBITED_AGENT_FIELDS: dict[str, str] = {
+    "hooks": "Plugin agents cannot define hooks in frontmatter — move to `hooks/hooks.json` at plugin root",
+    "mcpServers": "Plugin agents cannot define mcpServers in frontmatter — move to `.mcp.json` at plugin root",
+    "permissionMode": "Plugin agents cannot use permissionMode — copy agent to `.claude/agents/` if needed",
+}
+
+
+class PluginAgentFrontmatterValidator:
+    """Validates that plugin agent frontmatter does not contain prohibited fields.
+
+    Plugin subagents cannot use ``hooks``, ``mcpServers``, or ``permissionMode``
+    in their YAML frontmatter.  These fields are silently ignored by Claude Code
+    at runtime, so their presence is almost certainly a mistake.
+
+    Source: https://docs.anthropic.com/en/docs/claude-code/sub-agents
+    """
+
+    def validate(self, path: Path) -> ValidationResult:
+        """Validate plugin agent .md files for prohibited frontmatter fields.
+
+        Args:
+            path: Path to plugin directory (must contain .claude-plugin/plugin.json).
+
+        Returns:
+            ValidationResult with errors for each prohibited field found.
+        """
+        errors: list[ValidationIssue] = []
+        warnings: list[ValidationIssue] = []
+        info: list[ValidationIssue] = []
+
+        plugin_dir = self._find_plugin_dir(path)
+        if plugin_dir is None:
+            return ValidationResult(passed=True, errors=errors, warnings=warnings, info=info)
+
+        agents_dir = plugin_dir / "agents"
+        if not agents_dir.is_dir():
+            return ValidationResult(passed=True, errors=errors, warnings=warnings, info=info)
+
+        for agent_md in sorted(agents_dir.glob("*.md")):
+            content = agent_md.read_text(encoding="utf-8")
+            fm_text, _start, _end = extract_frontmatter(content)
+            if fm_text is None:
+                continue
+
+            parsed = _safe_load_yaml(fm_text)
+            if not isinstance(parsed, dict):
+                continue
+
+            for field, guidance in _PROHIBITED_AGENT_FIELDS.items():
+                if field in parsed:
+                    rel_path = agent_md.relative_to(plugin_dir)
+                    errors.append(
+                        ValidationIssue(
+                            field=str(rel_path),
+                            severity="error",
+                            message=f"Prohibited frontmatter field `{field}` in plugin agent",
+                            code=PA001,
+                            suggestion=guidance,
+                            docs_url=generate_docs_url(PA001),
+                        )
+                    )
+
+        return ValidationResult(passed=len(errors) == 0, errors=errors, warnings=warnings, info=info)
+
+    def can_fix(self) -> bool:
+        """Whether this validator supports auto-fixing.
+
+        Returns:
+            False — prohibited field removal requires manual review.
+        """
+        return False
+
+    def fix(self, path: Path) -> list[str]:
+        """Auto-fix is not supported for prohibited frontmatter fields.
+
+        Args:
+            path: Path to plugin directory.
+
+        Raises:
+            NotImplementedError: Always raised; manual review required.
+        """
+        raise NotImplementedError("Plugin agent prohibited frontmatter fields require manual fixes.")
+
+    def _find_plugin_dir(self, path: Path) -> Path | None:
+        """Find the plugin directory containing .claude-plugin/plugin.json.
+
+        Args:
+            path: Path to start searching from.
+
+        Returns:
+            Plugin directory path, or None if not found.
+        """
+        search_path = path.parent if path.is_file() else path
+        for parent in [search_path, *search_path.parents]:
+            if (parent / ".claude-plugin" / "plugin.json").exists():
+                return parent
+        return None
+
+
+# ============================================================================
 # PLUGIN STRUCTURE VALIDATOR (CLAUDE CLI INTEGRATION)
 # ============================================================================
 
@@ -4409,364 +4519,6 @@ def get_staged_files() -> list[Path]:
 # ============================================================================
 
 
-class Reporter(Protocol):
-    """Protocol for result reporters.
-
-    Defines interface for formatting and displaying validation results to users.
-    Different implementations support various output formats (Rich terminal,
-    plain text for CI, summary).
-    """
-
-    def report(self, file_results: FileResults, verbose: bool = False, *, show_progress: bool = False) -> None:
-        """Display validation results grouped by file.
-
-        Args:
-            file_results: Mapping of file paths to lists of (validator_name,
-                ValidationResult) tuples from validation
-            verbose: Whether to show additional detail like info messages
-            show_progress: Whether to show per-file PASSED status for clean files
-        """
-        ...
-
-    def summarize(self, total_files: int, passed: int, failed: int, warnings: int) -> None:
-        """Display summary statistics.
-
-        Args:
-            total_files: Total number of unique files validated
-            passed: Number of files where all validators passed
-            failed: Number of files where any validator failed
-            warnings: Number of files with warnings (all passed but with issues)
-        """
-        ...
-
-
-# ============================================================================
-# CONSOLE REPORTER (Rich-based)
-# ============================================================================
-
-
-class ConsoleReporter:
-    """Rich-based terminal reporter with colored output.
-
-    Uses Rich library for formatted terminal output with colors, tables, and
-    styled text. Implements Rich table best practices from python3-development
-    skill for proper width handling and no-wrap display.
-
-    Architecture lines 239-252
-    """
-
-    def __init__(self, console: Console | None = None, *, no_color: bool = False) -> None:
-        """Initialize console reporter.
-
-        Args:
-            console: Optional pre-built Rich Console instance. When provided,
-                the ``no_color`` parameter is ignored because color behaviour is
-                determined by the supplied console.
-            no_color: Disable color output for non-TTY environments. Only used
-                when ``console`` is not provided.
-        """
-        if console is not None:
-            self.console = console
-        else:
-            self.console = Console(force_terminal=not no_color, no_color=no_color)
-        self.no_color = no_color
-
-    @staticmethod
-    def _get_rendered_width(renderable: ConsoleRenderable | RichCast | str) -> int:
-        """Get actual rendered width of any Rich renderable.
-
-        Uses a temporary wide console to measure the natural width of a
-        renderable without any wrapping constraints. Handles color codes,
-        Unicode, styling, padding, and borders.
-
-        Args:
-            renderable: Any Rich renderable (Panel, Table, Text, etc.)
-
-        Returns:
-            The maximum rendered width in characters.
-        """
-        temp_console = Console(width=999999)
-        measurement = Measurement.get(temp_console, temp_console.options, renderable)
-        return int(measurement.maximum)
-
-    def _print_issue(self, issue: ValidationIssue) -> None:
-        """Print a single validation issue with Rich formatting.
-
-        Args:
-            issue: The validation issue to display
-        """
-        severity_icons = {"error": ":cross_mark:", "warning": ":warning:", "info": ":information:"}
-        severity_colors = {"error": "red", "warning": "yellow", "info": "blue"}
-
-        icon = severity_icons.get(issue.severity, "")
-        color = severity_colors.get(issue.severity, "white")
-        location = f":{issue.line}" if issue.line else ""
-
-        # Main message line -- may contain long paths or messages
-        self.console.print(
-            f"    {icon} [{color}][{issue.code}][/{color}] {issue.field}{location}: {issue.message}",
-            crop=False,
-            overflow="ignore",
-        )
-
-        # Suggestion line -- may contain long commands or paths
-        if issue.suggestion:
-            self.console.print(f"      [dim]→[/dim] {issue.suggestion}", crop=False, overflow="ignore")
-
-        # Docs URL line -- must never wrap
-        if issue.docs_url:
-            self.console.print(f"      [dim]→[/dim] [link]{issue.docs_url}[/link]", crop=False, overflow="ignore")
-
-    def report(self, file_results: FileResults, verbose: bool = False, *, show_progress: bool = False) -> None:
-        """Display validation results with Rich formatting, grouped by file.
-
-        Args:
-            file_results: Mapping of file paths to lists of (validator_name,
-                ValidationResult) tuples from validation
-            verbose: Whether to show info messages in addition to errors/warnings
-            show_progress: Whether to show per-file PASSED status for clean files
-        """
-        for file_path, validator_results in file_results.items():
-            # Determine overall file status
-            all_passed = all(r.passed for _, r in validator_results)
-            any_issues = False
-
-            for _vname, result in validator_results:
-                issues_to_show = [*result.errors, *result.warnings]
-                if verbose:
-                    issues_to_show.extend(result.info)
-                if issues_to_show:
-                    any_issues = True
-
-            if all_passed and not any_issues:
-                # File passed all validators with no issues
-                if show_progress:
-                    self.console.print(
-                        f":white_check_mark: [green]{file_path}[/green] - PASSED", crop=False, overflow="ignore"
-                    )
-                continue
-
-            # File has issues - show file header once, then per-validator results
-            # File paths may be long -- prevent wrapping
-            self.console.print(f"\n[bold]{file_path}[/bold]", crop=False, overflow="ignore")
-
-            for validator_name, result in validator_results:
-                issues_to_show = [*result.errors, *result.warnings]
-                if verbose:
-                    issues_to_show.extend(result.info)
-
-                if not issues_to_show:
-                    # This validator passed — only show if progress requested
-                    if show_progress:
-                        self.console.print(
-                            f"  :white_check_mark: [dim]{validator_name}:[/dim] PASSED", crop=False, overflow="ignore"
-                        )
-                    continue
-
-                # Show validator name as sub-header
-                status_icon = ":cross_mark:" if not result.passed else ":warning:"
-                self.console.print(f"  {status_icon} [dim]{validator_name}:[/dim]", crop=False, overflow="ignore")
-
-                for issue in issues_to_show:
-                    self._print_issue(issue)
-
-    def summarize(self, total_files: int, passed: int, failed: int, warnings: int) -> None:
-        """Display summary statistics with Rich formatting.
-
-        Args:
-            total_files: Total number of unique files validated
-            passed: Number of files where all validators passed
-            failed: Number of files where any validator failed
-            warnings: Number of files with warnings (all passed but with issues)
-        """
-        # Determine overall status
-        if failed == 0:
-            status_icon = ":white_check_mark:"
-            status_text = "PASSED"
-            status_color = "green"
-        else:
-            status_icon = ":cross_mark:"
-            status_text = "FAILED"
-            status_color = "red"
-
-        # Build summary text
-        summary_lines = [
-            f"{status_icon} [bold {status_color}]{status_text}[/bold {status_color}]",
-            "",
-            f"Total files: {total_files}",
-            f"[green]Passed: {passed}[/green]",
-            f"[red]Failed: {failed}[/red]",
-        ]
-
-        if warnings > 0:
-            summary_lines.append(f"[yellow]Warnings: {warnings}[/yellow]")
-
-        summary = "\n".join(summary_lines)
-
-        # Display in panel -- set console width to panel's natural width
-        # to prevent Panel from wrapping at 80 chars in non-TTY environments
-        panel = Panel(summary, title="Validation Summary", border_style=status_color, expand=False)
-        panel_width = self._get_rendered_width(panel)
-        self.console.width = panel_width
-        self.console.print(panel, crop=False, overflow="ignore", no_wrap=True, soft_wrap=True)
-
-
-# ============================================================================
-# CI REPORTER (Plain text)
-# ============================================================================
-
-
-class CIReporter:
-    """Plain text reporter for CI environments.
-
-    Outputs validation results without ANSI color codes or Rich formatting.
-    Uses standard file:line:code:message format for compatibility with CI
-    tools and log parsers.
-
-    Architecture lines 239-252
-    """
-
-    @staticmethod
-    def _print_issue(issue: ValidationIssue) -> None:
-        """Print a single validation issue in plain text.
-
-        Args:
-            issue: The validation issue to display
-        """
-        severity_prefixes = {"error": "✗ ERROR", "warning": "⚠ WARN", "info": "i INFO"}
-        prefix = severity_prefixes.get(issue.severity, "")
-        location = f":{issue.line}" if issue.line else ""
-
-        # Main message line
-        print(f"    {prefix} [{issue.code}] {issue.field}{location}: {issue.message}")
-
-        # Suggestion line (if present)
-        if issue.suggestion:
-            print(f"      → {issue.suggestion}")
-
-        # Docs URL line (if present)
-        if issue.docs_url:
-            print(f"      → {issue.docs_url}")
-
-    def report(self, file_results: FileResults, verbose: bool = False, *, show_progress: bool = False) -> None:
-        """Display validation results in plain text, grouped by file.
-
-        Args:
-            file_results: Mapping of file paths to lists of (validator_name,
-                ValidationResult) tuples from validation
-            verbose: Whether to show info messages in addition to errors/warnings
-            show_progress: Whether to show per-file PASSED status for clean files
-        """
-        for file_path, validator_results in file_results.items():
-            # Determine overall file status
-            all_passed = all(r.passed for _, r in validator_results)
-            any_issues = False
-
-            for _vname, result in validator_results:
-                issues_to_show = [*result.errors, *result.warnings]
-                if verbose:
-                    issues_to_show.extend(result.info)
-                if issues_to_show:
-                    any_issues = True
-
-            if all_passed and not any_issues:
-                # File passed all validators with no issues
-                if show_progress:
-                    print(f"✓ {file_path} - PASSED")
-                continue
-
-            # File has issues - show file header once, then per-validator results
-            print(f"\n{file_path}")
-
-            for validator_name, result in validator_results:
-                issues_to_show = [*result.errors, *result.warnings]
-                if verbose:
-                    issues_to_show.extend(result.info)
-
-                if not issues_to_show:
-                    if show_progress:
-                        print(f"  ✓ {validator_name}: PASSED")
-                    continue
-
-                # Show validator name as sub-header
-                status_icon = "✗" if not result.passed else "⚠"
-                print(f"  {status_icon} {validator_name}:")
-
-                for issue in issues_to_show:
-                    self._print_issue(issue)
-
-    def summarize(self, total_files: int, passed: int, failed: int, warnings: int) -> None:
-        """Display summary statistics in plain text.
-
-        Args:
-            total_files: Total number of files validated
-            passed: Number of files that passed validation
-            failed: Number of files that failed validation
-            warnings: Number of files with warnings (passed but with issues)
-        """
-        # Determine overall status
-        status = "✓ PASSED" if failed == 0 else "✗ FAILED"
-
-        # Display summary
-        print("\n" + "=" * 60)
-        print(f"{status}")
-        print(f"Total files: {total_files}")
-        print(f"Passed: {passed}")
-        print(f"Failed: {failed}")
-        if warnings > 0:
-            print(f"Warnings: {warnings}")
-        print("=" * 60)
-
-
-# ============================================================================
-# SUMMARY REPORTER (One-line status)
-# ============================================================================
-
-
-class SummaryReporter:
-    """Single-line summary reporter for quick status checks.
-
-    Outputs minimal validation summary in a single line format. Useful for
-    scripts, pre-commit hooks, or quick status checks.
-
-    Architecture lines 239-252
-    """
-
-    def report(self, file_results: FileResults, verbose: bool = False, *, show_progress: bool = False) -> None:
-        """Display nothing (summary-only reporter).
-
-        Args:
-            file_results: Mapping of file paths to lists of (validator_name,
-                ValidationResult) tuples (ignored for summary reporter)
-            verbose: Whether to show info messages (ignored for summary reporter)
-            show_progress: Whether to show per-file PASSED status (ignored)
-        """
-        # Summary reporter only shows final summary, not per-file results
-
-    def summarize(self, total_files: int, passed: int, failed: int, warnings: int) -> None:
-        """Display single-line summary.
-
-        Args:
-            total_files: Total number of files validated
-            passed: Number of files that passed validation
-            failed: Number of files that failed validation
-            warnings: Number of files with warnings (passed but with issues)
-        """
-        # Determine overall status
-        if failed == 0:
-            status_icon = "✓"
-            status = f"{passed}/{total_files} files passed"
-        else:
-            status_icon = "✗"
-            status = f"{failed}/{total_files} files failed"
-
-        # Add warnings if present
-        if warnings > 0:
-            status += f" ({warnings} with warnings)"
-
-        print(f"{status_icon} {status}")
-
-
 # ============================================================================
 # IGNORE PATTERN SUPPORT
 # ============================================================================
@@ -5195,12 +4947,7 @@ def validate_file(path: Path, adapters: dict, platform_override: str | None = No
     # Validators are filtered by constraint_scopes to support provider-specific rules.
     primary_adapter = matching[0]
     constraint_scopes = primary_adapter.constraint_scopes()
-    _logger.debug(
-        "Validating %s with adapter %s, constraint_scopes=%s",
-        path,
-        primary_adapter.id(),
-        constraint_scopes,
-    )
+    _logger.debug("Validating %s with adapter %s, constraint_scopes=%s", path, primary_adapter.id(), constraint_scopes)
 
     # Filter validators based on provider constraint scopes
     sk_validators = _get_validators_for_path(path)
