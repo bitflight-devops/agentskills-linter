@@ -59,3 +59,9 @@ walkthrough/
 .gsd/completed-units.json
 *.pyc
 __pycache__
+
+# ── GSD baseline (auto-generated) ──
+.gsd/gsd.db
+.gsd/DISCUSSION-MANIFEST.json
+.gsd/milestones/**/*-CONTINUE.md
+.gsd/milestones/**/continue.md

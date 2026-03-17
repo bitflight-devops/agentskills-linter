@@ -88,8 +88,8 @@ Guidelines:
 - Source: user
 - Primary owning slice: M002/S04
 - Supporting slices: M002/S06
-- Validation: mapped
-- Notes: Remaining hard failures may still be real findings and should stay visible.
+- Validation: validated
+- Notes: FM004/FM007/AS004 downgraded to warnings; remaining hard failures (FM003/FM005) are genuine schema violations documented in S04-FINDINGS.md.
 
 ### R019 — Provide evidence-driven rule-truth evaluation for disputed constraints
 - Class: failure-visibility
@@ -99,8 +99,8 @@ Guidelines:
 - Source: user
 - Primary owning slice: M002/S04
 - Supporting slices: M002/S05, M002/S06
-- Validation: mapped
-- Notes: Claude CLI probes are part of the evidence set, not the sole authority.
+- Validation: validated
+- Notes: Classification documented in plugin_validator.py code comments and S04-FINDINGS.md with runtime evidence.
 
 ### R020 — Document how to add a schema update
 - Class: admin/support
@@ -261,8 +261,8 @@ Guidelines:
 | R015 | integration | active | M002/S03 | M002/S04, M002/S06 | mapped |
 | R016 | integration | active | M002/S03 | M002/S04, M002/S06 | mapped |
 | R017 | integration | active | M002/S03 | M002/S04, M002/S06 | mapped |
-| R018 | launchability | active | M002/S04 | M002/S06 | mapped |
-| R019 | failure-visibility | active | M002/S04 | M002/S05, M002/S06 | mapped |
+| R018 | launchability | active | M002/S04 | M002/S06 | validated |
+| R019 | failure-visibility | active | M002/S04 | M002/S05, M002/S06 | validated |
 | R020 | admin/support | active | M002/S05 | none | mapped |
 | R021 | admin/support | active | M002/S05 | none | mapped |
 | R022 | admin/support | active | M002/S05 | none | mapped |
