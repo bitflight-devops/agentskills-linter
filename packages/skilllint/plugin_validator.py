@@ -3513,108 +3513,9 @@ class PluginRegistrationValidator:
 # ============================================================================
 # PLUGIN AGENT FRONTMATTER VALIDATOR
 # ============================================================================
-
-# Prohibited frontmatter fields for plugin agents.
-# Source: https://docs.anthropic.com/en/docs/claude-code/sub-agents
-# "For security reasons, plugin subagents do not support the `hooks`,
-# `mcpServers`, or `permissionMode` frontmatter fields."
-_PROHIBITED_AGENT_FIELDS: dict[str, str] = {
-    "hooks": "Plugin agents cannot define hooks in frontmatter — move to `hooks/hooks.json` at plugin root",
-    "mcpServers": "Plugin agents cannot define mcpServers in frontmatter — move to `.mcp.json` at plugin root",
-    "permissionMode": "Plugin agents cannot use permissionMode — copy agent to `.claude/agents/` if needed",
-}
-
-
-class PluginAgentFrontmatterValidator:
-    """Validates that plugin agent frontmatter does not contain prohibited fields.
-
-    Plugin subagents cannot use ``hooks``, ``mcpServers``, or ``permissionMode``
-    in their YAML frontmatter.  These fields are silently ignored by Claude Code
-    at runtime, so their presence is almost certainly a mistake.
-
-    Source: https://docs.anthropic.com/en/docs/claude-code/sub-agents
-    """
-
-    def validate(self, path: Path) -> ValidationResult:
-        """Validate plugin agent .md files for prohibited frontmatter fields.
-
-        Args:
-            path: Path to plugin directory (must contain .claude-plugin/plugin.json).
-
-        Returns:
-            ValidationResult with errors for each prohibited field found.
-        """
-        errors: list[ValidationIssue] = []
-        warnings: list[ValidationIssue] = []
-        info: list[ValidationIssue] = []
-
-        plugin_dir = self._find_plugin_dir(path)
-        if plugin_dir is None:
-            return ValidationResult(passed=True, errors=errors, warnings=warnings, info=info)
-
-        agents_dir = plugin_dir / "agents"
-        if not agents_dir.is_dir():
-            return ValidationResult(passed=True, errors=errors, warnings=warnings, info=info)
-
-        for agent_md in sorted(agents_dir.glob("*.md")):
-            content = agent_md.read_text(encoding="utf-8")
-            fm_text, _start, _end = extract_frontmatter(content)
-            if fm_text is None:
-                continue
-
-            parsed = _safe_load_yaml(fm_text)
-            if not isinstance(parsed, dict):
-                continue
-
-            for field, guidance in _PROHIBITED_AGENT_FIELDS.items():
-                if field in parsed:
-                    rel_path = agent_md.relative_to(plugin_dir)
-                    errors.append(
-                        ValidationIssue(
-                            field=str(rel_path),
-                            severity="error",
-                            message=f"Prohibited frontmatter field `{field}` in plugin agent",
-                            code=PA001,
-                            suggestion=guidance,
-                            docs_url=generate_docs_url(PA001),
-                        )
-                    )
-
-        return ValidationResult(passed=len(errors) == 0, errors=errors, warnings=warnings, info=info)
-
-    def can_fix(self) -> bool:
-        """Whether this validator supports auto-fixing.
-
-        Returns:
-            False — prohibited field removal requires manual review.
-        """
-        return False
-
-    def fix(self, path: Path) -> list[str]:
-        """Auto-fix is not supported for prohibited frontmatter fields.
-
-        Args:
-            path: Path to plugin directory.
-
-        Raises:
-            NotImplementedError: Always raised; manual review required.
-        """
-        raise NotImplementedError("Plugin agent prohibited frontmatter fields require manual fixes.")
-
-    def _find_plugin_dir(self, path: Path) -> Path | None:
-        """Find the plugin directory containing .claude-plugin/plugin.json.
-
-        Args:
-            path: Path to start searching from.
-
-        Returns:
-            Plugin directory path, or None if not found.
-        """
-        search_path = path.parent if path.is_file() else path
-        for parent in [search_path, *search_path.parents]:
-            if (parent / ".claude-plugin" / "plugin.json").exists():
-                return parent
-        return None
+# Validation logic lives in skilllint.rules.pa_series (check_pa001).
+# PluginAgentFrontmatterValidator is re-exported from there for pipeline compatibility.
+# Import happens at module bottom (line ~5030) to avoid circular imports.
 
 
 # ============================================================================
@@ -5176,6 +5077,7 @@ from rich.table import Table as _Table
 # Import rules to register them
 import skilllint.rules.as_series  # noqa: F401
 from skilllint.rule_registry import get_rule as _get_rule, list_rules as _list_rules
+from skilllint.rules.pa_series import PluginAgentFrontmatterValidator
 
 _rule_console = _Console()
 

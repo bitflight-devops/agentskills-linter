@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING
 import msgspec.json
 import pytest
 
-from skilllint.plugin_validator import PluginAgentFrontmatterValidator
+from skilllint.rules.pa_series import PluginAgentFrontmatterValidator
 
 if TYPE_CHECKING:
     from pathlib import Path
