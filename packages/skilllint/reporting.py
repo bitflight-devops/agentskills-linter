@@ -48,7 +48,11 @@ class ConsoleReporter:
 
     @staticmethod
     def _get_rendered_width(renderable: ConsoleRenderable | RichCast | str) -> int:
-        """Get actual rendered width of any Rich renderable."""
+        """Get actual rendered width of any Rich renderable.
+
+        Returns:
+            The maximum rendered width in characters.
+        """
         temp_console = Console(width=999999)
         measurement = Measurement.get(temp_console, temp_console.options, renderable)
         return int(measurement.maximum)
@@ -104,9 +108,7 @@ class ConsoleReporter:
                 if not issues_to_show:
                     if show_progress:
                         self.console.print(
-                            f"  :white_check_mark: [dim]{validator_name}:[/dim] PASSED",
-                            crop=False,
-                            overflow="ignore",
+                            f"  :white_check_mark: [dim]{validator_name}:[/dim] PASSED", crop=False, overflow="ignore"
                         )
                     continue
 

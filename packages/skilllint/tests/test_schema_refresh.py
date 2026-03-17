@@ -13,8 +13,6 @@ import json
 import sys
 from pathlib import Path
 
-import pytest
-
 # Add scripts directory to path for imports
 SCRIPTS_DIR = Path(__file__).resolve().parent.parent.parent.parent / "scripts"
 sys.path.insert(0, str(SCRIPTS_DIR))
@@ -275,13 +273,7 @@ class TestConstraintScopePreserved:
                 "last_verified": "2024-01-01",
                 "provider_id": "test",
             },
-            "definitions": {
-                "nested": {
-                    "properties": {
-                        "deep_field": {"constraint_scope": "shared"},
-                    }
-                }
-            },
+            "definitions": {"nested": {"properties": {"deep_field": {"constraint_scope": "shared"}}}},
         }
 
         refreshed = rs.create_refreshed_schema(original, 2, "test")

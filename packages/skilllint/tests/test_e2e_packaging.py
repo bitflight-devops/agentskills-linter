@@ -12,7 +12,6 @@ from __future__ import annotations
 
 import json
 import os
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -60,12 +59,7 @@ def built_wheel() -> Generator[Path, None, None]:
     DIST_DIR.mkdir(parents=True, exist_ok=True)
 
     # Build the wheel
-    result = subprocess.run(
-        ["uv", "build", "--wheel"],
-        cwd=REPO_ROOT,
-        capture_output=True,
-        text=True,
-    )
+    result = subprocess.run(["uv", "build", "--wheel"], cwd=REPO_ROOT, capture_output=True, text=True, check=False)
 
     if result.returncode != 0:
         pytest.fail(f"Failed to build wheel: {result.stderr}")
@@ -103,6 +97,7 @@ def temp_venv(built_wheel: Path) -> Generator[Path, None, None]:
             ["uv", "pip", "install", str(built_wheel), "--python", str(python_path)],
             capture_output=True,
             text=True,
+            check=False,
         )
 
         if result.returncode != 0:
@@ -161,8 +156,7 @@ class TestWheelContainsSchemas:
             assert "skilllint/schemas/__init__.py" in names, "Missing schemas/__init__.py"
 
             # Provider subpackage __init__.py (some providers have them)
-            for provider in EXPECTED_PROVIDERS:
-                init_path = f"skilllint/schemas/{provider}/__init__.py"
+            for _provider in EXPECTED_PROVIDERS:
                 # Not all providers have __init__.py, only check if the directory exists
                 pass
 
@@ -191,11 +185,7 @@ class TestInstalledCLIValidatesFixtures:
         """Installed CLI can run 'skilllint --help' successfully."""
         skilllint_path = self._get_skilllint_path(temp_venv)
 
-        result = subprocess.run(
-            [str(skilllint_path), "--help"],
-            capture_output=True,
-            text=True,
-        )
+        result = subprocess.run([str(skilllint_path), "--help"], capture_output=True, text=True, check=False)
 
         assert result.returncode == 0, f"CLI --help failed: {result.stderr}"
         assert "Usage:" in result.stdout
@@ -209,6 +199,7 @@ class TestInstalledCLIValidatesFixtures:
             [str(skilllint_path), "check", "--platform", "claude-code", str(fixture_path)],
             capture_output=True,
             text=True,
+            check=False,
         )
 
         # Valid skill should exit 0
@@ -225,6 +216,7 @@ class TestInstalledCLIValidatesFixtures:
             [str(skilllint_path), "check", "--platform", "claude-code", str(fixture_path)],
             capture_output=True,
             text=True,
+            check=False,
         )
 
         # Invalid skill should have non-zero exit code or produce violations
@@ -259,6 +251,7 @@ print(json.dumps({"platform": schema.get("platform"), "has_provenance": "provena
             [str(python_path), "-c", test_script],
             capture_output=True,
             text=True,
+            check=False,
             # Clear PYTHONPATH to ensure we use installed package, not repo
             env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"},
         )
@@ -266,8 +259,7 @@ print(json.dumps({"platform": schema.get("platform"), "has_provenance": "provena
         if result.returncode != 0:
             # If this fails, the package might be using the repo path
             pytest.fail(
-                f"Failed to load schema from installed package.\n"
-                f"stdout: {result.stdout}\nstderr: {result.stderr}"
+                f"Failed to load schema from installed package.\nstdout: {result.stdout}\nstderr: {result.stderr}"
             )
 
         try:
@@ -334,6 +326,7 @@ print(json.dumps(violations))
             [str(python_path), "-c", test_script, str(fixture_path)],
             capture_output=True,
             text=True,
+            check=False,
             # Clear PYTHONPATH to ensure we use the installed package, not repo
             env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"},
         )
@@ -356,9 +349,7 @@ print(json.dumps(violations))
 
         authority = violation["authority"]
         assert "origin" in authority, f"Missing 'origin' in authority: {authority}"
-        assert authority["origin"] == "agentskills.io", (
-            f"Expected origin 'agentskills.io', got: {authority['origin']}"
-        )
+        assert authority["origin"] == "agentskills.io", f"Expected origin 'agentskills.io', got: {authority['origin']}"
 
     def test_schema_provenance_in_package(self, temp_venv: Path) -> None:
         """Schema loaded from installed package contains provenance metadata."""
@@ -383,6 +374,7 @@ print(json.dumps({
             [str(python_path), "-c", test_script],
             capture_output=True,
             text=True,
+            check=False,
             # Clear PYTHONPATH to ensure we use the installed package, not repo
             env={k: v for k, v in os.environ.items() if k != "PYTHONPATH"},
         )
@@ -397,6 +389,4 @@ print(json.dumps({
 
         assert data.get("has_provenance"), "Schema missing provenance metadata"
         assert data.get("authority_url"), "Schema missing authority_url in provenance"
-        assert data.get("provider_id") == "claude_code", (
-            f"Wrong provider_id: {data.get('provider_id')}"
-        )
+        assert data.get("provider_id") == "claude_code", f"Wrong provider_id: {data.get('provider_id')}"

@@ -73,9 +73,9 @@ def load_entries(path: pathlib.Path, label: str) -> list[dict[str, object]]:
         print(f"Warning: could not parse {label} file {path}: {exc}", file=sys.stderr)
         return []
     if isinstance(data, list):
-        return data  # type: ignore[return-value]
+        return data
     # Single-dict fallback (shouldn't happen with bench output).
-    return [data]  # type: ignore[list-item]
+    return [data]
 
 
 def build_index(entries: list[dict[str, object]]) -> dict[str, dict[str, object]]:
