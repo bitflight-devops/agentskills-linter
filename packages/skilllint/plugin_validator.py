@@ -13,7 +13,6 @@ Token-based complexity measurement replaces line counting for accurate AI cost e
 
 from __future__ import annotations
 
-import fnmatch
 import logging
 import os
 import re
@@ -50,9 +49,6 @@ from git import Repo
 from git.exc import InvalidGitRepositoryError, NoSuchPathError
 from git.index.fun import entry_key
 from pydantic import ValidationError
-from rich.console import Console, ConsoleRenderable, RichCast
-from rich.measure import Measurement
-from rich.panel import Panel
 from ruamel.yaml import YAML, YAMLError
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
@@ -72,8 +68,11 @@ from .frontmatter_core import (
     fix_skill_name_field,
     get_frontmatter_model,
 )
+from .scan_runtime import _resolve_filter_and_expand_paths, run_validation_loop
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from pydantic_core import ErrorDetails
 
 # Module-level ruamel.yaml safe-mode instance (replaces yaml.safe_load)
@@ -86,7 +85,7 @@ _rt_yaml.width = 10000  # prevent line wrapping
 
 # Platform adapter registry — loaded once at module level.
 # Keys are adapter IDs (e.g. "claude_code", "cursor", "codex").
-_ADAPTERS: dict[str, object] = {a.id(): a for a in load_adapters()}
+ADAPTERS: dict[str, object] = {a.id(): a for a in load_adapters()}
 
 
 def _safe_load_yaml(text: str) -> YamlValue:
@@ -101,6 +100,25 @@ def _safe_load_yaml(text: str) -> YamlValue:
     if not text or not text.strip():
         return {}
     return _yaml_safe.load(text)
+
+
+def find_plugin_dir(path: Path) -> Path | None:
+    """Find the plugin directory containing .claude-plugin/plugin.json.
+
+    Walks up the directory tree from *path* (or its parent, if *path* is a
+    file) looking for a ``.claude-plugin/plugin.json`` marker.
+
+    Args:
+        path: Path to start searching from.
+
+    Returns:
+        Plugin directory path, or None if not found.
+    """
+    search_path = path.parent if path.is_file() else path
+    for parent in [search_path, *search_path.parents]:
+        if (parent / ".claude-plugin" / "plugin.json").exists():
+            return parent
+    return None
 
 
 def _dump_yaml(data: dict[str, YamlValue]) -> str:
@@ -170,6 +188,43 @@ def _fix_unquoted_colons(frontmatter_text: str) -> tuple[str, list[str], list[st
     return frontmatter_text, [], []
 
 
+def safe_load_yaml_with_colon_fix(fm_text: str) -> tuple[dict | None, str | None, list[str], str]:
+    """Parse YAML frontmatter, attempting unquoted-colon auto-fix on failure.
+
+    Consolidates the try/except YAMLError -> _fix_unquoted_colons -> retry
+    pattern used in multiple call sites.
+
+    Args:
+        fm_text: Raw YAML frontmatter text (without ``---`` delimiters).
+
+    Returns:
+        Tuple of (parsed_dict, yaml_error_msg, colon_fixed_fields, used_text).
+        - parsed_dict: The parsed YAML dict, or None if parsing failed.
+        - yaml_error_msg: Error message string if YAML parsing failed
+          even after colon fix, or None on success.
+        - colon_fixed_fields: List of field names where unquoted colons
+          were detected and auto-fixed (empty if no fix was needed).
+        - used_text: The frontmatter text that was successfully parsed
+          (may be the colon-fixed version if auto-fix was applied).
+    """
+    try:
+        data = _safe_load_yaml(fm_text)
+    except YAMLError as exc:
+        fixed_fm, colon_fixes, colon_fields = _fix_unquoted_colons(fm_text)
+        if colon_fixes:
+            try:
+                data = _safe_load_yaml(fixed_fm)
+            except YAMLError:
+                pass
+            else:
+                parsed = dict(data) if isinstance(data, dict) else None
+                return parsed, None, colon_fields, fixed_fm
+        return None, str(exc), [], fm_text
+    else:
+        parsed = dict(data) if isinstance(data, dict) else None
+        return parsed, None, [], fm_text
+
+
 # Error code base URL for documentation links
 ERROR_CODE_BASE_URL = (
     "https://github.com/jamie-bitflight/claude_skills/blob/main/plugins/plugin-creator/docs/ERROR_CODES.md"
@@ -179,14 +234,8 @@ ERROR_CODE_BASE_URL = (
 PLUGIN_MANIFEST_SCHEMA_URL = "https://code.claude.com/docs/en/plugins-reference.md#plugin-manifest-schema"
 SKILL_FRONTMATTER_SCHEMA_URL = "https://code.claude.com/docs/en/skills.md#frontmatter-reference"
 
-# Scan runtime imports - re-export for backwards compatibility
-from skilllint.scan_runtime import (
-    DEFAULT_SCAN_PATTERNS,
-    FILTER_TYPE_MAP,
-    compute_summary,
-    discover_validatable_paths,
-    resolve_filter_and_expand_paths,
-)
+# FILTER_TYPE_MAP and DEFAULT_SCAN_PATTERNS live in scan_runtime.py
+# and are re-imported at the top of this module.
 
 # Description requirements (Architecture lines 349-350)
 MIN_DESCRIPTION_LENGTH = 20
@@ -288,6 +337,9 @@ class ErrorCode(StrEnum):
     # Symlink (SL001)
     SL001 = "SL001"  # Symlink target has trailing whitespace/newlines
 
+    # AgentSkills cross-platform (AS004)
+    AS004 = "AS004"  # Unquoted colons in description (auto-fixable style warning)
+
     # Token Count (TC001)
     TC001 = "TC001"  # Token count info (total, frontmatter, body)
 
@@ -297,6 +349,9 @@ class ErrorCode(StrEnum):
     PR003 = "PR003"  # Plugin metadata fields (repository, homepage, author) not populated
     PR004 = "PR004"  # Plugin metadata repository URL mismatches git remote URL
     PR005 = "PR005"  # Registered command path is a skill directory (contains SKILL.md)
+
+    # Plugin Agent Frontmatter (PA001)
+    PA001 = "PA001"  # Plugin agent uses prohibited frontmatter field (hooks, mcpServers, permissionMode)
 
 
 # Aliases for backward compatibility and concise usage
@@ -349,6 +404,7 @@ PR001, PR002, PR003, PR004, PR005 = (
     ErrorCode.PR004,
     ErrorCode.PR005,
 )
+PA001 = ErrorCode.PA001
 
 # ============================================================================
 # VALIDATOR OWNERSHIP (Architecture lines 352a-352j)
@@ -448,7 +504,7 @@ def get_validator_constraint_scopes(class_name: str) -> set[str]:
 
 
 def filter_validators_by_constraint_scopes(
-    validators: list[Validator], constraint_scopes: set[str]
+    validators: Sequence[Validator], constraint_scopes: set[str]
 ) -> list[Validator]:
     """Filter validators based on provider constraint scopes.
 
@@ -908,7 +964,7 @@ def _pydantic_error_to_validation_issue(error: ErrorDetails) -> ValidationIssue:
         suggestion = "Quote the description or remove colons"
 
     # FM007/FM008 (YAML arrays for tools/skills) are runtime-accepted patterns -> warning
-    severity: Literal["error", "warning", "info"] = "warning" if code in (FM007, FM008) else "error"
+    severity: Literal["error", "warning", "info"] = "warning" if code in {FM007, FM008} else "error"
 
     return ValidationIssue(
         field=field, severity=severity, message=msg, code=code, docs_url=generate_docs_url(code), suggestion=suggestion
@@ -916,9 +972,7 @@ def _pydantic_error_to_validation_issue(error: ErrorDetails) -> ValidationIssue:
 
 
 def _check_list_valued_tool_fields(
-    data: dict[str, YamlValue],
-    errors: list[ValidationIssue],
-    warnings: list[ValidationIssue],
+    data: dict[str, YamlValue], errors: list[ValidationIssue], warnings: list[ValidationIssue]
 ) -> None:
     """Append warnings for list-valued tools/skills fields that Pydantic may not catch.
 
@@ -2020,33 +2074,22 @@ def _validate_frontmatter_yaml(
             )
         )
 
-    try:
-        data = _safe_load_yaml(frontmatter_text)
-    except YAMLError as e:
-        fixed_fm, colon_fixes, colon_fields = _fix_unquoted_colons(frontmatter_text)
-        if colon_fixes:
-            try:
-                fixed_data = _safe_load_yaml(fixed_fm)
-            except YAMLError:
-                pass
-            else:
-                # AS004: Unquoted colons break YAML parsing, but auto-fixable.
-                # Emit warning and continue with fixed YAML (runtime accepts quoted values).
-                warnings.append(
-                    ValidationIssue(
-                        field="description",
-                        severity="warning",
-                        message="Frontmatter contains unquoted colons that break YAML parsing — auto-fixable by quoting",
-                        code="AS004",
-                        docs_url="https://github.com/bitflight-devops/skilllint/blob/main/plugins/agentskills-skilllint/skills/skilllint/references/rule-catalog.md#as004",
-                        suggestion=f"Quote the following field values: {', '.join(colon_fields)}",
-                    )
-                )
-                # Continue validation with the fixed YAML data
-                if isinstance(fixed_data, dict):
-                    return fixed_data, None
-                # Fixed data is not a dict, fall through to error below
+    data, yaml_err, colon_fields, _used_text = safe_load_yaml_with_colon_fix(frontmatter_text)
+    if colon_fields:
+        # AS004: Unquoted colons break YAML parsing, but auto-fixable.
+        # Emit warning and continue with fixed YAML (runtime accepts quoted values).
+        warnings.append(
+            ValidationIssue(
+                field="description",
+                severity="warning",
+                message="Frontmatter contains unquoted colons that break YAML parsing",
+                code=ErrorCode.AS004,
+                docs_url=generate_docs_url(ErrorCode.AS004),
+                suggestion=f"Quote the following field values: {', '.join(colon_fields)}",
+            )
+        )
 
+    if yaml_err is not None:
         result = _validation_result_with_error(
             errors=errors,
             warnings=warnings,
@@ -2054,7 +2097,7 @@ def _validate_frontmatter_yaml(
             issue=ValidationIssue(
                 field="(yaml)",
                 severity="error",
-                message=f"Invalid YAML syntax: {e}",
+                message=f"Invalid YAML syntax: {yaml_err}",
                 code=FM002,
                 docs_url=generate_docs_url(FM002),
             ),
@@ -2206,6 +2249,8 @@ class FrontmatterValidator:
                         suggestion=f"Front-load critical information in first {RECOMMENDED_DESCRIPTION_LENGTH} characters. Run /plugin-creator:write-frontmatter-description to generate an optimized description",
                     )
                 )
+            # AS004 check removed — AS-series rules in as_series.py handle
+            # unquoted colon detection; emitting here would cause duplicates.
         except ValidationError as e:
             for err in e.errors():
                 issue = _pydantic_error_to_validation_issue(err)
@@ -2313,22 +2358,12 @@ class FrontmatterValidator:
             Tuple of (frontmatter_text, parsed_data, colon_fix_descriptions).
             parsed_data is None if parse failed even after colon fix.
         """
-        colon_fixes: list[str] = []
-        try:
-            original_data = _safe_load_yaml(frontmatter_text)
-        except YAMLError:
-            fixed_fm, colon_fixes, colon_fields = _fix_unquoted_colons(frontmatter_text)
-            if colon_fixes:
-                self._queue_fm009_info(colon_fields)
-                try:
-                    original_data = _safe_load_yaml(fixed_fm)
-                except YAMLError:
-                    pass
-                else:
-                    return (fixed_fm, cast("dict[str, YamlValue]", original_data), colon_fixes)
-            return frontmatter_text, None, colon_fixes
-        else:
-            return (frontmatter_text, cast("dict[str, YamlValue]", original_data), colon_fixes)
+        parsed, _yaml_err, colon_fields, used_text = safe_load_yaml_with_colon_fix(frontmatter_text)
+        if colon_fields:
+            self._queue_fm009_info(colon_fields)
+        # Build colon_fixes list (one description per fixed field) to match caller expectations
+        colon_fixes = ["Quoted description value containing unquoted colon"] * len(colon_fields)
+        return (used_text, cast("dict[str, YamlValue]", parsed), colon_fixes)
 
     def _normalize_tool_fields_and_detect_changes(
         self,
@@ -3210,13 +3245,13 @@ def _find_actual_capabilities(plugin_dir: Path) -> tuple[set[Path], set[Path], s
     agents_dir = plugin_dir / "agents"
     if agents_dir.is_dir():
         actual_agents = {
-            f.relative_to(plugin_dir) for f in agents_dir.glob("*.md") if f.name not in {"CLAUDE.md", "README.md"}
+            f.relative_to(plugin_dir) for f in agents_dir.glob("*.md") if f.name not in FRONTMATTER_EXEMPT_FILENAMES
         }
 
     commands_dir = plugin_dir / "commands"
     if commands_dir.is_dir():
         actual_commands = {
-            f.relative_to(plugin_dir) for f in commands_dir.glob("*.md") if f.name not in {"CLAUDE.md", "README.md"}
+            f.relative_to(plugin_dir) for f in commands_dir.glob("*.md") if f.name not in FRONTMATTER_EXEMPT_FILENAMES
         }
 
     return actual_skills, actual_agents, actual_commands
@@ -3244,7 +3279,7 @@ def _parse_registered_paths(plugin_config: dict[str, YamlValue], plugin_dir: Pat
         value_path = plugin_dir / value.lstrip("./")
         if value_path.is_dir():
             registered.update(
-                f.relative_to(plugin_dir) for f in value_path.glob("*.md") if f.name not in {"CLAUDE.md", "README.md"}
+                f.relative_to(plugin_dir) for f in value_path.glob("*.md") if f.name not in FRONTMATTER_EXEMPT_FILENAMES
             )
         else:
             registered.add(Path(value.lstrip("./")))
@@ -3502,17 +3537,23 @@ class PluginRegistrationValidator:
     def _find_plugin_dir(self, path: Path) -> Path | None:
         """Find the plugin directory containing .claude-plugin/plugin.json.
 
+        Delegates to the module-level :func:`find_plugin_dir`.
+
         Args:
             path: Path to start searching from.
 
         Returns:
             Plugin directory path, or None if not found.
         """
-        search_path = path.parent if path.is_file() else path
-        for parent in [search_path, *search_path.parents]:
-            if (parent / ".claude-plugin" / "plugin.json").exists():
-                return parent
-        return None
+        return find_plugin_dir(path)
+
+
+# ============================================================================
+# PLUGIN AGENT FRONTMATTER VALIDATOR
+# ============================================================================
+# Validation logic lives in skilllint.rules.pa_series (check_pa001).
+# PluginAgentFrontmatterValidator is re-exported from there for pipeline compatibility.
+# Import happens at module bottom (line ~5030) to avoid circular imports.
 
 
 # ============================================================================
@@ -3692,22 +3733,15 @@ class PluginStructureValidator:
     def _find_plugin_directory(self, path: Path) -> Path | None:
         """Find plugin directory containing .claude-plugin/plugin.json.
 
+        Delegates to the module-level :func:`find_plugin_dir`.
+
         Args:
             path: Path to file or directory within plugin
 
         Returns:
             Path to plugin directory, or None if not found
         """
-        # If path is a file, start from parent directory
-        search_path = path.parent if path.is_file() else path
-
-        # Search up the directory tree for .claude-plugin/plugin.json
-        for parent in [search_path, *search_path.parents]:
-            plugin_json = parent / ".claude-plugin" / "plugin.json"
-            if plugin_json.exists():
-                return parent
-
-        return None
+        return find_plugin_dir(path)
 
     def _validate_plugin_json_syntax(self, plugin_json_path: Path) -> str | None:
         """Validate plugin.json is parseable JSON. Catches syntax/encoding issues.
@@ -4409,419 +4443,12 @@ def get_staged_files() -> list[Path]:
 # ============================================================================
 
 
-class Reporter(Protocol):
-    """Protocol for result reporters.
-
-    Defines interface for formatting and displaying validation results to users.
-    Different implementations support various output formats (Rich terminal,
-    plain text for CI, summary).
-    """
-
-    def report(self, file_results: FileResults, verbose: bool = False, *, show_progress: bool = False) -> None:
-        """Display validation results grouped by file.
-
-        Args:
-            file_results: Mapping of file paths to lists of (validator_name,
-                ValidationResult) tuples from validation
-            verbose: Whether to show additional detail like info messages
-            show_progress: Whether to show per-file PASSED status for clean files
-        """
-        ...
-
-    def summarize(self, total_files: int, passed: int, failed: int, warnings: int) -> None:
-        """Display summary statistics.
-
-        Args:
-            total_files: Total number of unique files validated
-            passed: Number of files where all validators passed
-            failed: Number of files where any validator failed
-            warnings: Number of files with warnings (all passed but with issues)
-        """
-        ...
-
-
-# ============================================================================
-# CONSOLE REPORTER (Rich-based)
-# ============================================================================
-
-
-class ConsoleReporter:
-    """Rich-based terminal reporter with colored output.
-
-    Uses Rich library for formatted terminal output with colors, tables, and
-    styled text. Implements Rich table best practices from python3-development
-    skill for proper width handling and no-wrap display.
-
-    Architecture lines 239-252
-    """
-
-    def __init__(self, console: Console | None = None, *, no_color: bool = False) -> None:
-        """Initialize console reporter.
-
-        Args:
-            console: Optional pre-built Rich Console instance. When provided,
-                the ``no_color`` parameter is ignored because color behaviour is
-                determined by the supplied console.
-            no_color: Disable color output for non-TTY environments. Only used
-                when ``console`` is not provided.
-        """
-        if console is not None:
-            self.console = console
-        else:
-            self.console = Console(force_terminal=not no_color, no_color=no_color)
-        self.no_color = no_color
-
-    @staticmethod
-    def _get_rendered_width(renderable: ConsoleRenderable | RichCast | str) -> int:
-        """Get actual rendered width of any Rich renderable.
-
-        Uses a temporary wide console to measure the natural width of a
-        renderable without any wrapping constraints. Handles color codes,
-        Unicode, styling, padding, and borders.
-
-        Args:
-            renderable: Any Rich renderable (Panel, Table, Text, etc.)
-
-        Returns:
-            The maximum rendered width in characters.
-        """
-        temp_console = Console(width=999999)
-        measurement = Measurement.get(temp_console, temp_console.options, renderable)
-        return int(measurement.maximum)
-
-    def _print_issue(self, issue: ValidationIssue) -> None:
-        """Print a single validation issue with Rich formatting.
-
-        Args:
-            issue: The validation issue to display
-        """
-        severity_icons = {"error": ":cross_mark:", "warning": ":warning:", "info": ":information:"}
-        severity_colors = {"error": "red", "warning": "yellow", "info": "blue"}
-
-        icon = severity_icons.get(issue.severity, "")
-        color = severity_colors.get(issue.severity, "white")
-        location = f":{issue.line}" if issue.line else ""
-
-        # Main message line -- may contain long paths or messages
-        self.console.print(
-            f"    {icon} [{color}][{issue.code}][/{color}] {issue.field}{location}: {issue.message}",
-            crop=False,
-            overflow="ignore",
-        )
-
-        # Suggestion line -- may contain long commands or paths
-        if issue.suggestion:
-            self.console.print(f"      [dim]→[/dim] {issue.suggestion}", crop=False, overflow="ignore")
-
-        # Docs URL line -- must never wrap
-        if issue.docs_url:
-            self.console.print(f"      [dim]→[/dim] [link]{issue.docs_url}[/link]", crop=False, overflow="ignore")
-
-    def report(self, file_results: FileResults, verbose: bool = False, *, show_progress: bool = False) -> None:
-        """Display validation results with Rich formatting, grouped by file.
-
-        Args:
-            file_results: Mapping of file paths to lists of (validator_name,
-                ValidationResult) tuples from validation
-            verbose: Whether to show info messages in addition to errors/warnings
-            show_progress: Whether to show per-file PASSED status for clean files
-        """
-        for file_path, validator_results in file_results.items():
-            # Determine overall file status
-            all_passed = all(r.passed for _, r in validator_results)
-            any_issues = False
-
-            for _vname, result in validator_results:
-                issues_to_show = [*result.errors, *result.warnings]
-                if verbose:
-                    issues_to_show.extend(result.info)
-                if issues_to_show:
-                    any_issues = True
-
-            if all_passed and not any_issues:
-                # File passed all validators with no issues
-                if show_progress:
-                    self.console.print(
-                        f":white_check_mark: [green]{file_path}[/green] - PASSED", crop=False, overflow="ignore"
-                    )
-                continue
-
-            # File has issues - show file header once, then per-validator results
-            # File paths may be long -- prevent wrapping
-            self.console.print(f"\n[bold]{file_path}[/bold]", crop=False, overflow="ignore")
-
-            for validator_name, result in validator_results:
-                issues_to_show = [*result.errors, *result.warnings]
-                if verbose:
-                    issues_to_show.extend(result.info)
-
-                if not issues_to_show:
-                    # This validator passed — only show if progress requested
-                    if show_progress:
-                        self.console.print(
-                            f"  :white_check_mark: [dim]{validator_name}:[/dim] PASSED", crop=False, overflow="ignore"
-                        )
-                    continue
-
-                # Show validator name as sub-header
-                status_icon = ":cross_mark:" if not result.passed else ":warning:"
-                self.console.print(f"  {status_icon} [dim]{validator_name}:[/dim]", crop=False, overflow="ignore")
-
-                for issue in issues_to_show:
-                    self._print_issue(issue)
-
-    def summarize(self, total_files: int, passed: int, failed: int, warnings: int) -> None:
-        """Display summary statistics with Rich formatting.
-
-        Args:
-            total_files: Total number of unique files validated
-            passed: Number of files where all validators passed
-            failed: Number of files where any validator failed
-            warnings: Number of files with warnings (all passed but with issues)
-        """
-        # Determine overall status
-        if failed == 0:
-            status_icon = ":white_check_mark:"
-            status_text = "PASSED"
-            status_color = "green"
-        else:
-            status_icon = ":cross_mark:"
-            status_text = "FAILED"
-            status_color = "red"
-
-        # Build summary text
-        summary_lines = [
-            f"{status_icon} [bold {status_color}]{status_text}[/bold {status_color}]",
-            "",
-            f"Total files: {total_files}",
-            f"[green]Passed: {passed}[/green]",
-            f"[red]Failed: {failed}[/red]",
-        ]
-
-        if warnings > 0:
-            summary_lines.append(f"[yellow]Warnings: {warnings}[/yellow]")
-
-        summary = "\n".join(summary_lines)
-
-        # Display in panel -- set console width to panel's natural width
-        # to prevent Panel from wrapping at 80 chars in non-TTY environments
-        panel = Panel(summary, title="Validation Summary", border_style=status_color, expand=False)
-        panel_width = self._get_rendered_width(panel)
-        self.console.width = panel_width
-        self.console.print(panel, crop=False, overflow="ignore", no_wrap=True, soft_wrap=True)
-
-
-# ============================================================================
-# CI REPORTER (Plain text)
-# ============================================================================
-
-
-class CIReporter:
-    """Plain text reporter for CI environments.
-
-    Outputs validation results without ANSI color codes or Rich formatting.
-    Uses standard file:line:code:message format for compatibility with CI
-    tools and log parsers.
-
-    Architecture lines 239-252
-    """
-
-    @staticmethod
-    def _print_issue(issue: ValidationIssue) -> None:
-        """Print a single validation issue in plain text.
-
-        Args:
-            issue: The validation issue to display
-        """
-        severity_prefixes = {"error": "✗ ERROR", "warning": "⚠ WARN", "info": "i INFO"}
-        prefix = severity_prefixes.get(issue.severity, "")
-        location = f":{issue.line}" if issue.line else ""
-
-        # Main message line
-        print(f"    {prefix} [{issue.code}] {issue.field}{location}: {issue.message}")
-
-        # Suggestion line (if present)
-        if issue.suggestion:
-            print(f"      → {issue.suggestion}")
-
-        # Docs URL line (if present)
-        if issue.docs_url:
-            print(f"      → {issue.docs_url}")
-
-    def report(self, file_results: FileResults, verbose: bool = False, *, show_progress: bool = False) -> None:
-        """Display validation results in plain text, grouped by file.
-
-        Args:
-            file_results: Mapping of file paths to lists of (validator_name,
-                ValidationResult) tuples from validation
-            verbose: Whether to show info messages in addition to errors/warnings
-            show_progress: Whether to show per-file PASSED status for clean files
-        """
-        for file_path, validator_results in file_results.items():
-            # Determine overall file status
-            all_passed = all(r.passed for _, r in validator_results)
-            any_issues = False
-
-            for _vname, result in validator_results:
-                issues_to_show = [*result.errors, *result.warnings]
-                if verbose:
-                    issues_to_show.extend(result.info)
-                if issues_to_show:
-                    any_issues = True
-
-            if all_passed and not any_issues:
-                # File passed all validators with no issues
-                if show_progress:
-                    print(f"✓ {file_path} - PASSED")
-                continue
-
-            # File has issues - show file header once, then per-validator results
-            print(f"\n{file_path}")
-
-            for validator_name, result in validator_results:
-                issues_to_show = [*result.errors, *result.warnings]
-                if verbose:
-                    issues_to_show.extend(result.info)
-
-                if not issues_to_show:
-                    if show_progress:
-                        print(f"  ✓ {validator_name}: PASSED")
-                    continue
-
-                # Show validator name as sub-header
-                status_icon = "✗" if not result.passed else "⚠"
-                print(f"  {status_icon} {validator_name}:")
-
-                for issue in issues_to_show:
-                    self._print_issue(issue)
-
-    def summarize(self, total_files: int, passed: int, failed: int, warnings: int) -> None:
-        """Display summary statistics in plain text.
-
-        Args:
-            total_files: Total number of files validated
-            passed: Number of files that passed validation
-            failed: Number of files that failed validation
-            warnings: Number of files with warnings (passed but with issues)
-        """
-        # Determine overall status
-        status = "✓ PASSED" if failed == 0 else "✗ FAILED"
-
-        # Display summary
-        print("\n" + "=" * 60)
-        print(f"{status}")
-        print(f"Total files: {total_files}")
-        print(f"Passed: {passed}")
-        print(f"Failed: {failed}")
-        if warnings > 0:
-            print(f"Warnings: {warnings}")
-        print("=" * 60)
-
-
-# ============================================================================
-# SUMMARY REPORTER (One-line status)
-# ============================================================================
-
-
-class SummaryReporter:
-    """Single-line summary reporter for quick status checks.
-
-    Outputs minimal validation summary in a single line format. Useful for
-    scripts, pre-commit hooks, or quick status checks.
-
-    Architecture lines 239-252
-    """
-
-    def report(self, file_results: FileResults, verbose: bool = False, *, show_progress: bool = False) -> None:
-        """Display nothing (summary-only reporter).
-
-        Args:
-            file_results: Mapping of file paths to lists of (validator_name,
-                ValidationResult) tuples (ignored for summary reporter)
-            verbose: Whether to show info messages (ignored for summary reporter)
-            show_progress: Whether to show per-file PASSED status (ignored)
-        """
-        # Summary reporter only shows final summary, not per-file results
-
-    def summarize(self, total_files: int, passed: int, failed: int, warnings: int) -> None:
-        """Display single-line summary.
-
-        Args:
-            total_files: Total number of files validated
-            passed: Number of files that passed validation
-            failed: Number of files that failed validation
-            warnings: Number of files with warnings (passed but with issues)
-        """
-        # Determine overall status
-        if failed == 0:
-            status_icon = "✓"
-            status = f"{passed}/{total_files} files passed"
-        else:
-            status_icon = "✗"
-            status = f"{failed}/{total_files} files failed"
-
-        # Add warnings if present
-        if warnings > 0:
-            status += f" ({warnings} with warnings)"
-
-        print(f"{status_icon} {status}")
-
-
 # ============================================================================
 # IGNORE PATTERN SUPPORT
 # ============================================================================
 
 
-def _load_ignore_patterns() -> list[str]:
-    """Load glob patterns from .pluginvalidatorignore file.
-
-    Searches for the ignore file in the following order:
-    1. Current working directory (.pluginvalidatorignore)
-    2. .claude/.pluginvalidatorignore
-
-    Each line is a gitignore-style glob pattern. Lines starting with '#' are
-    comments, blank lines are ignored.
-
-    Returns:
-        List of glob patterns to match against file paths.
-    """
-    candidates = [Path.cwd() / ".pluginvalidatorignore", Path.cwd() / ".claude" / ".pluginvalidatorignore"]
-    for candidate in candidates:
-        if candidate.is_file():
-            lines = candidate.read_text(encoding="utf-8").splitlines()
-            return [line.strip() for line in lines if line.strip() and not line.strip().startswith("#")]
-    return []
-
-
-def _is_ignored(path: Path, patterns: list[str]) -> bool:
-    """Check whether a path matches any ignore pattern.
-
-    Patterns follow gitignore-style glob semantics:
-    - ``**/templates/*.md`` matches any ``templates`` directory at any depth
-    - ``plugins/foo/bar.md`` matches that exact relative path
-
-    The path is tested as a POSIX string (forward slashes) so patterns work
-    consistently across platforms.
-
-    Args:
-        path: File path to check (absolute or relative).
-        patterns: Glob patterns loaded from .pluginvalidatorignore.
-
-    Returns:
-        True if the path matches any pattern and should be skipped.
-    """
-    path_str = path.as_posix()
-    for pattern in patterns:
-        if fnmatch.fnmatch(path_str, pattern):
-            return True
-        # Also match against just the relative-to-cwd representation
-        try:
-            rel = path.resolve().relative_to(Path.cwd().resolve()).as_posix()
-        except ValueError:
-            rel = path_str
-        if fnmatch.fnmatch(rel, pattern):
-            return True
-    return False
+# _load_ignore_patterns and _is_ignored moved to scan_runtime.py
 
 
 # ============================================================================
@@ -4926,7 +4553,7 @@ def _get_validators_for_path(path: Path) -> list[Validator]:
         if file_type == FileType.SKILL:
             validators.extend([ComplexityValidator(), InternalLinkValidator(), ProgressiveDisclosureValidator()])
     elif file_type == FileType.PLUGIN:
-        validators.append(PluginStructureValidator())
+        validators.extend((PluginStructureValidator(), PluginAgentFrontmatterValidator()))
     elif file_type == FileType.HOOK_CONFIG:
         validators.append(HookValidator())
     elif file_type == FileType.HOOK_SCRIPT:
@@ -4935,7 +4562,7 @@ def _get_validators_for_path(path: Path) -> list[Validator]:
         validators.append(MarkdownTokenCounter())
     else:
         # Unknown file type — return empty list.  The CLI entry point
-        # (_validate_single_path) checks for this and emits a user-facing
+        # (validate_single_path) checks for this and emits a user-facing
         # error; library callers (run_platform_checks) receive an empty
         # validator list and can proceed without exceptions.
         return []
@@ -4966,7 +4593,7 @@ def _collect_validator_results(
     return results
 
 
-def _validate_single_path(path: Path, *, check: bool, fix: bool, verbose: bool) -> FileResults:
+def validate_single_path(path: Path, *, check: bool, fix: bool, verbose: bool) -> FileResults:
     """Validate a single path and return results grouped by file.
 
     Args:
@@ -5067,10 +4694,8 @@ def _handle_tokens_only(paths: list[Path], *, batch: bool = False) -> None:
     raise typer.Exit(0) from None
 
 
-# Aliases for backwards compatibility - functions now live in scan_runtime
-_discover_validatable_paths = discover_validatable_paths
-_resolve_filter_and_expand_paths = resolve_filter_and_expand_paths
-_compute_summary = compute_summary
+# _discover_validatable_paths, _resolve_filter_and_expand_paths,
+# and _compute_summary moved to scan_runtime.py
 
 
 def _show_help_and_exit(ctx: typer.Context, code: int = 0) -> NoReturn:
@@ -5097,27 +4722,35 @@ def is_skill_md(path: Path) -> bool:
     return path.name == "SKILL.md"
 
 
-def parse_skill_md(path: Path) -> tuple[dict, list[str]]:
+def parse_skill_md(path: Path) -> tuple[dict, list[str], str | None, list[str]]:
     """Parse a SKILL.md file into frontmatter dict and body lines.
 
     Uses extract_frontmatter (from frontmatter_core) and _safe_load_yaml
     to avoid the namespace conflict between the ``frontmatter`` and
     ``python-frontmatter`` PyPI packages.
 
+    When YAML parsing fails due to unquoted colons, the frontmatter is
+    auto-fixed (colons quoted) and the fixed data is returned along with
+    a list of fields that were fixed.
+
     Args:
         path: Path to the SKILL.md file.
 
     Returns:
-        Tuple of (frontmatter dict, body lines list).
+        Tuple of (frontmatter dict, body lines, yaml_error_message,
+        colon_fixed_fields).  yaml_error_message is None when parsing
+        succeeds (or when the colon auto-fix succeeds).
+        colon_fixed_fields lists field names where unquoted colons were
+        detected and auto-fixed.
     """
     content = path.read_text(encoding="utf-8")
     fm_text, _start, end_line = extract_frontmatter(content)
     if fm_text is None:
-        return {}, content.splitlines()
-    parsed = _safe_load_yaml(fm_text)
-    frontmatter_dict: dict = dict(parsed) if isinstance(parsed, dict) else {}
+        return {}, content.splitlines(), None, []
+    parsed, yaml_err, colon_fields, _used_text = safe_load_yaml_with_colon_fix(fm_text)
+    frontmatter_dict: dict = parsed if parsed is not None else {}
     body_lines = content.splitlines()[end_line:]
-    return frontmatter_dict, body_lines
+    return frontmatter_dict, body_lines, yaml_err, colon_fields
 
 
 def run_platform_checks(path: Path, adapter: PlatformAdapter) -> list[dict]:
@@ -5145,7 +4778,7 @@ def run_platform_checks(path: Path, adapter: PlatformAdapter) -> list[dict]:
         if not sk_validators:
             return list(adapter.validate(path))
 
-        file_results = _validate_single_path(path, check=True, fix=False, verbose=False)
+        file_results = validate_single_path(path, check=True, fix=False, verbose=False)
 
         violations: list[dict] = []
         for validator_results in file_results.values():
@@ -5195,12 +4828,7 @@ def validate_file(path: Path, adapters: dict, platform_override: str | None = No
     # Validators are filtered by constraint_scopes to support provider-specific rules.
     primary_adapter = matching[0]
     constraint_scopes = primary_adapter.constraint_scopes()
-    _logger.debug(
-        "Validating %s with adapter %s, constraint_scopes=%s",
-        path,
-        primary_adapter.id(),
-        constraint_scopes,
-    )
+    _logger.debug("Validating %s with adapter %s, constraint_scopes=%s", path, primary_adapter.id(), constraint_scopes)
 
     # Filter validators based on provider constraint scopes
     sk_validators = _get_validators_for_path(path)
@@ -5208,7 +4836,19 @@ def validate_file(path: Path, adapters: dict, platform_override: str | None = No
 
     # AS-series fires once per file — structural deduplication, not set-tracking
     if is_skill_md(path):
-        frontmatter_data, body_lines = parse_skill_md(path)
+        frontmatter_data, body_lines, yaml_err, colon_fields = parse_skill_md(path)
+        if colon_fields:
+            violations.append({
+                "code": "AS004",
+                "severity": "warning",
+                "message": f"Description contains unquoted colons that break YAML — quote the following fields: {', '.join(colon_fields)}",
+            })
+        if yaml_err is not None:
+            violations.append({
+                "code": str(FM002),
+                "severity": "error",
+                "message": f"Invalid YAML frontmatter: {yaml_err}",
+            })
         violations.extend(run_as_series(path, frontmatter_data, body_lines))
 
     for adapter in matching:
@@ -5232,16 +4872,16 @@ def _resolve_platform_override(platform: str | None) -> str | None:
     if platform is None:
         return None
     platform_key = platform.replace("-", "_")
-    if platform_key not in _ADAPTERS:
+    if platform_key not in ADAPTERS:
         typer.echo(
-            f"Unknown platform: {platform!r}. Valid choices: {', '.join(k.replace('_', '-') for k in _ADAPTERS)}",
+            f"Unknown platform: {platform!r}. Valid choices: {', '.join(k.replace('_', '-') for k in ADAPTERS)}",
             err=True,
         )
         raise typer.Exit(2) from None
     return platform_key
 
 
-def _violations_to_result(violations: list[dict]) -> ValidationResult:
+def violations_to_result(violations: list[dict]) -> ValidationResult:
     """Convert a list of violation dicts into a ValidationResult.
 
     Args:
@@ -5265,60 +4905,6 @@ def _violations_to_result(violations: list[dict]) -> ValidationResult:
     warnings = [i for i in issues if i.severity == "warning"]
     info = [i for i in issues if i.severity == "info"]
     return ValidationResult(passed=len(errors) == 0, errors=errors, warnings=warnings, info=info)
-
-
-def _run_validation_loop(
-    *,
-    expanded_paths: list[Path],
-    check: bool,
-    fix: bool,
-    verbose: bool,
-    no_color: bool,
-    show_progress: bool,
-    show_summary: bool,
-    platform_override: str | None,
-) -> NoReturn:
-    """Execute the validation loop, report results, and exit.
-
-    Args:
-        expanded_paths: Resolved file paths to validate.
-        check: Validate only, don't auto-fix.
-        fix: Auto-fix issues where possible.
-        verbose: Show detailed output.
-        no_color: Disable color output.
-        show_progress: Show per-file status.
-        show_summary: Show summary panel.
-        platform_override: Restrict to this adapter ID.
-
-    Raises:
-        typer.Exit: Always exits with appropriate code.
-    """
-    ignore_patterns = _load_ignore_patterns()
-    all_results: FileResults = {}
-    for path in expanded_paths:
-        if ignore_patterns and _is_ignored(path, ignore_patterns):
-            continue
-        if platform_override is not None:
-            violations = validate_file(path, _ADAPTERS, platform_override)
-            all_results[path] = [("platform", _violations_to_result(violations))]
-        else:
-            file_results = _validate_single_path(path, check=check, fix=fix, verbose=verbose)
-            for file_path, validator_results in file_results.items():
-                if file_path in all_results:
-                    all_results[file_path].extend(validator_results)
-                else:
-                    all_results[file_path] = list(validator_results)
-
-    reporter: Reporter = CIReporter() if no_color else ConsoleReporter(no_color=no_color)
-    reporter.report(all_results, verbose=verbose, show_progress=show_progress)
-
-    total_files, passed, failed, warnings = _compute_summary(all_results)
-    if show_summary:
-        reporter.summarize(total_files, passed, failed, warnings)
-
-    if failed > 0:
-        raise typer.Exit(1) from None
-    raise typer.Exit(0) from None
 
 
 def main(
@@ -5407,7 +4993,7 @@ def main(
             typer.echo("Error: Cannot use both --check and --fix flags", err=True)
             raise typer.Exit(2) from None
 
-        _run_validation_loop(
+        run_validation_loop(
             expanded_paths=expanded_paths,
             check=check,
             fix=fix,
@@ -5416,6 +5002,10 @@ def main(
             show_progress=show_progress,
             show_summary=show_summary,
             platform_override=platform_override,
+            validate_single_path=validate_single_path,
+            validate_file=validate_file,
+            violations_to_result=violations_to_result,
+            adapters=ADAPTERS,
         )
 
     except KeyboardInterrupt:
@@ -5538,6 +5128,7 @@ from rich.table import Table as _Table
 # Import rules to register them
 import skilllint.rules.as_series  # noqa: F401
 from skilllint.rule_registry import get_rule as _get_rule, list_rules as _list_rules
+from skilllint.rules.pa_series import PluginAgentFrontmatterValidator
 
 _rule_console = _Console()
 

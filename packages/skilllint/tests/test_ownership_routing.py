@@ -6,26 +6,26 @@ These tests verify:
 3. filter_validators_by_constraint_scopes() filters validators based on provider scopes
 """
 
-import pytest
+from __future__ import annotations
 
 from skilllint.plugin_validator import (
+    VALIDATOR_OWNERSHIP,
     ComplexityValidator,
     DescriptionValidator,
     FrontmatterValidator,
     HookValidator,
     InternalLinkValidator,
     MarkdownTokenCounter,
-    NamespaceReferenceValidator,
     NameFormatValidator,
+    NamespaceReferenceValidator,
     PluginRegistrationValidator,
     PluginStructureValidator,
     ProgressiveDisclosureValidator,
     SymlinkTargetValidator,
     ValidatorOwnership,
     filter_validators_by_constraint_scopes,
-    get_validator_ownership,
     get_validator_constraint_scopes,
-    VALIDATOR_OWNERSHIP,
+    get_validator_ownership,
 )
 
 
@@ -76,7 +76,7 @@ class TestValidatorOwnership:
             "NamespaceReferenceValidator": NamespaceReferenceValidator(),
             "MarkdownTokenCounter": MarkdownTokenCounter(),
         }
-        for class_name, validator in known_validators.items():
+        for class_name in known_validators:
             assert class_name in VALIDATOR_OWNERSHIP, f"{class_name} not in VALIDATOR_OWNERSHIP"
 
 
@@ -92,10 +92,7 @@ class TestValidatorConstraintScopes:
 
     def test_filter_with_shared_only(self):
         """Filtering with shared scope should include validators that support shared."""
-        validators = [
-            FrontmatterValidator(),
-            ComplexityValidator(),
-        ]
+        validators = [FrontmatterValidator(), ComplexityValidator()]
         # If provider only claims "shared", validators that support both should still run
         filtered = filter_validators_by_constraint_scopes(validators, {"shared"})
         # All validators in our map support both shared and provider_specific
@@ -104,15 +101,13 @@ class TestValidatorConstraintScopes:
 
     def test_filter_with_provider_specific_only(self):
         """Filtering with provider_specific scope should include validators that support it."""
-        validators = [
-            FrontmatterValidator(),
-            ComplexityValidator(),
-        ]
+        validators = [FrontmatterValidator(), ComplexityValidator()]
         filtered = filter_validators_by_constraint_scopes(validators, {"provider_specific"})
         assert len(filtered) == len(validators)
 
     def test_filter_excludes_mismatched_scopes(self):
         """If a validator only supports 'shared' but provider only has 'provider_specific', exclude it."""
+
         # Create a mock validator with limited scope
         class MockValidator:
             pass
@@ -129,7 +124,7 @@ class TestValidatorConstraintScopes:
 
             validators = [MockValidator()]
             # Provider only has provider_specific
-            filtered = filter_validators_by_constraint_scopes(validators, {"provider_specific"})
+            filtered = filter_validators_by_constraint_scopes(validators, {"provider_specific"})  # type: ignore[arg-type]  # intentional non-Validator mock
             # Should be filtered out
             assert len(filtered) == 0
         finally:
@@ -144,6 +139,6 @@ class TestValidatorConstraintScopes:
             pass
 
         validators = [UnknownValidator()]
-        filtered = filter_validators_by_constraint_scopes(validators, {"shared"})
+        filtered = filter_validators_by_constraint_scopes(validators, {"shared"})  # type: ignore[arg-type]  # intentional non-Validator mock
         # Unknown validators default to both scopes, so included
         assert len(filtered) == 1

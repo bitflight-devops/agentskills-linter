@@ -9,8 +9,8 @@ Each violation dict has the shape:
     {"code": str, "severity": str, "message": str}
 
 Severities:
-    "error"   — AS001, AS002, AS003, AS004
-    "warning" — AS005
+    "error"   — AS001, AS002, AS003
+    "warning" — AS004, AS005
     "info"    — AS006
 """
 
@@ -103,13 +103,21 @@ def _parse_skill_md(path: pathlib.Path) -> tuple[dict, list[str], str | None]:
 
 
 def _violation(
-    code: str,
-    severity: str,
-    message: str,
-    fix: str | None = None,
-    authority: dict | None = None,
-) -> dict:
-    result = {"code": code, "severity": severity, "message": message}
+    code: str, severity: str, message: str, fix: str | None = None, authority: dict | None = None
+) -> dict[str, str | dict]:
+    """Build a violation dict.
+
+    Args:
+        code: Rule code (e.g., "AS001").
+        severity: Severity level ("error", "warning", "info").
+        message: Human-readable message.
+        fix: Optional auto-fix instruction.
+        authority: Optional authority metadata dict.
+
+    Returns:
+        Violation dict with code, severity, message, and optional fix/authority.
+    """
+    result: dict[str, str | dict] = {"code": code, "severity": severity, "message": message}
     if fix:
         result["fix"] = fix
     if authority:
@@ -271,7 +279,7 @@ def _check_as003(description: str | None) -> dict | None:
 
 @skilllint_rule(
     "AS004",
-    severity="error",
+    severity="warning",
     category="skill",
     authority={"origin": "agentskills.io", "reference": "/specification#yaml-frontmatter"},
 )
@@ -306,7 +314,7 @@ def _check_as004(description: str | None, raw_line: str | None = None) -> dict |
         if _has_unquoted_colon(value_part):
             return _make_violation(
                 "AS004",
-                "error",
+                "warning",
                 "description contains unquoted colon that will break YAML parsing",
                 fix=f'Wrap description in quotes: description: "{value_part}"',
             )

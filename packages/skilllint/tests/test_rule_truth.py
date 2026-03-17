@@ -18,19 +18,10 @@ from __future__ import annotations
 from pathlib import Path
 from textwrap import dedent
 
-import pytest
-
-from skilllint.plugin_validator import (
-    ErrorCode,
-    FM003,
-    FM004,
-    FM005,
-    FM007,
-    FrontmatterValidator,
-)
+from skilllint.plugin_validator import FM003, FM004, FM007, ErrorCode, FrontmatterValidator, ValidationIssue
 
 
-def _find_issue_by_code(result, code: str | ErrorCode) -> dict | None:
+def _find_issue_by_code(result, code: str | ErrorCode) -> ValidationIssue | None:
     """Find first issue with given code from validation result."""
     code_str = str(code)
     for issue in result.errors + result.warnings + result.info:
@@ -53,7 +44,8 @@ class TestRuleTruthClassification:
         This is a style preference, not a schema requirement.
         """
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text(dedent("""\
+        skill_md.write_text(
+            dedent("""\
             ---
             description: >-
               This is a multiline description
@@ -61,16 +53,15 @@ class TestRuleTruthClassification:
             ---
 
             # Content
-        """))
+        """)
+        )
 
         validator = FrontmatterValidator()
         result = validator.validate(skill_md)
 
         fm004 = _find_issue_by_code(result, FM004)
         assert fm004 is not None, "Expected FM004 violation for multiline YAML"
-        assert fm004.severity == "warning", (
-            f"FM004 should be warning (runtime-accepted pattern), got {fm004.severity}"
-        )
+        assert fm004.severity == "warning", f"FM004 should be warning (runtime-accepted pattern), got {fm004.severity}"
 
     # -------------------------------------------------------------------------
     # FM007: Tools field as YAML array — should be WARNING
@@ -83,7 +74,8 @@ class TestRuleTruthClassification:
         This is a format preference, not a hard requirement.
         """
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text(dedent("""\
+        skill_md.write_text(
+            dedent("""\
             ---
             description: Test skill with YAML array tools
             tools:
@@ -93,16 +85,15 @@ class TestRuleTruthClassification:
             ---
 
             # Content
-        """))
+        """)
+        )
 
         validator = FrontmatterValidator()
         result = validator.validate(skill_md)
 
         fm007 = _find_issue_by_code(result, FM007)
         assert fm007 is not None, "Expected FM007 violation for YAML array tools"
-        assert fm007.severity == "warning", (
-            f"FM007 should be warning (runtime-accepted pattern), got {fm007.severity}"
-        )
+        assert fm007.severity == "warning", f"FM007 should be warning (runtime-accepted pattern), got {fm007.severity}"
 
     # -------------------------------------------------------------------------
     # AS004: Unquoted colons in description — should be WARNING
@@ -115,22 +106,22 @@ class TestRuleTruthClassification:
         When the value can be auto-fixed by quoting, it's a style issue.
         """
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text(dedent("""\
+        skill_md.write_text(
+            dedent("""\
             ---
             description: Use this: for testing colon handling
             ---
 
             # Content
-        """))
+        """)
+        )
 
         validator = FrontmatterValidator()
         result = validator.validate(skill_md)
 
         as004 = _find_issue_by_code(result, "AS004")
         assert as004 is not None, "Expected AS004 violation for unquoted colons"
-        assert as004.severity == "warning", (
-            f"AS004 should be warning (auto-fixable style issue), got {as004.severity}"
-        )
+        assert as004.severity == "warning", f"AS004 should be warning (auto-fixable style issue), got {as004.severity}"
 
     # -------------------------------------------------------------------------
     # FM003: Missing frontmatter — should be ERROR (justified)
@@ -143,20 +134,20 @@ class TestRuleTruthClassification:
         to function. This is a schema requirement.
         """
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text(dedent("""\
+        skill_md.write_text(
+            dedent("""\
             # Content without frontmatter
 
             This file has no YAML frontmatter.
-        """))
+        """)
+        )
 
         validator = FrontmatterValidator()
         result = validator.validate(skill_md)
 
         fm003 = _find_issue_by_code(result, FM003)
         assert fm003 is not None, "Expected FM003 violation for missing frontmatter"
-        assert fm003.severity == "error", (
-            f"FM003 should be error (frontmatter required), got {fm003.severity}"
-        )
+        assert fm003.severity == "error", f"FM003 should be error (frontmatter required), got {fm003.severity}"
 
     # -------------------------------------------------------------------------
     # FM005: Field type mismatch — should be ERROR (justified)
@@ -169,7 +160,8 @@ class TestRuleTruthClassification:
         A boolean field with a string value is invalid.
         """
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text(dedent("""\
+        skill_md.write_text(
+            dedent("""\
             ---
             description: Test skill
             some_invalid_field:
@@ -178,17 +170,15 @@ class TestRuleTruthClassification:
             ---
 
             # Content
-        """))
+        """)
+        )
 
         validator = FrontmatterValidator()
         result = validator.validate(skill_md)
 
         # Find any error that is not FM004, FM007, or AS004
         # FM005 is generated by Pydantic for type mismatches
-        non_warning_errors = [
-            e for e in result.errors
-            if str(e.code) not in ("FM004", "FM007", "AS004")
-        ]
+        non_warning_errors = [e for e in result.errors if str(e.code) not in ("FM004", "FM007", "AS004")]
         # The presence of any error confirms FM005-level issues are errors
         # (actual FM005 depends on specific Pydantic validation path)
         # For this test, we just verify that legitimate schema errors remain errors
@@ -206,7 +196,8 @@ class TestRuleTruthDoesNotRegress:
         The severity downgrade means FM004 is a warning, not a failure.
         """
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text(dedent("""\
+        skill_md.write_text(
+            dedent("""\
             ---
             description: >-
               A valid multiline description
@@ -215,15 +206,14 @@ class TestRuleTruthDoesNotRegress:
             # Valid Content
 
             This skill has valid frontmatter with multiline syntax.
-        """))
+        """)
+        )
 
         validator = FrontmatterValidator()
         result = validator.validate(skill_md)
 
         # Should pass because FM004 is now a warning
-        assert result.passed is True, (
-            "Validation should pass when only FM004 warning is present"
-        )
+        assert result.passed is True, "Validation should pass when only FM004 warning is present"
 
     def test_yaml_array_tools_with_valid_content_passes_validation(self, tmp_path: Path) -> None:
         """Files with FM007 warnings should still pass validation.
@@ -231,7 +221,8 @@ class TestRuleTruthDoesNotRegress:
         The severity downgrade means FM007 is a warning, not a failure.
         """
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text(dedent("""\
+        skill_md.write_text(
+            dedent("""\
             ---
             description: A valid skill with array tools
             tools:
@@ -240,15 +231,14 @@ class TestRuleTruthDoesNotRegress:
             ---
 
             # Valid Content
-        """))
+        """)
+        )
 
         validator = FrontmatterValidator()
         result = validator.validate(skill_md)
 
         # Should pass because FM007 is now a warning
-        assert result.passed is True, (
-            "Validation should pass when only FM007 warning is present"
-        )
+        assert result.passed is True, "Validation should pass when only FM007 warning is present"
 
 
 class TestSeverityRoutingIntegration:
@@ -265,12 +255,8 @@ class TestSeverityRoutingIntegration:
         validator = FrontmatterValidator()
         result = validator.validate(fixture_path)
 
-        assert result.passed is True, (
-            f"valid_skill.md should pass validation, got errors: {result.errors}"
-        )
-        assert len(result.errors) == 0, (
-            f"valid_skill.md should have no errors, got: {[e.code for e in result.errors]}"
-        )
+        assert result.passed is True, f"valid_skill.md should pass validation, got errors: {result.errors}"
+        assert len(result.errors) == 0, f"valid_skill.md should have no errors, got: {[e.code for e in result.errors]}"
 
     def test_fm004_fm007_patterns_route_to_warnings_not_errors(self, tmp_path: Path) -> None:
         """FM004 and FM007 patterns should produce warnings, not errors.
@@ -282,7 +268,8 @@ class TestSeverityRoutingIntegration:
         The file should pass validation because warnings don't block.
         """
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text(dedent("""\
+        skill_md.write_text(
+            dedent("""\
             ---
             name: integration-test-skill
             description: >-
@@ -297,33 +284,24 @@ class TestSeverityRoutingIntegration:
             # Integration Test Skill
 
             This skill has both FM004 and FM007 patterns.
-        """))
+        """)
+        )
 
         validator = FrontmatterValidator()
         result = validator.validate(skill_md)
 
         # Should pass because FM004/FM007 are warnings
-        assert result.passed is True, (
-            "Validation should pass when only FM004/FM007 warnings are present"
-        )
+        assert result.passed is True, "Validation should pass when only FM004/FM007 warnings are present"
 
         # FM004 should be in warnings, not errors
-        fm004_in_warnings = any(
-            str(w.code) == "FM004" for w in result.warnings
-        )
-        fm004_in_errors = any(
-            str(e.code) == "FM004" for e in result.errors
-        )
+        fm004_in_warnings = any(str(w.code) == "FM004" for w in result.warnings)
+        fm004_in_errors = any(str(e.code) == "FM004" for e in result.errors)
         assert fm004_in_warnings is True, "FM004 should be in warnings list"
         assert fm004_in_errors is False, "FM004 should NOT be in errors list"
 
         # FM007 should be in warnings, not errors
-        fm007_in_warnings = any(
-            str(w.code) == "FM007" for w in result.warnings
-        )
-        fm007_in_errors = any(
-            str(e.code) == "FM007" for e in result.errors
-        )
+        fm007_in_warnings = any(str(w.code) == "FM007" for w in result.warnings)
+        fm007_in_errors = any(str(e.code) == "FM007" for e in result.errors)
         assert fm007_in_warnings is True, "FM007 should be in warnings list"
         assert fm007_in_errors is False, "FM007 should NOT be in errors list"
 
@@ -333,7 +311,8 @@ class TestSeverityRoutingIntegration:
         The severity downgrade means AS004 is auto-fixable and doesn't block.
         """
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text(dedent("""\
+        skill_md.write_text(
+            dedent("""\
             ---
             name: as004-test-skill
             description: Use this skill: for testing colon handling
@@ -342,23 +321,18 @@ class TestSeverityRoutingIntegration:
             # AS004 Test Skill
 
             This skill has an unquoted colon in the description.
-        """))
+        """)
+        )
 
         validator = FrontmatterValidator()
         result = validator.validate(skill_md)
 
         # Should pass because AS004 is a warning
-        assert result.passed is True, (
-            "Validation should pass when only AS004 warning is present"
-        )
+        assert result.passed is True, "Validation should pass when only AS004 warning is present"
 
         # AS004 should be in warnings, not errors
-        as004_in_warnings = any(
-            str(w.code) == "AS004" for w in result.warnings
-        )
-        as004_in_errors = any(
-            str(e.code) == "AS004" for e in result.errors
-        )
+        as004_in_warnings = any(str(w.code) == "AS004" for w in result.warnings)
+        as004_in_errors = any(str(e.code) == "AS004" for e in result.errors)
         assert as004_in_warnings is True, "AS004 should be in warnings list"
         assert as004_in_errors is False, "AS004 should NOT be in errors list"
 
@@ -368,22 +342,20 @@ class TestSeverityRoutingIntegration:
         This verifies that justified hard failures are NOT downgraded.
         """
         skill_md = tmp_path / "SKILL.md"
-        skill_md.write_text(dedent("""\
+        skill_md.write_text(
+            dedent("""\
             # No Frontmatter Here
 
             This file has no YAML frontmatter at all.
-        """))
+        """)
+        )
 
         validator = FrontmatterValidator()
         result = validator.validate(skill_md)
 
         # Should fail because FM003 is a genuine error
-        assert result.passed is False, (
-            "Validation should fail when FM003 error is present"
-        )
+        assert result.passed is False, "Validation should fail when FM003 error is present"
 
         # FM003 should be in errors, not warnings
-        fm003_in_errors = any(
-            str(e.code) == "FM003" for e in result.errors
-        )
+        fm003_in_errors = any(str(e.code) == "FM003" for e in result.errors)
         assert fm003_in_errors is True, "FM003 should be in errors list"

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Refresh provider schemas with updated provenance and version bumps.
 
 Reads each provider's current latest schema, bumps the version (v1→v2),
@@ -14,6 +13,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import copy
 import json
 import sys
 from datetime import UTC, datetime
@@ -35,10 +35,7 @@ def get_provider_ids() -> list[str]:
     Returns:
         List of provider IDs (directory names), e.g., ['claude_code', 'cursor', 'codex'].
     """
-    providers = []
-    for item in SCHEMAS_DIR.iterdir():
-        if item.is_dir() and not item.name.startswith("_"):
-            providers.append(item.name)
+    providers = [item.name for item in SCHEMAS_DIR.iterdir() if item.is_dir() and not item.name.startswith("_")]
     return sorted(providers)
 
 
@@ -115,9 +112,7 @@ def validate_provenance(schema: dict[str, Any], provider: str) -> list[str]:
     return errors
 
 
-def create_refreshed_schema(
-    schema: dict[str, Any], new_version: int, provider: str
-) -> dict[str, Any]:
+def create_refreshed_schema(schema: dict[str, Any], new_version: int, provider: str) -> dict[str, Any]:
     """Create a refreshed schema with updated version and provenance.
 
     Args:
@@ -128,8 +123,6 @@ def create_refreshed_schema(
     Returns:
         New schema dict with updated provenance.
     """
-    import copy
-
     new_schema = copy.deepcopy(schema)
 
     # Update version in $id
@@ -170,9 +163,7 @@ def show_diff(old_schema: dict[str, Any], new_schema: dict[str, Any], provider: 
     print(f"     → {new_prov.get('last_verified', 'N/A')}")
 
 
-def refresh_provider(
-    provider: str, *, dry_run: bool, verbose: bool
-) -> tuple[bool, str]:
+def refresh_provider(provider: str, *, dry_run: bool, verbose: bool) -> tuple[bool, str]:
     """Refresh a single provider's schema.
 
     Args:
@@ -234,7 +225,7 @@ def count_constraint_scopes(schema: dict[str, Any]) -> int:
     """
     count = 0
 
-    def walk(obj: Any) -> None:
+    def walk(obj: object) -> None:
         nonlocal count
         if isinstance(obj, dict):
             if "constraint_scope" in obj:
@@ -250,7 +241,11 @@ def count_constraint_scopes(schema: dict[str, Any]) -> int:
 
 
 def main() -> int:
-    """Main entry point for schema refresh script."""
+    """Main entry point for schema refresh script.
+
+    Returns:
+        Exit code: 0 on success, 1 on validation error, 2 on write failure.
+    """
     parser = argparse.ArgumentParser(
         description="Refresh provider schemas with updated provenance and version bumps.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -261,37 +256,19 @@ Exit codes:
   2  Write failure
 """,
     )
+    parser.add_argument("--bump", action="store_true", help="Write new schema versions (default is dry-run)")
     parser.add_argument(
-        "--bump",
-        action="store_true",
-        help="Write new schema versions (default is dry-run)",
+        "--dry-run", action="store_true", help="Show proposed changes without writing (default behavior)"
     )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show proposed changes without writing (default behavior)",
-    )
-    parser.add_argument(
-        "--provider",
-        metavar="NAME",
-        help="Refresh only the specified provider",
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Show detailed constraint_scope preservation status",
-    )
+    parser.add_argument("--provider", metavar="NAME", help="Refresh only the specified provider")
+    parser.add_argument("--verbose", action="store_true", help="Show detailed constraint_scope preservation status")
     args = parser.parse_args()
 
     # Get providers to process
     if args.provider:
         available = get_provider_ids()
         if args.provider not in available:
-            print(
-                f"error: provider '{args.provider}' not found. "
-                f"Available: {available}",
-                file=sys.stderr,
-            )
+            print(f"error: provider '{args.provider}' not found. Available: {available}", file=sys.stderr)
             return 1
         providers = [args.provider]
     else:

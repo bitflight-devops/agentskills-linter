@@ -21,12 +21,8 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
-
-if TYPE_CHECKING:
-    pass
 
 # ANSI escape code pattern for stripping color codes from output
 _ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*[mGKHFJA-Z]")
@@ -39,11 +35,7 @@ EXTERNAL_REPOS = {
 }
 
 # Expected exit codes from S04 baseline
-EXPECTED_EXIT_CODES = {
-    "claude-plugins-official": 1,
-    "skills": 1,
-    "claude-code-plugins": 0,
-}
+EXPECTED_EXIT_CODES = {"claude-plugins-official": 1, "skills": 1, "claude-code-plugins": 0}
 
 # Rule codes by severity (S04 classification)
 ERROR_RULE_CODES = {"FM003", "FM005"}
@@ -68,10 +60,11 @@ def _run_skilllint_check(repo_path: Path) -> tuple[int, str, str]:
     env["PATH"] = os.environ.get("PATH", "")
 
     result = subprocess.run(
-        [sys.executable, "-m", "skilllint.plugin_validator", "check", str(repo_path)],
+        [sys.executable, "-m", "skilllint.plugin_validator", "check", "--no-color", str(repo_path)],
         capture_output=True,
         text=True,
         env=env,
+        check=False,
     )
 
     return result.returncode, result.stdout, result.stderr
@@ -101,8 +94,7 @@ class TestClaudePluginsOfficial:
     """Regression tests for claude-plugins-official scan."""
 
     @pytest.mark.skipif(
-        not EXTERNAL_REPOS["claude-plugins-official"].is_dir(),
-        reason="claude-plugins-official repo not present",
+        not EXTERNAL_REPOS["claude-plugins-official"].is_dir(), reason="claude-plugins-official repo not present"
     )
     def test_exit_code_matches_baseline(self) -> None:
         """Exit code is 1 (hard failures present)."""
@@ -117,13 +109,12 @@ class TestClaudePluginsOfficial:
         )
 
     @pytest.mark.skipif(
-        not EXTERNAL_REPOS["claude-plugins-official"].is_dir(),
-        reason="claude-plugins-official repo not present",
+        not EXTERNAL_REPOS["claude-plugins-official"].is_dir(), reason="claude-plugins-official repo not present"
     )
     def test_warning_rules_present_in_output(self) -> None:
         """Warning-level rules (FM004, FM007, AS004) appear in output."""
         repo_path = EXTERNAL_REPOS["claude-plugins-official"]
-        exit_code, stdout, stderr = _run_skilllint_check(repo_path)
+        _exit_code, stdout, stderr = _run_skilllint_check(repo_path)
 
         combined_output = stdout + stderr
         found_codes = _extract_rule_codes(combined_output)
@@ -131,13 +122,11 @@ class TestClaudePluginsOfficial:
         # At least one warning-level code should be present
         found_warnings = found_codes & WARNING_RULE_CODES
         assert len(found_warnings) > 0, (
-            f"Expected warning-level rules {WARNING_RULE_CODES} in output, "
-            f"but found none. Found codes: {found_codes}"
+            f"Expected warning-level rules {WARNING_RULE_CODES} in output, but found none. Found codes: {found_codes}"
         )
 
     @pytest.mark.skipif(
-        not EXTERNAL_REPOS["claude-plugins-official"].is_dir(),
-        reason="claude-plugins-official repo not present",
+        not EXTERNAL_REPOS["claude-plugins-official"].is_dir(), reason="claude-plugins-official repo not present"
     )
     def test_no_unexpected_error_rules(self) -> None:
         """No unexpected error-level rules beyond FM003/FM005."""
@@ -148,38 +137,26 @@ class TestClaudePluginsOfficial:
         found_codes = _extract_rule_codes(combined_output)
 
         # All error-level codes found must be FM003 or FM005
-        unexpected_errors = (found_codes & ERROR_RULE_CODES) - ERROR_RULE_CODES
+        (found_codes & ERROR_RULE_CODES) - ERROR_RULE_CODES
         # Actually check that found error codes are subset of expected error codes
         found_error_codes = found_codes & ERROR_RULE_CODES
         # All found error-level codes should be FM003 or FM005
         # (This is a tautology with the current sets, but documents the intent)
 
         # Check for any codes that are NOT in our known sets
-        unknown_codes = found_codes - ERROR_RULE_CODES - WARNING_RULE_CODES - {
-            "SK004",
-            "SK005",
-            "SK006",
-            "LK002",
-            "FM010",
-        }
+        (found_codes - ERROR_RULE_CODES - WARNING_RULE_CODES - {"SK004", "SK005", "SK006", "LK002", "FM010"})
         # unknown_codes are allowed (other warning-level rules)
         # The key assertion is that only FM003/FM005 cause exit code 1
 
         # Verify FM003 and/or FM005 are present (these cause exit code 1)
         if exit_code == 1:
-            assert found_error_codes, (
-                f"Exit code 1 but no FM003/FM005 found in output. "
-                f"Found codes: {found_codes}"
-            )
+            assert found_error_codes, f"Exit code 1 but no FM003/FM005 found in output. Found codes: {found_codes}"
 
 
 class TestSkillsRepo:
     """Regression tests for skills scan."""
 
-    @pytest.mark.skipif(
-        not EXTERNAL_REPOS["skills"].is_dir(),
-        reason="skills repo not present",
-    )
+    @pytest.mark.skipif(not EXTERNAL_REPOS["skills"].is_dir(), reason="skills repo not present")
     def test_exit_code_matches_baseline(self) -> None:
         """Exit code is 1 (hard failures present)."""
         repo_path = EXTERNAL_REPOS["skills"]
@@ -191,40 +168,32 @@ class TestSkillsRepo:
             f"stderr: {stderr[:500]}..."
         )
 
-    @pytest.mark.skipif(
-        not EXTERNAL_REPOS["skills"].is_dir(),
-        reason="skills repo not present",
-    )
+    @pytest.mark.skipif(not EXTERNAL_REPOS["skills"].is_dir(), reason="skills repo not present")
     def test_fm003_errors_present(self) -> None:
         """FM003 errors (missing frontmatter) are present."""
         repo_path = EXTERNAL_REPOS["skills"]
-        exit_code, stdout, stderr = _run_skilllint_check(repo_path)
+        _exit_code, stdout, stderr = _run_skilllint_check(repo_path)
 
         combined_output = stdout + stderr
         found_codes = _extract_rule_codes(combined_output)
 
         # FM003 should be present (causes exit code 1)
         assert "FM003" in found_codes, (
-            f"Expected FM003 in output (missing frontmatter), but not found. "
-            f"Found codes: {found_codes}"
+            f"Expected FM003 in output (missing frontmatter), but not found. Found codes: {found_codes}"
         )
 
-    @pytest.mark.skipif(
-        not EXTERNAL_REPOS["skills"].is_dir(),
-        reason="skills repo not present",
-    )
+    @pytest.mark.skipif(not EXTERNAL_REPOS["skills"].is_dir(), reason="skills repo not present")
     def test_no_fm005_errors(self) -> None:
         """FM005 errors (type mismatch) are not present in skills repo."""
         repo_path = EXTERNAL_REPOS["skills"]
-        exit_code, stdout, stderr = _run_skilllint_check(repo_path)
+        _exit_code, stdout, stderr = _run_skilllint_check(repo_path)
 
         combined_output = stdout + stderr
         found_codes = _extract_rule_codes(combined_output)
 
         # FM005 should NOT be present in skills repo (per findings report)
         assert "FM005" not in found_codes, (
-            f"FM005 (type mismatch) unexpectedly found in skills repo. "
-            f"Found codes: {found_codes}"
+            f"FM005 (type mismatch) unexpectedly found in skills repo. Found codes: {found_codes}"
         )
 
 
@@ -232,8 +201,7 @@ class TestClaudeCodePlugins:
     """Regression tests for claude-code-plugins scan."""
 
     @pytest.mark.skipif(
-        not EXTERNAL_REPOS["claude-code-plugins"].is_dir(),
-        reason="claude-code-plugins repo not present",
+        not EXTERNAL_REPOS["claude-code-plugins"].is_dir(), reason="claude-code-plugins repo not present"
     )
     def test_exit_code_matches_baseline(self) -> None:
         """Exit code is 0 (warnings only, no hard failures)."""
@@ -248,13 +216,12 @@ class TestClaudeCodePlugins:
         )
 
     @pytest.mark.skipif(
-        not EXTERNAL_REPOS["claude-code-plugins"].is_dir(),
-        reason="claude-code-plugins repo not present",
+        not EXTERNAL_REPOS["claude-code-plugins"].is_dir(), reason="claude-code-plugins repo not present"
     )
     def test_no_error_level_rules(self) -> None:
         """No error-level rules (FM003/FM005) in output."""
         repo_path = EXTERNAL_REPOS["claude-code-plugins"]
-        exit_code, stdout, stderr = _run_skilllint_check(repo_path)
+        _exit_code, stdout, stderr = _run_skilllint_check(repo_path)
 
         combined_output = stdout + stderr
         found_codes = _extract_rule_codes(combined_output)
@@ -262,18 +229,16 @@ class TestClaudeCodePlugins:
         # No FM003 or FM005 should be present
         found_errors = found_codes & ERROR_RULE_CODES
         assert not found_errors, (
-            f"Expected no error-level rules, but found: {found_errors}. "
-            f"All found codes: {found_codes}"
+            f"Expected no error-level rules, but found: {found_errors}. All found codes: {found_codes}"
         )
 
     @pytest.mark.skipif(
-        not EXTERNAL_REPOS["claude-code-plugins"].is_dir(),
-        reason="claude-code-plugins repo not present",
+        not EXTERNAL_REPOS["claude-code-plugins"].is_dir(), reason="claude-code-plugins repo not present"
     )
     def test_warning_rules_present_in_output(self) -> None:
         """Warning-level rules appear in output."""
         repo_path = EXTERNAL_REPOS["claude-code-plugins"]
-        exit_code, stdout, stderr = _run_skilllint_check(repo_path)
+        _exit_code, stdout, stderr = _run_skilllint_check(repo_path)
 
         combined_output = stdout + stderr
         found_codes = _extract_rule_codes(combined_output)
@@ -281,6 +246,5 @@ class TestClaudeCodePlugins:
         # At least one warning-level code should be present
         found_warnings = found_codes & WARNING_RULE_CODES
         assert len(found_warnings) > 0, (
-            f"Expected warning-level rules {WARNING_RULE_CODES} in output, "
-            f"but found none. Found codes: {found_codes}"
+            f"Expected warning-level rules {WARNING_RULE_CODES} in output, but found none. Found codes: {found_codes}"
         )

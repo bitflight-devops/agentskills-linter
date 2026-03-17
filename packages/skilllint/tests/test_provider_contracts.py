@@ -5,6 +5,8 @@ Any change to the provenance structure or constraint_scope values will fail
 these tests, signalling a breaking change that needs explicit review.
 """
 
+from __future__ import annotations
+
 import pytest
 
 from skilllint.rule_registry import RuleAuthority, RuleEntry, skilllint_rule
@@ -92,6 +94,7 @@ class TestRuleAuthority:
 
     def test_rule_entry_authority_structured(self) -> None:
         """RuleEntry should accept and expose structured authority."""
+
         # Create a test function
         def test_validator(frontmatter: dict) -> list:
             return []
@@ -114,6 +117,7 @@ class TestRuleAuthority:
 
     def test_rule_entry_authority_optional(self) -> None:
         """RuleEntry.authority should be optional (default None)."""
+
         # Create a test function
         def test_validator(frontmatter: dict) -> list:
             return []
@@ -157,11 +161,7 @@ class TestRuleAuthority:
         """skilllint_rule decorator should work without authority kwarg."""
         from skilllint.rule_registry import RULE_REGISTRY
 
-        @skilllint_rule(
-            "TEST_NO_AUTH_001",
-            severity="info",
-            category="test",
-        )
+        @skilllint_rule("TEST_NO_AUTH_001", severity="info", category="test")
         def test_rule_without_authority(frontmatter: dict) -> list:
             """Test rule without authority."""
             return []
