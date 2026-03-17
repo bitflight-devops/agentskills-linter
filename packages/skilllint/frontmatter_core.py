@@ -52,6 +52,10 @@ if TYPE_CHECKING:
 # Constants
 # ---------------------------------------------------------------------------
 
+# agentskills.io/specification.md: description Required=Yes, max 1024 chars, non-empty
+MAX_DESCRIPTION_LENGTH: int = 1024
+"""Maximum allowed length for a skill description (agentskills.io spec)."""
+
 RECOMMENDED_DESCRIPTION_LENGTH: int = 1024
 """Warn when a description exceeds this many characters."""
 
@@ -83,7 +87,8 @@ class SkillFrontmatter(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     name: str | None = Field(None, max_length=64, pattern=r"^[a-z0-9]+(-[a-z0-9]+)*$")
-    description: str | None = None
+    # agentskills.io/specification.md: description Required=Yes, max 1024 chars, non-empty
+    description: str = Field(min_length=1, max_length=MAX_DESCRIPTION_LENGTH)
     argument_hint: str | None = Field(None, alias="argument-hint")
     allowed_tools: str | None = Field(None, alias="allowed-tools")
     model: str | None = None
@@ -108,15 +113,16 @@ class SkillFrontmatter(BaseModel):
 
     @field_validator("description", mode="before")
     @classmethod
-    def normalize_single_line(cls, v: object) -> str | None:
+    def normalize_single_line(cls, v: object) -> object:
         """Collapse multiline descriptions to single line.
 
         Returns:
-            Normalized single-line string or None.
+            Normalized single-line string, or the original value unchanged
+            (Pydantic enforces the required str constraint after this runs).
         """
         if isinstance(v, str) and "\n" in v:
             return " ".join(v.split())
-        return v if isinstance(v, str) else None
+        return v
 
 
 class CommandFrontmatter(BaseModel):

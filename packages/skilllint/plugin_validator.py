@@ -59,6 +59,7 @@ from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHO
 from skilllint.version import __version__
 
 from .frontmatter_core import (
+    MAX_DESCRIPTION_LENGTH,
     MAX_SKILL_NAME_LENGTH,
     RECOMMENDED_DESCRIPTION_LENGTH,
     AgentFrontmatter,
