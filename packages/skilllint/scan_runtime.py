@@ -8,7 +8,10 @@ validation loop to a dedicated module without changing user-facing behavior.
 from __future__ import annotations
 
 import fnmatch
+import json
 from collections.abc import Callable
+from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from typing import Any, NoReturn
 
@@ -37,19 +40,182 @@ DEFAULT_SCAN_PATTERNS: tuple[str, ...] = (
 )
 
 
+class ScanContext(StrEnum):
+    """The structural context of a scan target directory."""
+
+    PLUGIN = "plugin"
+    PROVIDER = "provider"
+    BARE = "bare"
+
+
+KNOWN_PROVIDER_DIRS: frozenset[str] = frozenset({".claude", ".cursor", ".gemini", ".codex"})
+
+PLUGIN_FILTER_TYPE_MAP: dict[str, str] = {
+    "skills": "skills/*/SKILL.md",
+    "agents": "agents/*.md",
+    "commands": "commands/*.md",
+}
+
+
+# ---------------------------------------------------------------------------
+# Plugin manifest
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class PluginManifest:
+    """Parsed paths from plugin.json, if declared."""
+
+    plugin_root: Path
+    agents: list[str] | None = None
+    commands: list[str] | None = None
+    skills: list[str] | None = None
+
+    @property
+    def is_manifest_driven(self) -> bool:
+        """True if plugin.json declares any explicit paths."""
+        return any(v is not None for v in (self.agents, self.commands, self.skills))
+
+
+def _parse_plugin_manifest(plugin_root: Path) -> PluginManifest:
+    """Read plugin.json and extract declared paths.
+
+    If plugin.json has no path declarations, all fields are None
+    (convention-driven mode). Returns all-None manifest on error.
+
+    Args:
+        plugin_root: Directory containing .claude-plugin/plugin.json.
+
+    Returns:
+        PluginManifest with parsed paths or None fields.
+    """
+    manifest_path = plugin_root / ".claude-plugin" / "plugin.json"
+    try:
+        raw = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return PluginManifest(plugin_root=plugin_root)
+
+    def _extract(key: str) -> list[str] | None:
+        value = raw.get(key)
+        if isinstance(value, list):
+            return value
+        return None
+
+    return PluginManifest(
+        plugin_root=plugin_root, agents=_extract("agents"), commands=_extract("commands"), skills=_extract("skills")
+    )
+
+
+def _discover_plugin_paths(manifest: PluginManifest) -> list[Path]:
+    """Discover validatable files in a plugin directory.
+
+    Two modes based on manifest.is_manifest_driven:
+    - Manifest-driven: Resolve exactly the declared paths. No globbing.
+    - Convention-driven: Glob at plugin root only (no ** recursion).
+
+    Never recurses into skills/*/agents/ or skills/*/commands/.
+
+    Args:
+        manifest: Parsed plugin manifest with plugin_root and path lists.
+
+    Returns:
+        Sorted list of unique paths.
+    """
+    discovered: set[Path] = set()
+    root = manifest.plugin_root
+
+    if manifest.is_manifest_driven:
+        # Skills entries may be directories (e.g. "./skills/my-skill/") or
+        # direct SKILL.md paths. Resolve directories to their SKILL.md file.
+        if manifest.skills is not None:
+            for rel in manifest.skills:
+                resolved = root / rel
+                if resolved.is_dir():
+                    skill_md = resolved / "SKILL.md"
+                    if skill_md.exists():
+                        discovered.add(skill_md)
+                else:
+                    discovered.add(resolved)
+        # Agents and commands entries should be direct file paths.
+        for path_list in (manifest.agents, manifest.commands):
+            if path_list is not None:
+                discovered.update(root / rel for rel in path_list)
+    else:
+        discovered.update(root.glob("agents/*.md"))
+        discovered.update(root.glob("commands/*.md"))
+        discovered.update(root.glob("skills/*/SKILL.md"))
+
+    discovered.add(root)
+
+    if (root / "hooks" / "hooks.json").exists():
+        discovered.add(root / "hooks" / "hooks.json")
+    if (root / "CLAUDE.md").exists():
+        discovered.add(root / "CLAUDE.md")
+
+    return sorted(discovered)
+
+
+# ---------------------------------------------------------------------------
+# Scan context detection
+# ---------------------------------------------------------------------------
+
+
+def detect_scan_context(directory: Path) -> ScanContext:
+    """Identify the scan context of a directory.
+
+    Decision order:
+    1. If directory contains .claude-plugin/plugin.json -> PLUGIN
+    2. If directory name matches a known provider prefix (.claude, .cursor,
+       .gemini, etc.) -> PROVIDER
+    3. Otherwise -> BARE
+
+    Plugin check takes precedence over provider check: a .claude/ directory
+    that also contains .claude-plugin/plugin.json is classified as PLUGIN.
+
+    Args:
+        directory: The target directory to classify.
+
+    Returns:
+        ScanContext enum value.
+    """
+    if (directory / ".claude-plugin" / "plugin.json").exists():
+        return ScanContext.PLUGIN
+    if directory.name in KNOWN_PROVIDER_DIRS:
+        return ScanContext.PROVIDER
+    return ScanContext.BARE
+
+
+def _discover_provider_paths(directory: Path) -> list[Path]:
+    """Discover validatable files in a provider directory.
+
+    Uses the provider's known agent location pattern:
+        {directory}/agents/**/*.md
+
+    No other files in the provider tree are discovered as agents.
+
+    Args:
+        directory: The provider directory (e.g., .claude/).
+
+    Returns:
+        Sorted list of unique paths.
+    """
+    return sorted(set(directory.glob("agents/**/*.md")))
+
+
 # ---------------------------------------------------------------------------
 # Path discovery and filtering
 # ---------------------------------------------------------------------------
 
 
 def _discover_validatable_paths(directory: Path) -> list[Path]:
-    """Auto-discover validatable files in a bare directory.
+    """Auto-discover validatable files using context-appropriate rules.
 
-    Globs ``DEFAULT_SCAN_PATTERNS`` against *directory* and returns
-    deduplicated, sorted paths.  For any ``.claude-plugin/plugin.json``
-    match the **plugin root directory** (grandparent of plugin.json) is
-    returned instead of the file itself, because ``detect_file_type``
-    recognises directories that contain ``.claude-plugin/plugin.json``.
+    Detects the scan context of the directory and dispatches to the
+    appropriate discovery function:
+    - PLUGIN: parse manifest and discover plugin-scoped paths
+    - PROVIDER: discover agents/**/*.md only
+    - BARE: handle nested plugins and providers, then apply DEFAULT_SCAN_PATTERNS
+             for paths not covered by any plugin/provider subtree
 
     Args:
         directory: The directory to scan.
@@ -57,13 +223,52 @@ def _discover_validatable_paths(directory: Path) -> list[Path]:
     Returns:
         Sorted list of unique paths suitable for validation.
     """
+    context = detect_scan_context(directory)
+
+    if context == ScanContext.PLUGIN:
+        manifest = _parse_plugin_manifest(directory)
+        return _discover_plugin_paths(manifest)
+
+    if context == ScanContext.PROVIDER:
+        return _discover_provider_paths(directory)
+
+    # BARE context: find nested plugins and providers, then apply DEFAULT_SCAN_PATTERNS
     discovered: set[Path] = set()
+    plugin_roots: set[Path] = set()
+
+    # Find nested plugin roots
+    for plugin_json in directory.glob("**/.claude-plugin/plugin.json"):
+        plugin_root = plugin_json.parent.parent
+        plugin_roots.add(plugin_root)
+        manifest = _parse_plugin_manifest(plugin_root)
+        discovered.update(_discover_plugin_paths(manifest))
+
+    # Find nested provider directories (skip those inside plugin trees)
+    for provider_name in KNOWN_PROVIDER_DIRS:
+        for provider_dir in directory.glob(f"**/{provider_name}"):
+            if not provider_dir.is_dir():
+                continue
+            # Plugin takes precedence: skip providers inside plugin trees
+            if any(provider_dir.is_relative_to(pr) for pr in plugin_roots):
+                continue
+            discovered.update(_discover_provider_paths(provider_dir))
+
+    # Files outside any plugin/provider subtree: use DEFAULT_SCAN_PATTERNS
+    covered_roots = plugin_roots | {
+        provider_dir
+        for provider_name in KNOWN_PROVIDER_DIRS
+        for provider_dir in directory.glob(f"**/{provider_name}")
+        if provider_dir.is_dir() and not any(provider_dir.is_relative_to(pr) for pr in plugin_roots)
+    }
+
     for pattern in DEFAULT_SCAN_PATTERNS:
         for match in directory.glob(pattern):
-            if match.name == "plugin.json":
-                discovered.add(match.parent.parent)
-            else:
-                discovered.add(match)
+            # For plugin.json matches, add the plugin root (grandparent)
+            candidate = match.parent.parent if pattern.endswith("plugin.json") else match
+            # Only add if not already inside a discovered plugin/provider tree
+            if not any(candidate.is_relative_to(root) for root in covered_roots):
+                discovered.add(candidate)
+
     return sorted(discovered)
 
 
@@ -85,29 +290,30 @@ def _resolve_filter_and_expand_paths(
         typer.echo("Error: --filter and --filter-type are mutually exclusive", err=True)
         raise typer.Exit(2) from None
 
-    resolved_glob: str | None = filter_glob
-    if filter_type is not None:
-        if filter_type not in FILTER_TYPE_MAP:
-            valid = ", ".join(FILTER_TYPE_MAP)
-            typer.echo(f"Error: --filter-type must be one of: {valid}", err=True)
-            raise typer.Exit(2) from None
-        resolved_glob = FILTER_TYPE_MAP[filter_type]
+    if filter_type is not None and filter_type not in FILTER_TYPE_MAP:
+        valid = ", ".join(FILTER_TYPE_MAP)
+        typer.echo(f"Error: --filter-type must be one of: {valid}", err=True)
+        raise typer.Exit(2) from None
 
     expanded_paths: list[Path] = []
     is_batch = False
     for path in paths:
+        if filter_type is not None:
+            # Context-aware resolution: plugin dirs use root-only globs to
+            # avoid matching skill-internal agent/command files.
+            if path.is_dir() and detect_scan_context(path) == ScanContext.PLUGIN:
+                resolved_glob: str | None = PLUGIN_FILTER_TYPE_MAP.get(filter_type, FILTER_TYPE_MAP[filter_type])
+            else:
+                resolved_glob = FILTER_TYPE_MAP[filter_type]
+        else:
+            resolved_glob = filter_glob
         if resolved_glob is not None and path.is_dir():
             matched = sorted(path.glob(resolved_glob))
             expanded_paths.extend(matched)
             is_batch = True
         elif resolved_glob is None and path.is_dir():
-            if (path / ".claude-plugin/plugin.json").exists():
-                expanded_paths.append(path)
-                # Also validate SKILL.md files (InternalLinkValidator, etc.)
-                expanded_paths.extend(sorted(path.glob("**/skills/*/SKILL.md")))
-            else:
-                expanded_paths.extend(_discover_validatable_paths(path))
-                is_batch = True
+            expanded_paths.extend(_discover_validatable_paths(path))
+            is_batch = True
         else:
             expanded_paths.append(path)
     return expanded_paths, is_batch

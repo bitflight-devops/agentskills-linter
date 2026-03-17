@@ -75,6 +75,8 @@ if TYPE_CHECKING:
 
     from pydantic_core import ErrorDetails
 
+    from skilllint.scan_runtime import ScanContext
+
 # Module-level ruamel.yaml safe-mode instance (replaces yaml.safe_load)
 _yaml_safe = YAML(typ="safe")
 
@@ -734,15 +736,52 @@ class FileType(StrEnum):
     UNKNOWN = "unknown"
 
     @staticmethod
-    def detect_file_type(path: Path) -> FileType:
-        """Detect file type from path structure.
+    def _is_plugin_scoped_unknown(path: Path, plugin_root: Path) -> bool:
+        """Return True if path is skill-internal and must be classified as UNKNOWN.
+
+        In PLUGIN context, only direct children of {plugin_root}/agents/ or
+        {plugin_root}/commands/ qualify. Skill-internal paths are UNKNOWN.
 
         Args:
-            path: Path to file or directory to classify
+            path: The file path to classify.
+            plugin_root: The plugin root directory.
 
         Returns:
-            FileType enum value based on path structure
+            True if the path should be classified as UNKNOWN.
         """
+        if "agents" in path.parts and path.parent != plugin_root / "agents":
+            return True
+        return bool("commands" in path.parts and path.parent != plugin_root / "commands")
+
+    @staticmethod
+    def detect_file_type(
+        path: Path, scan_context: ScanContext | None = None, plugin_root: Path | None = None
+    ) -> FileType:
+        """Detect file type from path structure, optionally scoped by context.
+
+        When scan_context is PLUGIN and plugin_root is provided:
+        - Only classify as AGENT if path is directly under {plugin_root}/agents/
+        - Only classify as COMMAND if path is directly under {plugin_root}/commands/
+        - Files under skills/*/agents/ or skills/*/commands/ within the plugin
+          are classified as UNKNOWN (skill-internal, not plugin-level components)
+
+        When scan_context is None: current behavior (backward compatible).
+
+        Args:
+            path: The file path to classify.
+            scan_context: Optional scan context for scoped classification.
+            plugin_root: Optional plugin root for context-aware classification.
+
+        Returns:
+            FileType enum value.
+        """
+        if (
+            scan_context is not None
+            and plugin_root is not None
+            and FileType._is_plugin_scoped_unknown(path, plugin_root)
+        ):
+            return FileType.UNKNOWN
+
         if path.name == "SKILL.md":
             result = FileType.SKILL
         elif path.name == "plugin.json" or (path / ".claude-plugin/plugin.json").exists():
