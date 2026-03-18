@@ -244,6 +244,7 @@ def _discover_validatable_paths(directory: Path) -> list[Path]:
         discovered.update(_discover_plugin_paths(manifest))
 
     # Find nested provider directories (skip those inside plugin trees)
+    provider_roots: set[Path] = set()
     for provider_name in KNOWN_PROVIDER_DIRS:
         for provider_dir in directory.glob(f"**/{provider_name}"):
             if not provider_dir.is_dir():
@@ -251,15 +252,11 @@ def _discover_validatable_paths(directory: Path) -> list[Path]:
             # Plugin takes precedence: skip providers inside plugin trees
             if any(provider_dir.is_relative_to(pr) for pr in plugin_roots):
                 continue
+            provider_roots.add(provider_dir)
             discovered.update(_discover_provider_paths(provider_dir))
 
     # Files outside any plugin/provider subtree: use DEFAULT_SCAN_PATTERNS
-    covered_roots = plugin_roots | {
-        provider_dir
-        for provider_name in KNOWN_PROVIDER_DIRS
-        for provider_dir in directory.glob(f"**/{provider_name}")
-        if provider_dir.is_dir() and not any(provider_dir.is_relative_to(pr) for pr in plugin_roots)
-    }
+    covered_roots = plugin_roots | provider_roots
 
     for pattern in DEFAULT_SCAN_PATTERNS:
         for match in directory.glob(pattern):

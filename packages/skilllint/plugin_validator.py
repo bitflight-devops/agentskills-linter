@@ -55,6 +55,7 @@ from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
 from skilllint.adapters.claude_code import ClaudeCodeAdapter
 from skilllint.rules.as_series import run_as_series
+from skilllint.scan_runtime import ScanContext
 from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
 from skilllint.version import __version__
 
@@ -75,7 +76,6 @@ if TYPE_CHECKING:
 
     from pydantic_core import ErrorDetails
 
-    from skilllint.scan_runtime import ScanContext
 
 # Module-level ruamel.yaml safe-mode instance (replaces yaml.safe_load)
 _yaml_safe = YAML(typ="safe")
@@ -776,7 +776,7 @@ class FileType(StrEnum):
             FileType enum value.
         """
         if (
-            scan_context is not None
+            scan_context == ScanContext.PLUGIN
             and plugin_root is not None
             and FileType._is_plugin_scoped_unknown(path, plugin_root)
         ):
