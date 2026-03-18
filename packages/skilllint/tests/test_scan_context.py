@@ -819,13 +819,15 @@ class TestDiscoverPluginPaths:
         assert tmp_path / "agents" / "extra.md" not in result
 
     def test_manifest_driven_resolves_skill_paths(self, tmp_path: Path) -> None:
-        """Manifest mode resolves declared skill paths relative to plugin root.
+        """Manifest mode resolves a declared skill directory to its SKILL.md child.
 
         Tests: _discover_plugin_paths — manifest-driven skills path resolution
         How: Declare skills=["skills/review"] in manifest, assert that
-             tmp_path / "skills" / "review" is in the result
-        Why: Skill entries in plugin.json are relative paths; the function must
-             resolve them against plugin_root for callers to use directly
+             tmp_path / "skills" / "review" / "SKILL.md" is in the result
+        Why: Skill entries in plugin.json are directory references; the function
+             resolves them to their SKILL.md child unconditionally. Using the path
+             name rather than is_dir() means resolution works even when the skill
+             directory does not yet exist on disk (missing = lint error, not silence).
         """
         # Arrange
         manifest = PluginManifest(plugin_root=tmp_path, skills=["skills/review"])
@@ -834,7 +836,7 @@ class TestDiscoverPluginPaths:
         result = _discover_plugin_paths(manifest)
 
         # Assert
-        assert tmp_path / "skills" / "review" in result
+        assert tmp_path / "skills" / "review" / "SKILL.md" in result
 
     def test_manifest_driven_always_includes_plugin_root(self, tmp_path: Path) -> None:
         """Manifest mode always includes the plugin root directory.
@@ -852,6 +854,45 @@ class TestDiscoverPluginPaths:
 
         # Assert
         assert tmp_path in result
+
+    def test_manifest_driven_includes_declared_skill_dir_even_when_skill_md_missing(self, tmp_path: Path) -> None:
+        """Declared skill directory is included even when its SKILL.md does not exist.
+
+        Tests: _discover_plugin_paths — manifest-driven unconditional inclusion for skills
+        How: Declare skills=["skills/ghost-skill"] in manifest without creating the
+             directory or SKILL.md; assert skills/ghost-skill/SKILL.md is in the result
+        Why: Missing declared files are lint errors that downstream validators should
+             flag. Silently dropping them would hide the error entirely. This is the
+             intentional design difference between manifest-driven and convention-driven
+             mode: convention uses globs (only existing files appear), manifest-driven
+             adds declared paths unconditionally.
+        """
+        # Arrange — skill directory and SKILL.md deliberately not created
+        manifest = PluginManifest(plugin_root=tmp_path, skills=["skills/ghost-skill"])
+
+        # Act
+        result = _discover_plugin_paths(manifest)
+
+        # Assert — path present despite not existing on disk
+        assert tmp_path / "skills" / "ghost-skill" / "SKILL.md" in result
+
+    def test_manifest_driven_includes_declared_agent_even_when_file_missing(self, tmp_path: Path) -> None:
+        """Declared agent file is included even when it does not exist on disk.
+
+        Tests: _discover_plugin_paths — manifest-driven unconditional inclusion for agents
+        How: Declare agents=["agents/ghost.md"] without creating the file;
+             assert agents/ghost.md is in the result
+        Why: Same intentional design as skills — a declared-but-missing path is a
+             validation error for downstream validators, not a silent omission.
+        """
+        # Arrange — agent file deliberately not created
+        manifest = PluginManifest(plugin_root=tmp_path, agents=["agents/ghost.md"])
+
+        # Act
+        result = _discover_plugin_paths(manifest)
+
+        # Assert — path present despite not existing on disk
+        assert tmp_path / "agents" / "ghost.md" in result
 
     def test_result_is_sorted_and_deduplicated(self, tmp_path: Path) -> None:
         """Return value is a sorted list with no duplicate entries.
@@ -1028,6 +1069,63 @@ class TestIntegrationContextAwareDiscovery:
         # Assert
         assert provider / "agents" / "my-agent.md" in result
         assert provider / "commands" / "cmd.md" not in result
+
+    def test_bare_context_skips_provider_inside_plugin_tree(self, tmp_path: Path) -> None:
+        """Q2: provider dir nested inside a plugin tree is skipped — plugin takes precedence.
+
+        Tests: _discover_validatable_paths — BARE context Q2 precedence rule
+        How: Create a plugin tree that contains a .claude/ provider dir nested inside it;
+             assert the plugin's own agent is discovered while the nested provider dir is
+             not treated as a standalone provider
+        Why: Architecture spec Q2 resolution states that when a provider dir is found
+             inside a plugin tree, the plugin context takes precedence.  The provider dir
+             is part of the plugin's content, not an independent provider root.  Without
+             this rule, provider discovery would double-count paths already covered by
+             plugin discovery and could surface internal plugin structure as top-level
+             provider agents.
+        """
+        # Arrange — plugin with a .claude/ provider dir nested inside it
+        plugin = tmp_path / "my-plugin"
+        (plugin / ".claude-plugin").mkdir(parents=True)
+        (plugin / ".claude-plugin" / "plugin.json").write_text("{}")
+        (plugin / "agents").mkdir()
+        (plugin / "agents" / "root-agent.md").write_text("# Root Agent")
+        # .claude/ nested inside the plugin — should be treated as plugin content, not provider
+        (plugin / ".claude" / "agents").mkdir(parents=True)
+        (plugin / ".claude" / "agents" / "provider-agent.md").write_text("# Provider Agent")
+
+        # Act
+        result = _discover_validatable_paths(tmp_path)
+
+        # Assert
+        # The plugin's root agent must be discovered via plugin discovery
+        assert plugin / "agents" / "root-agent.md" in result
+        # .claude/ inside the plugin is NOT discovered as an independent provider;
+        # plugin takes precedence (Q2 resolution)
+        assert plugin / ".claude" / "agents" / "provider-agent.md" not in result
+
+    def test_bare_context_discovers_provider_outside_plugin_tree(self, tmp_path: Path) -> None:
+        """Provider dir outside any plugin tree is discovered normally.
+
+        Tests: _discover_validatable_paths — BARE context provider discovery without Q2 suppression
+        How: Create a standalone .claude/ provider dir with no plugin sibling; assert
+             the provider's agent is included in the discovery result
+        Why: The Q2 skip-logic must only suppress providers that are nested inside a
+             plugin tree.  A .claude/ dir at the same level as — or outside — any plugin
+             root must still be discovered as a provider.  This test confirms the
+             positive path so that a future regression tightening the skip condition
+             does not silently drop legitimate providers.
+        """
+        # Arrange — standalone .claude/ provider with no plugin anywhere nearby
+        provider = tmp_path / ".claude"
+        (provider / "agents").mkdir(parents=True)
+        (provider / "agents" / "my-agent.md").write_text("# Agent")
+
+        # Act
+        result = _discover_validatable_paths(tmp_path)
+
+        # Assert
+        assert provider / "agents" / "my-agent.md" in result
 
 
 class TestBareDirectoryRegressionCompatibility:

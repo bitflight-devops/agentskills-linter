@@ -135,6 +135,11 @@ def _discover_plugin_paths(manifest: PluginManifest) -> list[Path]:
 
     Never recurses into skills/*/agents/ or skills/*/commands/.
 
+    In manifest-driven mode, declared paths are added unconditionally regardless
+    of whether they exist on disk. This is intentional: a missing declared file
+    is a validation error that downstream validators (e.g. PL001) should flag.
+    Convention-driven mode uses glob matching so only existing files appear.
+
     Args:
         manifest: Parsed plugin manifest with plugin_root and path lists.
 
@@ -145,17 +150,19 @@ def _discover_plugin_paths(manifest: PluginManifest) -> list[Path]:
     root = manifest.plugin_root
 
     if manifest.is_manifest_driven:
+        # Intentionally no existence check — missing declared paths are a lint error.
         # Skills entries may be directories (e.g. "./skills/my-skill/") or
-        # direct SKILL.md paths. Resolve directories to their SKILL.md file.
+        # direct SKILL.md paths. Use the path name to distinguish: a path whose
+        # final component is "SKILL.md" is a direct file reference; anything else
+        # is treated as a skill directory and resolved to its SKILL.md child.
+        # This avoids an is_dir() check that would silently drop non-existent dirs.
         if manifest.skills is not None:
             for rel in manifest.skills:
                 resolved = root / rel
-                if resolved.is_dir():
-                    skill_md = resolved / "SKILL.md"
-                    if skill_md.exists():
-                        discovered.add(skill_md)
-                else:
+                if resolved.name == "SKILL.md":
                     discovered.add(resolved)
+                else:
+                    discovered.add(resolved / "SKILL.md")
         # Agents and commands entries should be direct file paths.
         for path_list in (manifest.agents, manifest.commands):
             if path_list is not None:
