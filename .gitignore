@@ -54,6 +54,7 @@ scripts/results/
 
 .bg-shell/
 .claude-audit/
+.continue-here.md
 docs/plans/
 docs/superpowers/
 walkthrough/
