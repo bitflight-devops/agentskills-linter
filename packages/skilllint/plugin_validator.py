@@ -441,6 +441,7 @@ VALIDATOR_OWNERSHIP: dict[str, ValidatorOwnership] = {
     "ProgressiveDisclosureValidator": ValidatorOwnership.LINT,
     "NamespaceReferenceValidator": ValidatorOwnership.LINT,
     "MarkdownTokenCounter": ValidatorOwnership.LINT,
+    "AsSeriesValidator": ValidatorOwnership.LINT,
 }
 
 # ============================================================================
@@ -489,6 +490,7 @@ VALIDATOR_CONSTRAINT_SCOPES: dict[str, set[str]] = {
     "ProgressiveDisclosureValidator": {"shared", "provider_specific"},
     "NamespaceReferenceValidator": {"shared", "provider_specific"},
     "MarkdownTokenCounter": {"shared", "provider_specific"},
+    "AsSeriesValidator": {"shared", "provider_specific"},
 }
 
 
@@ -1975,6 +1977,73 @@ class SymlinkTargetValidator:
                         symlinks.append(candidate)
 
         return symlinks
+
+
+class AsSeriesValidator:
+    """Runs AS001-AS008 rules on SKILL.md and agent .md files.
+
+    AS-series rules are cross-platform quality checks that apply to any file
+    carrying skill or agent frontmatter, regardless of which platform adapter
+    is active. This validator integrates them into the default
+    ``validate_single_path`` code path so they fire without ``--platform``.
+    """
+
+    def validate(self, path: Path) -> ValidationResult:
+        """Run AS-series checks on a skill or agent file.
+
+        Args:
+            path: Path to a SKILL.md or agent .md file.
+
+        Returns:
+            ValidationResult grouping AS-series issues by severity.
+        """
+        from skilllint.rules.as_series import run_as_series  # noqa: PLC0415
+
+        frontmatter_data, body_lines, _yaml_err, _colon_fields = parse_skill_md(path)
+        violations = run_as_series(path, frontmatter_data, body_lines)
+
+        # AS002 checks that `name` matches the skill's own directory name
+        # (e.g. skills/my-skill/SKILL.md). Agent files are stored directly in
+        # agents/, so their parent is always "agents" — AS002 is not meaningful
+        # for them and would produce false positives on every agent file.
+        if path.name != "SKILL.md":
+            violations = [v for v in violations if v.get("code") != "AS002"]
+        issues = [
+            ValidationIssue(
+                field=v.get("code", "unknown"),
+                severity=(
+                    v.get("severity", "error")
+                    if v.get("severity", "error") in {"error", "warning", "info"}
+                    else "error"
+                ),
+                message=v.get("message", ""),
+                code=cast("ErrorCode", v.get("code", "unknown")),
+            )
+            for v in violations
+        ]
+        errors = [i for i in issues if i.severity == "error"]
+        warnings = [i for i in issues if i.severity == "warning"]
+        info = [i for i in issues if i.severity == "info"]
+        return ValidationResult(passed=len(errors) == 0, errors=errors, warnings=warnings, info=info)
+
+    def can_fix(self) -> bool:
+        """AS-series rules do not support auto-fixing.
+
+        Returns:
+            Always False.
+        """
+        return False
+
+    def fix(self, path: Path) -> list[str]:
+        """No-op — AS-series rules do not support auto-fixing.
+
+        Args:
+            path: Unused.
+
+        Returns:
+            Empty list.
+        """
+        return []
 
 
 # SkillFrontmatter, CommandFrontmatter, AgentFrontmatter imported from frontmatter_core
@@ -4548,6 +4617,8 @@ def _get_validators_for_path(path: Path) -> list[Validator]:
         if fm_req == _FrontmatterRequirement.REQUIRED or _file_has_frontmatter(path):
             validators.extend([NameFormatValidator(), DescriptionValidator(file_type=file_type)])
         validators.append(NamespaceReferenceValidator())
+        if file_type in {FileType.SKILL, FileType.AGENT}:
+            validators.append(AsSeriesValidator())
         if file_type == FileType.SKILL:
             validators.extend([ComplexityValidator(), InternalLinkValidator(), ProgressiveDisclosureValidator()])
     elif file_type == FileType.PLUGIN:
@@ -4815,25 +4886,12 @@ def validate_file(path: Path, adapters: dict, platform_override: str | None = No
     else:
         matching = [a for a in adapters.values() if matches_file(a, pure)]
 
-    if not matching:
-        return []
-
     violations: list[dict] = []
 
-    # Get constraint scopes from the primary adapter for filtering
-    # AS-series rules are cross-platform (constraint_scope: "shared"),
-    # so they always run regardless of provider.
-    # Validators are filtered by constraint_scopes to support provider-specific rules.
-    primary_adapter = matching[0]
-    constraint_scopes = primary_adapter.constraint_scopes()
-    _logger.debug("Validating %s with adapter %s, constraint_scopes=%s", path, primary_adapter.id(), constraint_scopes)
-
-    # Filter validators based on provider constraint scopes
-    sk_validators = _get_validators_for_path(path)
-    sk_validators = filter_validators_by_constraint_scopes(sk_validators, constraint_scopes)
-
-    # AS-series fires once per file — structural deduplication, not set-tracking
-    if is_skill_md(path):
+    # AS-series rules are cross-platform — they run before the adapter matching
+    # guard so that agent files outside a recognised plugin structure still get
+    # AS007/AS008 checks even when no platform adapter claims the file.
+    if is_skill_md(path) or "agents" in path.parts:
         frontmatter_data, body_lines, yaml_err, colon_fields = parse_skill_md(path)
         if colon_fields:
             violations.append({
@@ -4848,6 +4906,19 @@ def validate_file(path: Path, adapters: dict, platform_override: str | None = No
                 "message": f"Invalid YAML frontmatter: {yaml_err}",
             })
         violations.extend(run_as_series(path, frontmatter_data, body_lines))
+
+    if not matching:
+        return violations
+
+    # Get constraint scopes from the primary adapter for filtering
+    # Validators are filtered by constraint_scopes to support provider-specific rules.
+    primary_adapter = matching[0]
+    constraint_scopes = primary_adapter.constraint_scopes()
+    _logger.debug("Validating %s with adapter %s, constraint_scopes=%s", path, primary_adapter.id(), constraint_scopes)
+
+    # Filter validators based on provider constraint scopes
+    sk_validators = _get_validators_for_path(path)
+    sk_validators = filter_validators_by_constraint_scopes(sk_validators, constraint_scopes)
 
     for adapter in matching:
         violations.extend(run_platform_checks(path, adapter))
