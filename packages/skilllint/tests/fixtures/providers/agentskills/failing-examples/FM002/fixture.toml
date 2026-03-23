@@ -1,0 +1,14 @@
+[fixture]
+rule_id = "FM002"
+tier = 1
+description = "Invalid YAML syntax in frontmatter"
+
+[[variants]]
+name = "unclosed-brace"
+kind = "failing"
+expected_count = 1
+# AS001/AS003 are structural consequences of FM002: when YAML is syntactically
+# invalid the parser cannot extract any fields, so name/description appear
+# missing even though they are present in the source.  These are collateral
+# violations caused by the FM002 trigger, not independent fixture defects.
+allowed_collateral = ["AS001", "AS003"]

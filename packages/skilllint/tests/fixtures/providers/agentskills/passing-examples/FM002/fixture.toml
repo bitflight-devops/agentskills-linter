@@ -1,0 +1,9 @@
+[fixture]
+rule_id = "FM002"
+tier = 1
+description = "Valid YAML syntax in frontmatter"
+
+[[variants]]
+name = "valid-yaml"
+kind = "passing"
+expected_count = 0

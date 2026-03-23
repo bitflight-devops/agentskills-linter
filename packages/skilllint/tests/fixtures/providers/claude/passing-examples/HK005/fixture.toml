@@ -1,0 +1,10 @@
+[fixture]
+rule_id = "HK005"
+tier = 5
+description = "Hook script has executable permission"
+
+[[variants]]
+name = "exec-permission"
+kind = "passing"
+expected_count = 0
+setup = "chmod +x hooks/check.sh"

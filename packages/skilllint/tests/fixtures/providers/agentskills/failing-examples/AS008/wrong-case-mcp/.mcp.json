@@ -1,0 +1,1 @@
+{ "mcpServers": { "Ref": { "command": "echo", "args": ["test"] } } }

@@ -1,0 +1,10 @@
+[fixture]
+rule_id = "HK005"
+tier = 5
+description = "Hook script missing executable permission"
+
+[[variants]]
+name = "no-exec-permission"
+kind = "failing"
+expected_count = 1
+setup = "chmod -x hooks/check.sh"

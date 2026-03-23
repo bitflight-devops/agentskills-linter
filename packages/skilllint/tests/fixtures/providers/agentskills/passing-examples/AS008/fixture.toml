@@ -1,0 +1,9 @@
+[fixture]
+rule_id = "AS008"
+tier = 4
+description = "MCP tool reference uses correct case for server name"
+
+[[variants]]
+name = "correct-case-mcp"
+kind = "passing"
+expected_count = 0
