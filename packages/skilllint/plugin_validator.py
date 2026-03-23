@@ -17,6 +17,7 @@ import logging
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 from io import TextIOWrapper
@@ -54,6 +55,7 @@ from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
 from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
 from skilllint.adapters.claude_code import ClaudeCodeAdapter
+from skilllint.cli_docs import docs_app
 from skilllint.rules.as_series import run_as_series
 from skilllint.scan_runtime import ScanContext
 from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
@@ -72,7 +74,7 @@ from .frontmatter_core import (
 from .scan_runtime import _resolve_filter_and_expand_paths, run_validation_loop
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Iterator, Sequence
 
     from pydantic_core import ErrorDetails
 
@@ -3976,22 +3978,31 @@ class HookValidator:
     """
 
     VALID_EVENT_TYPES: ClassVar[frozenset[str]] = frozenset({
+        "SessionStart",
+        "UserPromptSubmit",
         "PreToolUse",
         "PermissionRequest",
         "PostToolUse",
         "PostToolUseFailure",
         "Notification",
-        "UserPromptSubmit",
-        "Stop",
         "SubagentStart",
         "SubagentStop",
+        "Stop",
+        "StopFailure",
+        "TeammateIdle",
+        "TaskCompleted",
+        "InstructionsLoaded",
+        "ConfigChange",
+        "WorktreeCreate",
+        "WorktreeRemove",
         "PreCompact",
-        "Setup",
-        "SessionStart",
+        "PostCompact",
+        "Elicitation",
+        "ElicitationResult",
         "SessionEnd",
     })
 
-    VALID_HOOK_TYPES: ClassVar[frozenset[str]] = frozenset({"command", "prompt"})
+    VALID_HOOK_TYPES: ClassVar[frozenset[str]] = frozenset({"command", "http", "prompt", "agent"})
 
     def validate(self, path: Path) -> ValidationResult:
         """Validate a hooks.json configuration file.
@@ -4008,23 +4019,105 @@ class HookValidator:
         """Check if validator supports auto-fixing.
 
         Returns:
-            False (hook validation cannot be auto-fixed)
+            True (HK005 non-executable scripts can be fixed with chmod/git)
         """
-        return False
+        return True
 
     def fix(self, path: Path) -> list[str]:
-        """Auto-fix hook issues (not supported).
+        """Auto-fix HK005 by making non-executable hook scripts executable.
+
+        For each command script referenced in hooks.json that exists but is not
+        executable, applies ``git update-index --chmod=+x`` when the file is
+        git-tracked, or ``os.chmod`` with execute bits otherwise.
 
         Args:
-            path: Path to hook file to fix
+            path: Path to hooks.json file
 
         Returns:
-            Never returns (always raises)
-
-        Raises:
-            NotImplementedError: Hook validation cannot be auto-fixed
+            List of human-readable descriptions of fixes applied
         """
-        raise NotImplementedError("Hook validation cannot be auto-fixed.")
+        try:
+            content = path.read_text(encoding="utf-8")
+        except OSError:
+            return []
+
+        try:
+            data = msgspec.json.decode(content)
+        except msgspec.DecodeError:
+            return []
+
+        if not isinstance(data, dict):
+            return []
+
+        hooks_dict = data.get("hooks")
+        if not isinstance(hooks_dict, dict):
+            return []
+
+        base_dir = path.parent
+        plugin_root = self._find_hook_plugin_dir(base_dir)
+        fixes: list[str] = []
+
+        for command, resolved_path in self._iter_command_scripts(hooks_dict, base_dir, plugin_root):
+            fix_desc = self._fix_execute_bit(resolved_path, command)
+            if fix_desc:
+                fixes.append(fix_desc)
+
+        return fixes
+
+    def _iter_command_scripts(
+        self, hooks_dict: dict[str, object], base_dir: Path, plugin_root: Path
+    ) -> Iterator[tuple[str, Path]]:
+        for groups in hooks_dict.values():
+            if not isinstance(groups, list):
+                continue
+            for group in groups:
+                if not isinstance(group, dict):
+                    continue
+                group_dict = cast("dict[str, YamlValue]", group)
+                hook_entries = group_dict.get("hooks", [])
+                if not isinstance(hook_entries, list):
+                    continue
+                for entry in hook_entries:
+                    if not isinstance(entry, dict):
+                        continue
+                    if entry.get("type") != "command":
+                        continue
+                    command = entry.get("command", "")
+                    if not isinstance(command, str) or not self._is_file_path_reference(command):
+                        continue
+                    resolved_command = command.replace("${CLAUDE_PLUGIN_ROOT}", str(plugin_root))
+                    resolved_path = Path(resolved_command)
+                    if not resolved_path.is_absolute():
+                        resolved_path = (base_dir / resolved_command).resolve()
+                    if not resolved_path.exists():
+                        continue
+                    yield command, resolved_path
+
+    def _fix_execute_bit(self, resolved_path: Path, command: str) -> str | None:
+        git_exec = _git_file_has_execute_bit(resolved_path)
+        if git_exec is True:
+            return None
+        if git_exec is False:
+            git_bin = shutil.which("git")
+            if git_bin:
+                try:
+                    subprocess.run(
+                        [git_bin, "update-index", "--chmod=+x", str(resolved_path)], check=True, capture_output=True
+                    )
+                except (subprocess.CalledProcessError, OSError):
+                    pass
+                else:
+                    return f"Made hook script executable: {command}"
+            return None
+        if not os.access(resolved_path, os.X_OK):
+            try:
+                current_mode = resolved_path.stat().st_mode
+                resolved_path.chmod(current_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+            except OSError:
+                pass
+            else:
+                return f"Made hook script executable: {command}"
+        return None
 
     def _validate_hook_config(self, path: Path) -> ValidationResult:
         """Validate hooks.json structure and contents.
@@ -4247,6 +4340,28 @@ class HookValidator:
                             field=f"{field_prefix}.prompt",
                             severity="error",
                             message="Hook type 'prompt' requires 'prompt' field",
+                            code=HK003,
+                            docs_url=generate_docs_url(HK003),
+                        )
+                    )
+            case "http":
+                if "url" not in entry_dict:
+                    errors.append(
+                        ValidationIssue(
+                            field=f"{field_prefix}.url",
+                            severity="error",
+                            message="Hook type 'http' requires 'url' field",
+                            code=HK003,
+                            docs_url=generate_docs_url(HK003),
+                        )
+                    )
+            case "agent":
+                if "prompt" not in entry_dict:
+                    errors.append(
+                        ValidationIssue(
+                            field=f"{field_prefix}.prompt",
+                            severity="error",
+                            message="Hook type 'agent' requires 'prompt' field",
                             code=HK003,
                             docs_url=generate_docs_url(HK003),
                         )
@@ -4706,20 +4821,24 @@ def validate_single_path(path: Path, *, check: bool, fix: bool, verbose: bool) -
     # Apply fixes if requested and validator supports it
     # Note: --fix still runs even for suppressed issues (ignore = suppress reporting, not fixing)
     if fix:
-        fixes_applied: list[str] = []
-        for validator in validators:
-            if validator.can_fix():
-                try:
-                    validator_fixes = validator.fix(path)
-                    fixes_applied.extend(validator_fixes)
-                except NotImplementedError:
-                    pass  # Validator doesn't support fixing
+        # Guard: never auto-fix intentionally broken test fixtures
+        if "/failing-examples/" in str(path):
+            _logger.debug("Skipping auto-fix for fixture file: %s", path)
+        else:
+            fixes_applied: list[str] = []
+            for validator in validators:
+                if validator.can_fix():
+                    try:
+                        validator_fixes = validator.fix(path)
+                        fixes_applied.extend(validator_fixes)
+                    except NotImplementedError:
+                        pass  # Validator doesn't support fixing
 
-        # Re-validate after fixes
-        if fixes_applied:
-            validator_results = _collect_validator_results(
-                validators, path, plugin_root=plugin_root, ignore_config=ignore_config
-            )
+            # Re-validate after fixes
+            if fixes_applied:
+                validator_results = _collect_validator_results(
+                    validators, path, plugin_root=plugin_root, ignore_config=ignore_config
+                )
 
     return {path: validator_results}
 
@@ -4966,7 +5085,7 @@ def violations_to_result(violations: list[dict]) -> ValidationResult:
                 v.get("severity", "error") if v.get("severity", "error") in {"error", "warning", "info"} else "error"
             ),
             message=v.get("message", ""),
-            code=cast("ErrorCode", v.get("code", "unknown")),
+            code=v.get("code", "unknown"),
         )
         for v in violations
     ]
@@ -5088,6 +5207,7 @@ def main(
 
 # Create Typer app
 app = typer.Typer(help="Validate Claude Code plugins and skills", add_completion=False)
+app.add_typer(docs_app, name="docs")
 
 # Version option handled via callback
 

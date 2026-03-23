@@ -52,7 +52,7 @@ function runDriftCheck() {
   // Run the drift-check script synchronously; capture stdout, suppress stderr
   let exitCode = 0;
   try {
-    execFileSync('uv', ['run', scriptPath], {
+    execFileSync('uv', ['run', '--script', scriptPath], {
       stdio: ['ignore', 'pipe', 'ignore'],
       timeout: 60000,
       cwd: projectDir,

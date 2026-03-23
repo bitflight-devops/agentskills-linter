@@ -121,4 +121,4 @@ repos:
 default_language_version:
   python: python3
 
-exclude: ^(\.?plan(ning)?/|\.claude/backlog/|\.claude/get-shit-done|\.claude/hooks/gsd-.*|\.gsd/)
+exclude: ^(\.?plan(ning)?/|\.claude/backlog/|\.claude/get-shit-done|\.claude/hooks/gsd-.*|\.gsd/|packages/skilllint/tests/fixtures/providers/.*/failing-examples/)

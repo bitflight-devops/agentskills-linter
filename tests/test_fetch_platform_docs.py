@@ -17,11 +17,11 @@ from scripts.fetch_platform_docs import (
     HttpDriftResult,
     HttpFileDriftResult,
     _git_head_sha,
-    _read_text_or_none,
-    _sha256,
     clone_or_update_repo,
     fetch_doc_site,
 )
+
+from skilllint.vendor_io import read_text_or_none as _read_text_or_none, sha256_hex as _sha256
 
 if TYPE_CHECKING:
     from pathlib import Path

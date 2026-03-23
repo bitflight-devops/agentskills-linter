@@ -27,6 +27,7 @@ keywords = [
 requires-python = ">=3.11,<3.15"
 dependencies = [
     "gitpython>=3.1.45",
+    "marko>=2.2.2",
     "msgspec>=0.20.0",
     "pydantic>=2.0.0",
     "ruamel-yaml>=0.18.0",
@@ -137,9 +138,11 @@ extra-paths = [
 root = ["./"]
 
 [tool.ty.src]
+exclude = ["packages/skilllint/tests/fixtures/providers/*/failing-examples/*"]
 include = [".github", "packages", "scripts", "tests"]
 
 [tool.ruff]
+exclude = ["packages/skilllint/tests/fixtures/providers/*/failing-examples/*"]
 fix = true
 line-length = 120
 src = [".github", "packages", "scripts", "tests"]
@@ -258,6 +261,9 @@ max-complexity = 12
     "S",    # Security checks not needed in tests
     "SLF",  # Private name imports acceptable for testing internals
     "T",    # print() statements are intentional for CI output visibility
+]
+"packages/skilllint/tests/fixtures/providers/*/failing-examples/**" = [
+    "ALL", # Intentionally broken fixture files — must never be linted or fixed
 ]
 
 [tool.ruff.lint.pycodestyle]

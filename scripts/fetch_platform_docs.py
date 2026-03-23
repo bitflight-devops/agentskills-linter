@@ -3,9 +3,12 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #   "typer>=0.21.0",
-#   "rich>=13.0",
 #   "httpx>=0.27.0",
+#   "skilllint",
 # ]
+#
+# [tool.uv.sources]
+# skilllint = { path = ".." }
 # ///
 """Fetch platform documentation for schema auditing.
 
@@ -14,26 +17,26 @@ Clones/updates git repos and fetches doc-site pages into .claude/vendor/.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import shutil
 import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from pathlib import Path
-from typing import Annotated, TypedDict, final
+from typing import TYPE_CHECKING, Annotated, Any, TypedDict, cast, final
 
 import httpx
 import typer
 from rich.console import Console
 from rich.panel import Panel
 
+from skilllint.vendor_io import VENDOR_DIR, read_text_or_none, sha256_hex, write_json
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-VENDOR_DIR = PROJECT_ROOT / ".claude" / "vendor"
 DRIFT_FILE = VENDOR_DIR / ".drift-pending.json"
 
 console = Console()
@@ -180,38 +183,6 @@ class DriftReport:
 
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _sha256(text: str) -> str:
-    """Return hex SHA-256 digest of text content.
-
-    Args:
-        text: The string content to hash.
-
-    Returns:
-        Hex-encoded SHA-256 digest.
-    """
-    return hashlib.sha256(text.encode()).hexdigest()
-
-
-def _read_text_or_none(path: Path) -> str | None:
-    """Read file content or return None if file does not exist.
-
-    Args:
-        path: Path to the file to read.
-
-    Returns:
-        File content as string, or None if file is missing.
-    """
-    try:
-        return path.read_text(encoding="utf-8")
-    except FileNotFoundError:
-        return None
-
-
-# ---------------------------------------------------------------------------
 # Drift report writer
 # ---------------------------------------------------------------------------
 
@@ -224,8 +195,7 @@ def _write_drift_report(report: DriftReport) -> None:
     Args:
         report: The drift report to persist.
     """
-    DRIFT_FILE.parent.mkdir(parents=True, exist_ok=True)
-    _ = DRIFT_FILE.write_text(json.dumps(report.to_dict(), indent=2) + "\n", encoding="utf-8")
+    write_json(DRIFT_FILE, cast("dict[str, Any]", report.to_dict()))
 
 
 # ---------------------------------------------------------------------------
@@ -450,27 +420,25 @@ def fetch_doc_site(platform: DocSitePlatform, *, dry_run: bool) -> HttpDriftResu
             console.print(f"  :globe_with_meridians: Fetching [cyan]{platform.name}[/cyan]/{page.filename}")
             try:
                 # Snapshot existing content before fetch
-                existing_content = _read_text_or_none(dest / page.filename)
-                before_hash = _sha256(existing_content) if existing_content is not None else None
+                existing_content = read_text_or_none(dest / page.filename)
+                before_hash = sha256_hex(existing_content) if existing_content is not None else None
 
                 response = client.get(page.url)
                 _ = response.raise_for_status()
                 new_content = response.text
-                after_hash = _sha256(new_content)
+                after_hash = sha256_hex(new_content)
 
                 # Write the new content
                 _ = (dest / page.filename).write_text(new_content, encoding="utf-8")
 
                 # Detect drift: only when there was a previous file and hashes differ
                 if before_hash is not None and before_hash != after_hash:
-                    if existing_content is None:
-                        continue
                     changed_files.append(
                         HttpFileDriftResult(
                             filename=page.filename,
                             before_hash=before_hash,
                             after_hash=after_hash,
-                            before_content=existing_content,
+                            before_content=existing_content or "",
                             after_content=new_content,
                         )
                     )

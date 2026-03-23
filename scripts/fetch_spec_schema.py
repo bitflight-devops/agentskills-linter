@@ -4,7 +4,11 @@
 # dependencies = [
 #   "httpx>=0.27.0",
 #   "beautifulsoup4>=4.12.0",
+#   "skilllint",
 # ]
+#
+# [tool.uv.sources]
+# skilllint = { path = ".." }
 # ///
 
 """Fetch agentskills.io specification and generate JSON Schema.
@@ -20,18 +24,20 @@ Drift detection compares new schema against previous to detect:
 
 from __future__ import annotations
 
-import hashlib
 import json
 import re
 from dataclasses import dataclass, field
-from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from bs4 import BeautifulSoup
 
+from skilllint.vendor_io import PROJECT_ROOT, load_json_or_none, sha256_hex, utc_now_iso, write_json
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
 SPEC_URL = "https://agentskills.io/specification"
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
 SCHEMA_DIR = PROJECT_ROOT / "packages" / "skilllint" / "schemas" / "agentskills_io"
 OUTPUT_FILE = SCHEMA_DIR / "v1.json"
 PREVIOUS_FILE = SCHEMA_DIR / ".previous_v1.json"
@@ -199,7 +205,7 @@ def build_json_schema(constraints: dict[str, dict[str, Any]]) -> dict[str, Any]:
         "properties": properties,
         "required": required_fields,
         "additionalProperties": True,
-        "x-source": {"url": SPEC_URL, "fetched_at": "2026-03-14"},
+        "x-source": {"url": SPEC_URL, "fetched_at": utc_now_iso()},
     }
 
 
@@ -277,7 +283,7 @@ def compute_content_hash(schema: dict[str, Any]) -> str:
         A short stable hash of the schema payload.
     """
     stable = {key: value for key, value in schema.items() if key != "x-source"}
-    return hashlib.sha256(json.dumps(stable, sort_keys=True).encode()).hexdigest()[:12]
+    return sha256_hex(json.dumps(stable, sort_keys=True))[:12]
 
 
 def load_previous_schema() -> dict[str, Any] | None:
@@ -286,12 +292,7 @@ def load_previous_schema() -> dict[str, Any] | None:
     Returns:
         The previously saved schema, or None when no prior snapshot exists.
     """
-    if PREVIOUS_FILE.exists():
-        try:
-            return json.loads(PREVIOUS_FILE.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, OSError):
-            pass
-    return None
+    return load_json_or_none(PREVIOUS_FILE)
 
 
 def detect_drift(old_schema: dict[str, Any], new_schema: dict[str, Any]) -> SchemaDrift:
@@ -331,7 +332,7 @@ def detect_drift(old_schema: dict[str, Any], new_schema: dict[str, Any]) -> Sche
 
 def save_previous_schema(schema: dict[str, Any]) -> None:
     """Save current schema as previous for next comparison."""
-    PREVIOUS_FILE.write_text(json.dumps(schema, indent=2), encoding="utf-8")
+    write_json(PREVIOUS_FILE, schema)
 
 
 if __name__ == "__main__":
