@@ -1,0 +1,3 @@
+# Test fixtures — exclude from GitHub language statistics
+packages/skilllint/tests/fixtures/providers/*/failing-examples/** linguist-generated
+packages/skilllint/tests/fixtures/providers/*/passing-examples/** linguist-generated

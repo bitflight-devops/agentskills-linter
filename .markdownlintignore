@@ -1,3 +1,6 @@
 # Ignore archived planning documents
 .planning/
 .gsd/
+
+# Intentionally broken test fixtures — must not be linted or auto-fixed
+packages/skilllint/tests/fixtures/providers/*/failing-examples/
