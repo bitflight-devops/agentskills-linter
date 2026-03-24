@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1773859997475,
+  "lastUpdate": 1774319596856,
   "repoUrl": "https://github.com/bitflight-devops/skilllint",
   "entries": {
     "Benchmark": [
@@ -120,6 +120,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "files_per_second",
             "value": 104.455,
+            "unit": "files/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jamie Nelson",
+            "username": "Jamie-BitFlight",
+            "email": "jamie@bitflight.io"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "546b05ac9b7e43625352768b4f2b1b863b5fb1d3",
+          "message": "fix: add httpx dependency and fix test fixtures for CI green (#23)",
+          "timestamp": "2026-03-24T02:30:28Z",
+          "url": "https://github.com/bitflight-devops/skilllint/commit/546b05ac9b7e43625352768b4f2b1b863b5fb1d3"
+        },
+        "date": 1774319596141,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "scan_min_ms",
+            "value": 14820.393,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_mean_ms",
+            "value": 15229.892,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_max_ms",
+            "value": 16042.105,
+            "unit": "ms"
+          },
+          {
+            "name": "files_per_second",
+            "value": 65.726,
             "unit": "files/s"
           }
         ]
