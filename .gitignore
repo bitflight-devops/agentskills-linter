@@ -52,6 +52,7 @@ tmp/
 scripts/bench-plugin/
 scripts/results/
 
+.cocoindex_code/
 .bg-shell/
 .claude-audit/
 .continue-here.md

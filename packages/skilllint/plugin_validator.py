@@ -4970,7 +4970,12 @@ def run_platform_checks(path: Path, adapter: PlatformAdapter) -> list[dict]:
 
         violations: list[dict] = []
         for validator_results in file_results.values():
-            for _name, vr_result in validator_results:
+            for name, vr_result in validator_results:
+                # AsSeriesValidator is already run unconditionally in validate_file()
+                # before run_platform_checks() is called.  Skipping it here prevents
+                # duplicate AS-series violations in the output.
+                if name == "AsSeriesValidator":
+                    continue
                 all_issues = [*vr_result.errors, *vr_result.warnings, *vr_result.info]
                 violations.extend(
                     {"code": str(issue.code), "severity": str(issue.severity), "message": str(issue.message)}

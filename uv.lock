@@ -916,6 +916,7 @@ name = "skilllint"
 source = { editable = "." }
 dependencies = [
     { name = "gitpython" },
+    { name = "httpx" },
     { name = "marko" },
     { name = "msgspec" },
     { name = "pydantic" },
@@ -930,7 +931,6 @@ dev = [
     { name = "beautifulsoup4" },
     { name = "hatch-vcs" },
     { name = "hatchling" },
-    { name = "httpx" },
     { name = "hypothesis" },
     { name = "prek" },
     { name = "pytest" },
@@ -945,6 +945,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "gitpython", specifier = ">=3.1.45" },
+    { name = "httpx", specifier = ">=0.28.1" },
     { name = "marko", specifier = ">=2.2.2" },
     { name = "msgspec", specifier = ">=0.20.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
@@ -959,7 +960,6 @@ dev = [
     { name = "beautifulsoup4", specifier = ">=4.14.3" },
     { name = "hatch-vcs", specifier = ">=0.5.0" },
     { name = "hatchling", specifier = ">=1.14.0" },
-    { name = "httpx", specifier = ">=0.28.1" },
     { name = "hypothesis", specifier = ">=6.151.9" },
     { name = "prek", specifier = ">=0.2.19" },
     { name = "pytest", specifier = ">=9.0.2" },

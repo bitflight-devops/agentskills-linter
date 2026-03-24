@@ -202,6 +202,7 @@ class TestFixFlag:
         skill_dir.mkdir()
         skill_file = skill_dir / "SKILL.md"
         skill_file.write_text("""---
+name: fix-test-skill
 description: |-
   Test skill for auto-fix with multiline description
   that needs to be converted to single line format
@@ -232,6 +233,7 @@ tools: Read, Write
         skill_dir.mkdir()
         skill_file = skill_dir / "SKILL.md"
         skill_file.write_text("""---
+name: fix-report-skill
 description: >-
   Test skill with multiline description using fold marker
 tools: Read, Write
@@ -258,6 +260,7 @@ tools: Read, Write
         skill_dir.mkdir()
         skill_file = skill_dir / "SKILL.md"
         skill_file.write_text("""---
+name: revalidate-skill
 description: Test skill with only fixable issues
 tools:
   - Read
@@ -538,6 +541,7 @@ class TestFileGroupedReporting:
             skill_dir.mkdir()
             (skill_dir / "SKILL.md").write_text(
                 "---\n"
+                f"name: {name}\n"
                 "description: Use this skill when testing file count reporting\n"
                 "tools: Read, Write\n"
                 "model: sonnet\n"

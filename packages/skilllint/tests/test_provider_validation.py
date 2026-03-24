@@ -56,7 +56,7 @@ class TestProviderValidationRouting:
 
         # Invalid name (My_Skill!) should trigger AS001
         as001 = [v for v in violations if v.get("code") == "AS001"]
-        assert len(as001) == 1, f"Expected AS001 violation, got: {violations}"
+        assert len(as001) == 1, f"Expected exactly one AS001 violation, got: {violations}"
 
     def test_cursor_adapter_validates_cursor_fixtures(self) -> None:
         """Cursor adapter validates fixtures in cursor/ directory."""
@@ -117,7 +117,7 @@ class TestAuthorityProvenance:
         violations = validate_file(skill_file, adapters, platform_override="claude_code")
 
         as001 = [v for v in violations if v.get("code") == "AS001"]
-        assert len(as001) >= 1, f"Expected AS001 violation, got: {violations}"
+        assert len(as001) == 1, f"Expected exactly one AS001 violation, got: {violations}"
 
         violation = as001[0]
         assert "authority" in violation, f"Expected 'authority' key in violation, got: {violation}"
@@ -145,7 +145,7 @@ Body content.
         violations = validate_file(skill_file, adapters, platform_override="claude_code")
 
         as003 = [v for v in violations if v.get("code") == "AS003"]
-        assert len(as003) >= 1, f"Expected AS003 violation, got: {violations}"
+        assert len(as003) == 1, f"Expected exactly one AS003 violation, got: {violations}"
 
         violation = as003[0]
         assert "authority" in violation, f"Expected 'authority' key in violation, got: {violation}"
@@ -409,7 +409,7 @@ Body content.
 
         # Find AS001 violation
         as001 = [v for v in violations if v.get("code") == "AS001"]
-        assert len(as001) >= 1, f"Expected AS001 violation, got: {violations}"
+        assert len(as001) == 1, f"Expected exactly one AS001 violation, got: {violations}"
 
         # Verify authority is present
         violation = as001[0]

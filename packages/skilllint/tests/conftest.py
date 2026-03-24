@@ -67,6 +67,7 @@ def sample_skill_dir(tmp_path: Path) -> Path:
     # Create valid SKILL.md
     skill_md = skill_dir / "SKILL.md"
     skill_md.write_text("""---
+name: test-skill
 description: Use this skill when you need a test skill for validation
 tools: Read, Write, Grep
 model: sonnet
@@ -150,6 +151,7 @@ def sample_plugin_dir(tmp_path: Path) -> Path:
     skills_dir = plugin_dir / "skills" / "test-skill"
     skills_dir.mkdir(parents=True)
     (skills_dir / "SKILL.md").write_text("""---
+name: test-skill
 description: Test skill for plugin validation
 ---
 
