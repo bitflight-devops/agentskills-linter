@@ -9,8 +9,8 @@ Each violation dict has the shape:
     {"code": str, "severity": str, "message": str}
 
 Severities:
-    "error"   — AS001, AS002, AS003, AS007
-    "warning" — AS004, AS005, AS008, AS009
+    "error"   — AS001 (invalid format), AS002, AS003, AS007
+    "warning" — AS001 (missing name), AS004, AS005, AS008, AS009
     "info"    — AS006
 """
 
@@ -197,7 +197,9 @@ def _check_as001(name: str | None) -> dict | None:
         Invalid: ``MySkill``, ``my_skill``, ``skill--name``, ``-skill``
     """
     if name is None:
-        return _make_violation("AS001", "error", "name field is missing")
+        # name is RECOMMENDED but not required per AgentSkills spec
+        # https://agentskills.io/specification#skill-naming
+        return _make_violation("AS001", "warning", "name field is missing (recommended but not required)")
 
     if len(name) == 0 or len(name) > _MAX_NAME_LENGTH:
         return _make_violation(
