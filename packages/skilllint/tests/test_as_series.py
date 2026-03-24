@@ -68,6 +68,32 @@ def test_as001_name_format_invalid(tmp_path: pathlib.Path):
     assert _violations_with_code(violations, "AS001") != [], "Expected AS001 violation for name 'My_Skill!'"
 
 
+def test_as001_missing_name_is_error(tmp_path: pathlib.Path):
+    """Absent name field produces AS001 with severity 'error'.
+
+    The AgentSkills spec (agentskills.io/specification) marks name as required.
+    A missing name must be an error, not a warning.
+    """
+    skill_dir = tmp_path / "my-skill"
+    skill_dir.mkdir()
+    skill_md = skill_dir / "SKILL.md"
+    skill_md.write_text(
+        textwrap.dedent("""\
+            ---
+            description: A skill with no name field.
+            ---
+
+            Body content.
+        """)
+    )
+    violations = check_skill_md(skill_md)
+    as001 = _violations_with_code(violations, "AS001")
+    assert as001 != [], "Expected AS001 violation when name field is absent"
+    assert as001[0]["severity"] == "error", (
+        f"AS001 missing-name must be 'error' (name is required per AgentSkills spec), got: {as001[0]['severity']}"
+    )
+
+
 # ---------------------------------------------------------------------------
 # AS002: name matches parent directory name
 # ---------------------------------------------------------------------------
