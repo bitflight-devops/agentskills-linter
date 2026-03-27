@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774621065559,
+  "lastUpdate": 1774621639541,
   "repoUrl": "https://github.com/bitflight-devops/skilllint",
   "entries": {
     "Benchmark": [
@@ -246,6 +246,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "files_per_second",
             "value": 65.916,
+            "unit": "files/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jamie McGregor Nelson",
+            "username": "Jamie-BitFlight",
+            "email": "jamie@bitflight.io"
+          },
+          "committer": {
+            "name": "Jamie McGregor Nelson",
+            "username": "Jamie-BitFlight",
+            "email": "jamie@bitflight.io"
+          },
+          "id": "cd4507d92593472f851d762bf5d40edbfa6f29b2",
+          "message": "refactor: clarify typing policy and boundary validation guidelines\n\n- Enhanced the typing policy section to specify restrictions on the use of `cast()` and the treatment of raw external payloads.\n- Introduced a structured approach for handling type checking and validation, emphasizing the use of `@no_type_check` for exceptions.\n- Updated references to the TYPING_POLICY document for consistency and clarity in coding standards.",
+          "timestamp": "2026-03-27T14:22:13Z",
+          "url": "https://github.com/bitflight-devops/skilllint/commit/cd4507d92593472f851d762bf5d40edbfa6f29b2"
+        },
+        "date": 1774621639136,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "scan_min_ms",
+            "value": 15270.716,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_mean_ms",
+            "value": 15969.644,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_max_ms",
+            "value": 17180.945,
+            "unit": "ms"
+          },
+          {
+            "name": "files_per_second",
+            "value": 62.681,
             "unit": "files/s"
           }
         ]
