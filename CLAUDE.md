@@ -149,7 +149,11 @@ Both locations are discovered by `pytest` via `testpaths = ["**/tests"]` in `pyp
 
 ## Python typing policy
 
-External input is ingested only through explicit boundaries (`packages/skilllint/boundary/`, `*_ingest.py`, etc.), validated with **Pydantic** (`BaseModel` / `TypeAdapter`, strict mode where producer errors must not be coerced away), and passed inward as concrete types. Property-test boundary validators with **Hypothesis** where practical. The typed core avoids `typing.Any`, unjustified `cast()`, and raw payloads as application data. **Type checking:** `uv run ty check packages/` only (CI / pre-commit). `pyproject.toml` keeps **mypy** and **basedpyright** effectively off so they do not overlap or conflict with `ty` or duplicate config. Full standard: `docs/TYPING_POLICY.md`.
+External input is ingested only through explicit boundaries (`packages/skilllint/boundary/`, `*_ingest.py`, etc.), validated with **Pydantic** (`BaseModel` / `TypeAdapter`, strict mode where producer errors must not be coerced away), and passed inward as concrete types. Property-test boundary validators with **Hypothesis** where practical.
+
+**Typed core (non-boundary code):** no `typing.Any`, no treating raw external payloads as domain data, and **no `cast()`** — `cast()` is not validation. The only `cast()` permitted is **at a typed boundary**, immediately after a proof step (runtime narrowing, Pydantic output, or a documented library guarantee), per `docs/TYPING_POLICY.md` §2–§4. Tests that must violate static rules for coverage (e.g. Protocol `...` stubs, frozen-dataclass mutation assertions) isolate that in a **named helper or method** marked `@no_type_check` with a one-line rationale — not `cast()` lies or blanket `# ty: ignore`.
+
+**Type checking:** `uv run ty check packages/` only (CI / pre-commit). `pyproject.toml` keeps **mypy** and **basedpyright** effectively off so they do not overlap or conflict with `ty` or duplicate config. Full standard: `docs/TYPING_POLICY.md`.
 
 ## No invented constraints
 
