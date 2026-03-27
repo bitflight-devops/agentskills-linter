@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774355993580,
+  "lastUpdate": 1774621065559,
   "repoUrl": "https://github.com/bitflight-devops/skilllint",
   "entries": {
     "Benchmark": [
@@ -204,6 +204,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "files_per_second",
             "value": 67.215,
+            "unit": "files/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jamie McGregor Nelson",
+            "username": "Jamie-BitFlight",
+            "email": "jamie@bitflight.io"
+          },
+          "committer": {
+            "name": "Jamie McGregor Nelson",
+            "username": "Jamie-BitFlight",
+            "email": "jamie@bitflight.io"
+          },
+          "id": "662935bd1bc23951705dcb9ded8f2b40a25e2a68",
+          "message": "fix: restore FM004/FM010 routing, coerce ValidationIssue for Pydantic, ty-clean tests\n\n- FM004: detect block-scalar descriptions in raw YAML (folded strings lack newlines)\n- FM010: directory/name mismatch is a warning; invalid patterns stay errors\n- Rebuild issues via ValidationIssue.model_validate in _build_validation_result to\n  avoid model_type failures when running python -m skilllint.plugin_validator\n- Thread frontmatter_text into check_fm004; satisfy ty in tests (cast, assert, ty: ignore)",
+          "timestamp": "2026-03-27T14:08:08Z",
+          "url": "https://github.com/bitflight-devops/skilllint/commit/662935bd1bc23951705dcb9ded8f2b40a25e2a68"
+        },
+        "date": 1774621065214,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "scan_min_ms",
+            "value": 14644.386,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_mean_ms",
+            "value": 15186.098,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_max_ms",
+            "value": 16266.304,
+            "unit": "ms"
+          },
+          {
+            "name": "files_per_second",
+            "value": 65.916,
             "unit": "files/s"
           }
         ]
