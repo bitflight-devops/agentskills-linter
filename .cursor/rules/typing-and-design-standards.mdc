@@ -1,0 +1,34 @@
+---
+description: Typing policy, SOLID/DRY, and non-negotiable design quality for this repo
+globs: "**/*.py"
+alwaysApply: true
+---
+
+# Typing and design standards (no compromise)
+
+## Typing
+
+- Follow **`docs/TYPING_POLICY.md`** as the source of truth. The type gate is **`uv run ty check packages/`** (see `pyproject.toml` `[tool.ty.*]`).
+- **No** using `Any`, unchecked `cast()`, or `type: ignore` / `ty: ignore` to silence the checker without a documented, localized reason (e.g. test-only `@no_type_check` with a short rationale).
+- **`cast()`** only after a real proof step (runtime check, Pydantic validation, or documented library guarantee). `cast()` is not validation.
+- Ingress: isolate unknown shape in boundary-style modules (`*_ingest.py`, `boundary/`, etc.); validate with **Pydantic**; pass concrete types inward.
+
+## SOLID and structure
+
+- **S**ingle responsibility: one module/function, one reason to change.
+- **O**pen/closed: extend via new types or adapters, not sprawling conditionals.
+- **L**iskov: subtypes honor contracts; no surprise narrowing of behavior.
+- **I**nterface segregation: small `Protocol`s / facades; avoid fat “god” interfaces.
+- **D**ependency inversion: depend on abstractions at boundaries; wire concretions at the edge.
+
+## DRY and clarity
+
+- **DRY** real duplication only—do not abstract for two copies or speculative reuse.
+- Prefer explicit names and small helpers over clever one-offs.
+- Match existing project patterns (imports, error handling, test layout per `CLAUDE.md`).
+
+## Non-negotiables
+
+- **No invented constraints** (magic numbers, timeouts, length limits) without a spec, config, or comment citing the source (`CLAUDE.md`).
+- **No drive-by refactors** unrelated to the task; every changed line should serve the request.
+- Prefer one principled fix over a quick hack; if a shortcut is unavoidable, isolate it, document why, and keep it out of domain code.
