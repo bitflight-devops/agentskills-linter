@@ -50,6 +50,12 @@ repos:
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
 
+  # GitHub Actions workflow static checks
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.11
+    hooks:
+      - id: actionlint
+
   # TOML sorting and formatting
   - repo: https://github.com/bitflight-devops/pyproject-fmt
     rev: v1.1.5
