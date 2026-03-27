@@ -383,7 +383,7 @@ class TestPluginManifest:
 
         # Act / Assert
         with pytest.raises((AttributeError, TypeError)):
-            m.agents = ["should_fail"]  # type: ignore[misc]
+            m.agents = ["should_fail"]  # ty: ignore[invalid-assignment]
 
 
 class TestParsePluginManifest:

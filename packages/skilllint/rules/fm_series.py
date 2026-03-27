@@ -5,9 +5,9 @@ ValidationIssue objects. Functions receive the parsed frontmatter dict,
 the file path, and the detected file type string.
 
 Severities:
-    "error"   — FM002, FM003, FM005, FM006, FM010
-    "warning" — FM001 (skills), FM004, FM007, FM008
-    "error"   — FM001 (agents), FM010
+    "error"   — FM002, FM003, FM005, FM006; FM010 when the name pattern is invalid
+    "warning" — FM001 (skills), FM004, FM007, FM008; FM010 when skill name mismatches parent directory
+    "error"   — FM001 (agents)
     "info"    — FM009
 
 Import note: ValidationIssue and generate_docs_url are deferred inside each
@@ -238,6 +238,10 @@ def check_fm003(frontmatter: dict, path: Path, file_type: str) -> list[Validatio
 # FM004 — Multiline YAML indicator in description
 # ---------------------------------------------------------------------------
 
+# Block-style description (`>-`, `|`, etc.): YAML parsers fold content to a single-line
+# string, so we also inspect raw frontmatter text to preserve FM004 coverage.
+_FM004_DESCRIPTION_BLOCK_SCALAR = re.compile(r"(?m)^description\s*:\s*(?:\|[-+]?|>[-+]?)(?:\s+#.*)?\s*$")
+
 
 @skilllint_rule(
     "FM004",
@@ -246,7 +250,9 @@ def check_fm003(frontmatter: dict, path: Path, file_type: str) -> list[Validatio
     platforms=["agentskills"],
     authority={"origin": "anthropic.com", "reference": _SKILLS_SPEC_URL},
 )
-def check_fm004(frontmatter: dict, path: Path, file_type: str) -> list[ValidationIssue]:
+def check_fm004(
+    frontmatter: dict, path: Path, file_type: str, *, frontmatter_yaml: str | None = None
+) -> list[ValidationIssue]:
     """## FM004 — Multiline YAML syntax in description
 
     The `description` field uses a multiline YAML indicator (`|`, `>`,
@@ -268,13 +274,15 @@ def check_fm004(frontmatter: dict, path: Path, file_type: str) -> list[Validatio
     ```
 
     Returns:
-        List containing one warning issue when the parsed description contains
-        a newline (indicating multiline YAML was used); empty otherwise.
+        List containing one warning when the description used a block scalar or
+        the parsed string still contains a newline; empty otherwise.
 
     <!-- examples: FM004 -->
     """
     desc = frontmatter.get("description")
-    if isinstance(desc, str) and ("\n" in desc):
+    uses_block_scalar = bool(frontmatter_yaml and _FM004_DESCRIPTION_BLOCK_SCALAR.search(frontmatter_yaml))
+    folded_multiline = isinstance(desc, str) and ("\n" in desc)
+    if uses_block_scalar or folded_multiline:
         return [
             _make_issue(
                 field="description",
@@ -596,7 +604,7 @@ def check_fm010(frontmatter: dict, path: Path, file_type: str) -> list[Validatio
             issues.append(
                 _make_issue(
                     field="name",
-                    severity="error",
+                    severity="warning",
                     message=f"'name' field value '{name}' does not match directory name '{dir_name}'",
                     code="FM010",
                     suggestion=f"Set name: {dir_name} to match the directory name",

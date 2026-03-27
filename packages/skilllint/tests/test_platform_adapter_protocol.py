@@ -15,6 +15,7 @@ Why: The protocol method stubs (``...`` bodies) were 0% covered because
 from __future__ import annotations
 
 import pathlib
+from typing import cast
 
 import pytest
 
@@ -75,27 +76,32 @@ class TestPlatformAdapterProtocol:
     def test_protocol_method_id(self) -> None:
         """Protocol.id() stub is callable and returns None (placeholder)."""
         # Calling the stub directly exercises the '...' body for coverage.
-        result = PlatformAdapter.id(None)  # type: ignore[arg-type]
+        none_adapter = cast("PlatformAdapter", None)
+        result = PlatformAdapter.id(none_adapter)
         assert result is None
 
     def test_protocol_method_path_patterns(self) -> None:
         """Protocol.path_patterns() stub is callable."""
-        result = PlatformAdapter.path_patterns(None)  # type: ignore[arg-type]
+        none_adapter = cast("PlatformAdapter", None)
+        result = PlatformAdapter.path_patterns(none_adapter)
         assert result is None
 
     def test_protocol_method_applicable_rules(self) -> None:
         """Protocol.applicable_rules() stub is callable."""
-        result = PlatformAdapter.applicable_rules(None)  # type: ignore[arg-type]
+        none_adapter = cast("PlatformAdapter", None)
+        result = PlatformAdapter.applicable_rules(none_adapter)
         assert result is None
 
     def test_protocol_method_constraint_scopes(self) -> None:
         """Protocol.constraint_scopes() stub is callable."""
-        result = PlatformAdapter.constraint_scopes(None)  # type: ignore[arg-type]
+        none_adapter = cast("PlatformAdapter", None)
+        result = PlatformAdapter.constraint_scopes(none_adapter)
         assert result is None
 
     def test_protocol_method_validate(self) -> None:
         """Protocol.validate() stub is callable."""
-        result = PlatformAdapter.validate(None, pathlib.Path())  # type: ignore[arg-type]
+        none_adapter = cast("PlatformAdapter", None)
+        result = PlatformAdapter.validate(none_adapter, pathlib.Path())
         assert result is None
 
     def test_real_adapters_satisfy_protocol(self) -> None:

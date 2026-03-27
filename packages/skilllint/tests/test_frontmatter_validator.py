@@ -525,7 +525,7 @@ description: Test
 ---
 """,
             "FM010",
-            False,  # FM010 is still an error (directory name mismatch)
+            False,  # FM010 error: invalid name pattern (uppercase), not directory mismatch
         ),
     ],
 )

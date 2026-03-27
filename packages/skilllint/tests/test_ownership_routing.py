@@ -8,6 +8,8 @@ These tests verify:
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, cast
+
 from skilllint.plugin_validator import (
     VALIDATOR_OWNERSHIP,
     ComplexityValidator,
@@ -22,11 +24,15 @@ from skilllint.plugin_validator import (
     PluginStructureValidator,
     ProgressiveDisclosureValidator,
     SymlinkTargetValidator,
+    Validator,
     ValidatorOwnership,
     filter_validators_by_constraint_scopes,
     get_validator_constraint_scopes,
     get_validator_ownership,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 class TestValidatorOwnership:
@@ -124,7 +130,9 @@ class TestValidatorConstraintScopes:
 
             validators = [MockValidator()]
             # Provider only has provider_specific
-            filtered = filter_validators_by_constraint_scopes(validators, {"provider_specific"})  # type: ignore[arg-type]  # intentional non-Validator mock
+            filtered = filter_validators_by_constraint_scopes(
+                cast("Sequence[Validator]", validators), {"provider_specific"}
+            )
             # Should be filtered out
             assert len(filtered) == 0
         finally:
@@ -139,6 +147,6 @@ class TestValidatorConstraintScopes:
             pass
 
         validators = [UnknownValidator()]
-        filtered = filter_validators_by_constraint_scopes(validators, {"shared"})  # type: ignore[arg-type]  # intentional non-Validator mock
+        filtered = filter_validators_by_constraint_scopes(cast("Sequence[Validator]", validators), {"shared"})
         # Unknown validators default to both scopes, so included
         assert len(filtered) == 1

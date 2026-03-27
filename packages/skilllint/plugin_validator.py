@@ -2101,6 +2101,24 @@ def _validate_skill_directory_name(skill_dir_name: str) -> list[tuple[str, str]]
     return results
 
 
+def _coerce_validation_issues(issues: list[ValidationIssue]) -> list[ValidationIssue]:
+    """Rebuild issues as this module's ``ValidationIssue`` instances.
+
+    Deferred imports (e.g. rules calling ``ValidationIssue`` from inside helpers) can
+    produce a different class object than the one bound on ``ValidationResult`` in
+    edge loads (notably ``python -m skilllint.plugin_validator``). Pydantic then
+    rejects nested instances with ``model_type``. Round-tripping through
+    ``model_dump`` / ``model_validate`` normalizes to a single class identity.
+
+    Args:
+        issues: Issues collected during validation.
+
+    Returns:
+        Equivalent issues re-instantiated on the canonical ``ValidationIssue`` model.
+    """
+    return [ValidationIssue.model_validate(i.model_dump()) for i in issues]
+
+
 def _build_validation_result(
     *, errors: list[ValidationIssue], warnings: list[ValidationIssue], info: list[ValidationIssue]
 ) -> ValidationResult:
@@ -2114,7 +2132,12 @@ def _build_validation_result(
     Returns:
         ValidationResult with pass/fail derived from whether errors exist.
     """
-    return ValidationResult(passed=len(errors) == 0, errors=errors, warnings=warnings, info=info)
+    return ValidationResult(
+        passed=len(errors) == 0,
+        errors=_coerce_validation_issues(errors),
+        warnings=_coerce_validation_issues(warnings),
+        info=_coerce_validation_issues(info),
+    )
 
 
 def _validation_result_with_error(
@@ -2291,7 +2314,9 @@ class FrontmatterValidator:
             return _build_validation_result(errors=errors, warnings=warnings, info=info)
 
         validated_data = cast("dict[str, YamlValue]", data)
-        self._validate_pydantic_model(model_class, validated_data, file_type, path, errors=errors, warnings=warnings)
+        self._validate_pydantic_model(
+            model_class, validated_data, file_type, path, frontmatter_text, errors=errors, warnings=warnings
+        )
 
         return _build_validation_result(errors=errors, warnings=warnings, info=info)
 
@@ -2301,6 +2326,7 @@ class FrontmatterValidator:
         data: dict[str, YamlValue],
         file_type: FileType,
         path: Path,
+        frontmatter_text: str,
         *,
         errors: list[ValidationIssue],
         warnings: list[ValidationIssue],
@@ -2312,6 +2338,7 @@ class FrontmatterValidator:
             data: Parsed frontmatter data
             file_type: Detected file type
             path: Path to the file being validated
+            frontmatter_text: Raw YAML frontmatter (between ``---`` delimiters) for FM004 source checks
             errors: Mutable list to append errors to
             warnings: Mutable list to append warnings to
 
@@ -2343,7 +2370,7 @@ class FrontmatterValidator:
                 else:
                     errors.append(issue)
 
-        warnings.extend(check_fm004(data, path, file_type.value))
+        warnings.extend(check_fm004(data, path, file_type.value, frontmatter_yaml=frontmatter_text))
         _check_list_valued_tool_fields(data, errors, warnings)
         _check_skill_name_and_directory(data, path, file_type, errors, warnings)
 

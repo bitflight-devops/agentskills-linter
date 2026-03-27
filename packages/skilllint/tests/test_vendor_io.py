@@ -674,7 +674,9 @@ class TestUtcNowIso:
         parsed = datetime.fromisoformat(result)
 
         # Assert
-        assert parsed.utcoffset().total_seconds() == 0  # type: ignore[union-attr]
+        offset = parsed.utcoffset()
+        assert offset is not None
+        assert offset.total_seconds() == 0
 
 
 # ---------------------------------------------------------------------------

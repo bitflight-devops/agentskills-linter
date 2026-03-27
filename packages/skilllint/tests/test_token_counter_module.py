@@ -162,7 +162,7 @@ class TestTokenCounts:
 
         tc = TokenCounts(total=10, frontmatter=3, body=7)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            tc.total = 99  # type: ignore[misc]
+            tc.total = 99  # ty: ignore[invalid-assignment]
 
     def test_fields_accessible(self) -> None:
         """All three fields are readable."""
