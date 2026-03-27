@@ -109,13 +109,13 @@ skilllint check --platform claude-code plugins/my-plugin
 | AS001–AS006 | AgentSkills | Cross-platform open standard compliance |
 | LK001–LK002 | Links | Markdown link validity and broken reference detection |
 | PD001–PD003 | Progressive disclosure | Directory structure for references/, examples/, scripts/ |
-| PL001–PL005 | Plugin | Structure, manifest correctness, subprocess safety |
+| PL001–PL006 | Plugin | Structure, manifest correctness, marketplace layout, subprocess safety |
 | HK001–HK005 | Hook | Script existence, configuration validity |
 | NR001–NR002 | Namespace refs | Cross-plugin skill/agent/command references |
 | SL001 | Symlinks | Symlink hygiene within plugin directory |
 | TC001 | Token count | Token count reporting and threshold enforcement |
 | PR001–PR005 | Plugin registration | Capability registration completeness and correctness in plugin.json |
-| PA001 | Plugin agent | Sub-agent frontmatter restrictions (hooks, mcpServers, permissionMode) |
+| PA001 | Plugin agent | Plugin-packaged agents: `hooks` / `mcpServers` / `permissionMode` unsupported per Anthropic (ignored at load; cite sub-agents doc) |
 
 ---
 

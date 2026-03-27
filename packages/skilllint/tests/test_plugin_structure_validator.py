@@ -6,10 +6,12 @@ Tests:
 - Error parsing from claude output
 - Subprocess security (no shell=True)
 - Timeout handling
+- marketplace.json layout (PL006) and --fix relocation
 """
 
 from __future__ import annotations
 
+import json
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -20,7 +22,7 @@ if TYPE_CHECKING:
 
     from pytest_mock import MockerFixture
 
-from skilllint.plugin_validator import PluginStructureValidator
+from skilllint.plugin_validator import PL006, PluginStructureValidator
 
 
 class TestPluginStructureValidatorBasic:
@@ -30,17 +32,19 @@ class TestPluginStructureValidatorBasic:
         """Test PluginStructureValidator can be instantiated."""
         validator = PluginStructureValidator()
         assert validator is not None
-        assert validator.can_fix() is False
+        assert validator.can_fix() is True
 
     def test_fix_raises_not_implemented(self, tmp_path: Path) -> None:
-        """Test fix() raises NotImplementedError.
+        """Test fix() raises NotImplementedError when nothing to fix.
 
-        Tests: PluginStructureValidator is not auto-fixable
-        How: Call fix() method, expect NotImplementedError
-        Why: Plugin structure fixes require manual changes
+        Tests: fix() requires a plugin dir with fixable marketplace.json
+        How: Call fix() without marketplace.json, expect NotImplementedError
         """
         plugin_dir = tmp_path / "test-plugin"
         plugin_dir.mkdir()
+        claude_plugin = plugin_dir / ".claude-plugin"
+        claude_plugin.mkdir()
+        (claude_plugin / "plugin.json").write_text('{"name": "test"}')
 
         validator = PluginStructureValidator()
         with pytest.raises(NotImplementedError):
@@ -450,3 +454,93 @@ class TestEdgeCases:
 
         # Should handle symlinks
         assert isinstance(result.passed, bool)
+
+
+class TestMarketplaceJsonLayout:
+    """marketplace.json root keys (PL006) and --fix relocation."""
+
+    def test_pl006_misplaced_keys_skips_claude_subprocess(self, mocker: MockerFixture, tmp_path: Path) -> None:
+        """Disallowed marketplace root keys fail fast with PL006; do not invoke claude."""
+        mocker.patch("shutil.which", return_value="/usr/local/bin/claude")
+        mocker.patch("skilllint.plugin_validator._should_skip_claude_validate", return_value=False)
+
+        mock_run = mocker.patch("subprocess.run")
+
+        plugin_dir = tmp_path / "test-plugin"
+        plugin_dir.mkdir()
+        claude_plugin = plugin_dir / ".claude-plugin"
+        claude_plugin.mkdir()
+        (claude_plugin / "plugin.json").write_text('{"name": "test"}')
+        marketplace = {
+            "name": "cat",
+            "owner": {"name": "x"},
+            "plugins": [],
+            "repository": "https://example.com/r",
+            "homepage": "https://example.com",
+            "license": "MIT",
+        }
+        (claude_plugin / "marketplace.json").write_text(json.dumps(marketplace))
+
+        validator = PluginStructureValidator()
+        result = validator.validate(plugin_dir)
+
+        assert result.passed is False
+        assert any(e.code == PL006 for e in result.errors)
+        mock_run.assert_not_called()
+
+    def test_fix_moves_relocatable_keys_to_metadata(self, tmp_path: Path) -> None:
+        """fix() moves repository, homepage, license under metadata."""
+        plugin_dir = tmp_path / "test-plugin"
+        plugin_dir.mkdir()
+        claude_plugin = plugin_dir / ".claude-plugin"
+        claude_plugin.mkdir()
+        (claude_plugin / "plugin.json").write_text('{"name": "test"}')
+        marketplace = {
+            "name": "cat",
+            "owner": {"name": "x"},
+            "plugins": [],
+            "repository": "https://example.com/r",
+            "homepage": "https://example.com",
+            "license": "MIT",
+        }
+        (claude_plugin / "marketplace.json").write_text(json.dumps(marketplace))
+
+        validator = PluginStructureValidator()
+        fixes = validator.fix(plugin_dir)
+        assert len(fixes) == 1
+        assert "repository" in fixes[0]
+
+        data = json.loads((claude_plugin / "marketplace.json").read_text(encoding="utf-8"))
+        assert data["metadata"]["repository"] == "https://example.com/r"
+        assert data["metadata"]["homepage"] == "https://example.com"
+        assert data["metadata"]["license"] == "MIT"
+        assert "repository" not in data
+
+    def test_claude_output_marketplace_unrecognized_keys_maps_to_pl006(
+        self, mocker: MockerFixture, tmp_path: Path
+    ) -> None:
+        """Fallback parser maps marketplace unrecognized-keys CLI output to PL006."""
+        mocker.patch("shutil.which", return_value="/usr/local/bin/claude")
+        mocker.patch("skilllint.plugin_validator._should_skip_claude_validate", return_value=False)
+
+        stderr = (
+            "Validating marketplace manifest: /tmp/.claude-plugin/marketplace.json\n"
+            'Found 1 error:\n  root: Unrecognized keys: "repository", "homepage", "license"\n'
+        )
+        mock_run = mocker.patch("subprocess.run")
+        mock_run.return_value = mocker.Mock(returncode=1, stdout="", stderr=stderr)
+
+        plugin_dir = tmp_path / "test-plugin"
+        plugin_dir.mkdir()
+        claude_plugin = plugin_dir / ".claude-plugin"
+        claude_plugin.mkdir()
+        (claude_plugin / "plugin.json").write_text('{"name": "test"}')
+        (claude_plugin / "marketplace.json").write_text(
+            json.dumps({"name": "c", "owner": {"name": "a"}, "plugins": []})
+        )
+
+        validator = PluginStructureValidator()
+        result = validator.validate(plugin_dir)
+
+        assert result.passed is False
+        assert any(e.code == PL006 for e in result.errors)

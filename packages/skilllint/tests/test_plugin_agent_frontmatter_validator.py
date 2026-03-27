@@ -13,7 +13,7 @@ Tests cover nuanced severity levels and cross-checking:
 - Non-plugin (standalone) agent with restricted fields produces no issues (TestStandaloneAgent)
 - Error/warning messages include correct actionable guidance per field (TestGuidance)
 
-Source: https://docs.anthropic.com/en/docs/claude-code/sub-agents
+Source: https://docs.anthropic.com/en/docs/claude-code/sub-agents.md#choose-the-subagent-scope
 > "For security reasons, plugin subagents do not support the `hooks`,
 > `mcpServers`, or `permissionMode` frontmatter fields."
 """
@@ -242,7 +242,7 @@ class TestHooksAlwaysWarns:
         assert result.passed is True
         hooks_warnings = [w for w in result.warnings if "hooks" in w.message]
         assert len(hooks_warnings) >= 1
-        assert "move to" in (hooks_warnings[0].suggestion or "")
+        assert "move to" in (hooks_warnings[0].suggestion or "").lower()
 
 
 class TestMcpServersInline:
@@ -615,6 +615,22 @@ class TestGuidance:
         for error in perm_errors:
             combined_text = f"{error.message} {error.suggestion or ''}"
             assert ".claude/agents/" in combined_text
+            assert "~/.claude/agents/" in combined_text
+            assert "permissions.allow" in combined_text
+            assert error.docs_url is not None
+            assert "choose-the-subagent-scope" in error.docs_url
+
+    def test_pa001_permission_mode_cites_ignored_policy(self, tmp_path: Path) -> None:
+        """Messages state Anthropic's documented behavior (ignored at load), not vague 'prohibited'."""
+        plugin_dir = _make_plugin(tmp_path)
+        _add_agent_with_frontmatter(
+            plugin_dir, "my-agent", {"name": "my-agent", "description": "Test agent", "permissionMode": "full"}
+        )
+        validator = PluginAgentFrontmatterValidator()
+        result = validator.validate(plugin_dir)
+        perm_errors = [e for e in result.errors if "permissionMode" in e.message]
+        assert len(perm_errors) >= 1
+        assert "ignored" in perm_errors[0].message.lower()
 
 
 class TestValidatorInterface:

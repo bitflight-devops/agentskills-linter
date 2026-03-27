@@ -147,6 +147,10 @@ Project-level tests that are not owned by any package:
 
 Both locations are discovered by `pytest` via `testpaths = ["**/tests"]` in `pyproject.toml`.
 
+## Python typing policy
+
+External input is ingested only through explicit boundaries (`packages/skilllint/boundary/`, `*_ingest.py`, etc.), validated with **Pydantic** (`BaseModel` / `TypeAdapter`, strict mode where producer errors must not be coerced away), and passed inward as concrete types. Property-test boundary validators with **Hypothesis** where practical. The typed core avoids `typing.Any`, unjustified `cast()`, and raw payloads as application data. **Type checking:** `uv run ty check packages/` only (CI / pre-commit). `pyproject.toml` keeps **mypy** and **basedpyright** effectively off so they do not overlap or conflict with `ty` or duplicate config. Full standard: `docs/TYPING_POLICY.md`.
+
 ## No invented constraints
 
 A numeric limit without a source is a hallucination. Every threshold, max length, timeout, or cap must have an origin.

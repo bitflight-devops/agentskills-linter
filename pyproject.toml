@@ -58,19 +58,18 @@ build-backend = "hatchling.build"
 
 [dependency-groups]
 dev = [
-    "basedpyright>=1.37.2",
     "beautifulsoup4>=4.14.3",
     "hatch-vcs>=0.5.0",
-    "hatchling>=1.14.0",
+    "hatchling>=1.29.0",
     "hypothesis>=6.151.9",
-    "prek>=0.2.19",
-    "pytest-cov>=7.0.0",
-    "pytest-mock>=3.14.0",
+    "prek>=0.3.8",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.15.1",
     "pytest-xdist>=3.8.0",
     "pytest>=9.0.2",
     "rich>=14.3.3",
-    "ruff>=0.14.0",
-    "ty>=0.0.21",
+    "ruff>=0.15.8",
+    "ty>=0.0.26",
 ]
 
 [tool.hatch.build.targets.sdist]
@@ -272,6 +271,9 @@ max-line-length = 120
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+# Type checking: Astral ty only (`[tool.ty.*]`, `uv run ty check packages/`, CI + pre-commit).
+# Mypy and Pyright/basedpyright overlap ty; we disable them here so IDEs and one-off CLI runs
+# do not second-guess ty or force duplicate config and edge-case handling.
 [tool.mypy]
 exclude = [".*"]
 

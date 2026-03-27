@@ -99,6 +99,17 @@ Validate `plugin.json` structure.
 | PL003 | error | no | Required `name` field is missing from `plugin.json` |
 | PL004 | error | no | A path in `plugin.json` does not start with `./` |
 | PL005 | error | no | Referenced file in `plugin.json` does not exist |
+| PL006 | error | yes | `marketplace.json` root keys violate [Claude Code marketplace schema](https://code.claude.com/docs/en/plugin-marketplaces.md#marketplace-schema); known plugin-manifest fields can move under `metadata` (`skilllint check --fix`) |
+
+---
+
+## PA — Plugin-packaged agent frontmatter
+
+Anthropic documents that **plugin** subagents do not support `hooks`, `mcpServers`, or `permissionMode` in agent frontmatter (ignored when loading from a plugin). Authority: [Choose the subagent scope](https://docs.anthropic.com/en/docs/claude-code/sub-agents.md#choose-the-subagent-scope).
+
+| Rule | Severity | Auto-fix | Description |
+|------|----------|----------|-------------|
+| PA001 | error / warning | no | `permissionMode` → error; `hooks` / `mcpServers` → warnings with plugin-level cross-checks (`.mcp.json`, `hooks/hooks.json`) |
 
 ---
 

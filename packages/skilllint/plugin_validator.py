@@ -238,6 +238,19 @@ ERROR_CODE_BASE_URL = (
 # Official plugin.json schema (plugin manifest)
 PLUGIN_MANIFEST_SCHEMA_URL = "https://code.claude.com/docs/en/plugins-reference.md#plugin-manifest-schema"
 SKILL_FRONTMATTER_SCHEMA_URL = "https://code.claude.com/docs/en/skills.md#frontmatter-reference"
+# Claude Code marketplace.json top-level keys (not plugin-manifest fields at root)
+MARKETPLACE_MANIFEST_SCHEMA_URL = "https://code.claude.com/docs/en/plugin-marketplaces.md#marketplace-schema"
+MARKETPLACE_JSON_ROOT_KEYS: frozenset[str] = frozenset({"name", "owner", "plugins", "metadata"})
+# Same field names as plugin.json metadata, but must live under `metadata` on marketplace.json
+MARKETPLACE_METADATA_RELOCATABLE_KEYS: frozenset[str] = frozenset({
+    "repository",
+    "homepage",
+    "license",
+    "author",
+    "keywords",
+    "description",
+    "version",
+})
 
 # FILTER_TYPE_MAP and DEFAULT_SCAN_PATTERNS live in scan_runtime.py
 # and are re-imported at the top of this module.
@@ -318,12 +331,13 @@ class ErrorCode(StrEnum):
     PD002 = "PD002"  # No `examples/` directory found
     PD003 = "PD003"  # No `scripts/` directory found
 
-    # Plugin (PL001-PL005)
+    # Plugin (PL001-PL006)
     PL001 = "PL001"  # Missing `plugin.json` file
     PL002 = "PL002"  # Invalid JSON syntax in `plugin.json`
     PL003 = "PL003"  # Missing required field `name` in plugin.json
     PL004 = "PL004"  # Component path does not start with `./`
     PL005 = "PL005"  # Referenced component file does not exist
+    PL006 = "PL006"  # marketplace.json has invalid top-level keys (use `metadata`)
 
     # Command (CM001)
     CM001 = "CM001"  # Command-specific validation (reserved)
@@ -356,7 +370,7 @@ class ErrorCode(StrEnum):
     PR005 = "PR005"  # Registered command path is a skill directory (contains SKILL.md)
 
     # Plugin Agent Frontmatter (PA001)
-    PA001 = "PA001"  # Plugin agent uses prohibited frontmatter field (hooks, mcpServers, permissionMode)
+    PA001 = "PA001"  # Plugin agent: hooks/mcpServers/permissionMode unsupported per Anthropic (ignored at load)
 
     # Cursor adapter (CU001-CU002)
     CU001 = "CU001"  # Required field missing from .mdc frontmatter
@@ -393,12 +407,13 @@ SK001, SK002, SK003, SK004, SK005, SK006, SK007, SK008, SK009 = (
 )
 LK001, LK002 = ErrorCode.LK001, ErrorCode.LK002
 PD001, PD002, PD003 = ErrorCode.PD001, ErrorCode.PD002, ErrorCode.PD003
-PL001, PL002, PL003, PL004, PL005 = (
+PL001, PL002, PL003, PL004, PL005, PL006 = (
     ErrorCode.PL001,
     ErrorCode.PL002,
     ErrorCode.PL003,
     ErrorCode.PL004,
     ErrorCode.PL005,
+    ErrorCode.PL006,
 )
 CM001 = ErrorCode.CM001
 HK001, HK002, HK003, HK004, HK005 = (
@@ -3618,6 +3633,132 @@ class PluginRegistrationValidator:
 # ============================================================================
 
 
+def _analyze_marketplace_root_keys(data: dict[str, YamlValue]) -> tuple[list[str], list[str]]:
+    """Classify misplaced top-level keys in marketplace.json.
+
+    Returns:
+        (relocatable, unknown) — keys to move under ``metadata``, and keys that are not
+        recognized at root and are not auto-relocated (require manual removal or rename).
+    """
+    misplaced = [k for k in data if k not in MARKETPLACE_JSON_ROOT_KEYS]
+    relocatable = sorted(k for k in misplaced if k in MARKETPLACE_METADATA_RELOCATABLE_KEYS)
+    unknown = sorted(k for k in misplaced if k not in MARKETPLACE_METADATA_RELOCATABLE_KEYS)
+    return relocatable, unknown
+
+
+def _validate_marketplace_json_layout(plugin_dir: Path) -> list[ValidationIssue]:
+    """Return validation issues when marketplace.json has disallowed top-level keys.
+
+    Claude's ``claude plugin validate`` rejects plugin-manifest fields (e.g. ``repository``,
+    ``homepage``, ``license``) at the marketplace root; they belong under ``metadata``.
+    """
+    mp_path = plugin_dir / ".claude-plugin" / "marketplace.json"
+    if not mp_path.exists():
+        return []
+    try:
+        raw = msgspec.json.decode(mp_path.read_bytes())
+    except msgspec.DecodeError as e:
+        return [
+            ValidationIssue(
+                field="marketplace.json",
+                severity="error",
+                message=f"Invalid JSON syntax in marketplace.json: {e}",
+                code=PL002,
+                docs_url=generate_docs_url(PL002),
+                suggestion=f"marketplace.json must be valid JSON. Schema: {MARKETPLACE_MANIFEST_SCHEMA_URL}",
+            )
+        ]
+    except OSError as e:
+        return [
+            ValidationIssue(
+                field="marketplace.json",
+                severity="error",
+                message=f"Cannot read marketplace.json: {e}",
+                code=PL002,
+                docs_url=generate_docs_url(PL002),
+            )
+        ]
+    if not isinstance(raw, dict):
+        return [
+            ValidationIssue(
+                field="marketplace.json",
+                severity="error",
+                message="marketplace.json must be a JSON object at the root",
+                code=PL006,
+                docs_url=generate_docs_url(PL006),
+                suggestion=f"See: {MARKETPLACE_MANIFEST_SCHEMA_URL}",
+            )
+        ]
+    relocatable, unknown = _analyze_marketplace_root_keys(raw)
+    if not relocatable and not unknown:
+        return []
+    parts: list[str] = []
+    if relocatable:
+        parts.append("move these fields under a `metadata` object: " + ", ".join(f"`{k}`" for k in relocatable))
+    if unknown:
+        parts.append("remove or rename unrecognized top-level keys: " + ", ".join(f"`{k}`" for k in unknown))
+    detail = "; ".join(parts)
+    suggestion = (
+        "Claude Code marketplace manifests only allow top-level `name`, `owner`, `plugins`, "
+        f"and optional `metadata`. {detail.capitalize()}. "
+        f"Reference: {MARKETPLACE_MANIFEST_SCHEMA_URL}"
+    )
+    if relocatable and not unknown:
+        suggestion += " Run `skilllint check --fix` on the plugin directory to move them automatically."
+    return [
+        ValidationIssue(
+            field="marketplace.json",
+            severity="error",
+            message=(
+                f"marketplace.json violates the Claude Code marketplace schema: {detail}. "
+                "Plugin-manifest fields must not appear beside `plugins` at the catalog root."
+            ),
+            code=PL006,
+            docs_url=generate_docs_url(PL006),
+            suggestion=suggestion,
+        )
+    ]
+
+
+def _fix_marketplace_json_metadata_keys(plugin_dir: Path) -> list[str]:
+    """Move MARKETPLACE_METADATA_RELOCATABLE_KEYS from root into ``metadata``.
+
+    Returns:
+        One-line summaries of changes written to ``marketplace.json``.
+    """
+    mp_path = plugin_dir / ".claude-plugin" / "marketplace.json"
+    if not mp_path.exists():
+        raise NotImplementedError("No marketplace.json to fix.")
+    raw = msgspec.json.decode(mp_path.read_bytes())
+    if not isinstance(raw, dict):
+        raise NotImplementedError("marketplace.json root must be a JSON object.")
+    relocatable, unknown = _analyze_marketplace_root_keys(raw)
+    if unknown:
+        raise NotImplementedError(
+            "Cannot auto-fix marketplace.json: unrecognized top-level keys must be removed manually: "
+            + ", ".join(unknown)
+        )
+    if not relocatable:
+        raise NotImplementedError("No misplaced marketplace metadata keys to move.")
+    meta_raw = raw.get("metadata")
+    if meta_raw is None:
+        metadata: dict[str, YamlValue] = {}
+    elif isinstance(meta_raw, dict):
+        metadata = dict(meta_raw)
+    else:
+        raise NotImplementedError("marketplace.json `metadata` must be an object to apply fixes.")
+    for k in relocatable:
+        metadata[k] = raw[k]
+    new_root: dict[str, YamlValue] = {}
+    for key in ("name", "owner", "plugins"):
+        if key in raw:
+            new_root[key] = raw[key]
+    new_root["metadata"] = metadata
+    out = msgspec.json.format(msgspec.json.encode(new_root), indent=2).decode() + "\n"
+    mp_path.write_text(out, encoding="utf-8")
+    return [f"Moved {', '.join(relocatable)} under metadata in {mp_path}"]
+
+
 class PluginStructureValidator:
     """Validates plugin structure using claude CLI.
 
@@ -3664,6 +3805,11 @@ class PluginStructureValidator:
                     )
                 )
                 return ValidationResult(passed=False, errors=errors, warnings=warnings, info=info)
+
+        mp_layout = _validate_marketplace_json_layout(plugin_dir)
+        if mp_layout:
+            errors.extend(mp_layout)
+            return ValidationResult(passed=False, errors=errors, warnings=warnings, info=info)
 
         # Skip claude plugin validate when running inside a Claude Code session
         # (nested CLI invocations are blocked by Anthropic safety measure).
@@ -3758,26 +3904,26 @@ class PluginStructureValidator:
         """Check if validator supports auto-fixing.
 
         Returns:
-            False (plugin structure issues require manual structural changes)
+            True (marketplace.json metadata keys can be relocated under ``metadata``).
         """
-        return False
+        return True
 
     def fix(self, path: Path) -> list[str]:
-        """Auto-fix plugin structure issues (not supported).
+        """Relocate misplaced marketplace.json root keys into ``metadata``.
 
         Args:
-            path: Path to plugin directory to fix
+            path: Path to plugin directory or file within plugin
 
         Returns:
-            Never returns (always raises)
+            Human-readable descriptions of fixes applied
 
         Raises:
-            NotImplementedError: Plugin structure validation cannot be auto-fixed
+            NotImplementedError: No fixable marketplace layout, or not a plugin directory
         """
-        raise NotImplementedError(
-            "Plugin structure validation cannot be auto-fixed. "
-            "Structural issues require manual changes to plugin.json and component files."
-        )
+        plugin_dir = find_plugin_dir(path)
+        if plugin_dir is None:
+            raise NotImplementedError("Not inside a plugin directory (no .claude-plugin/plugin.json).")
+        return _fix_marketplace_json_metadata_keys(plugin_dir)
 
     def _get_claude_path(self) -> str | None:
         """Get full path to claude CLI if available.
@@ -3877,22 +4023,42 @@ class PluginStructureValidator:
         # Include actual CLI output for diagnosis (truncate to avoid huge messages)
         if not errors:
             detail = (stdout.strip() + "\n" + stderr.strip())[:500] or "(no output)"
-            errors.append(
-                ValidationIssue(
-                    field="plugin.json",
-                    severity="error",
-                    message="Plugin validation failed (see claude CLI output for details)",
-                    code=PL002,
-                    docs_url=generate_docs_url(PL002),
-                    suggestion=f"Run 'claude plugin validate <plugin-dir>'. CLI output: {detail}",
+            low = detail.lower()
+            if "marketplace" in low and "unrecognized keys" in low:
+                errors.append(
+                    ValidationIssue(
+                        field="marketplace.json",
+                        severity="error",
+                        message=(
+                            "marketplace.json: top-level keys rejected by `claude plugin validate` "
+                            "(Claude Code allows only `name`, `owner`, `plugins`, and `metadata` at the catalog root)"
+                        ),
+                        code=PL006,
+                        docs_url=generate_docs_url(PL006),
+                        suggestion=(
+                            "Plugin-manifest fields such as `repository`, `homepage`, and `license` belong under "
+                            f"`metadata`, not beside `plugins`. Reference: {MARKETPLACE_MANIFEST_SCHEMA_URL}. "
+                            f"Run `skilllint check --fix` to relocate known fields. CLI output: {detail}"
+                        ),
+                    )
                 )
-            )
+            else:
+                errors.append(
+                    ValidationIssue(
+                        field="plugin.json",
+                        severity="error",
+                        message="Plugin validation failed (see claude CLI output for details)",
+                        code=PL002,
+                        docs_url=generate_docs_url(PL002),
+                        suggestion=f"Run 'claude plugin validate <plugin-dir>'. CLI output: {detail}",
+                    )
+                )
 
     def _get_error_message(self, code: str, output: str) -> str:
         """Get human-readable error message for code.
 
         Args:
-            code: Error code (PL001-PL005)
+            code: Error code (PL001-PL006)
             output: CLI output containing error details
 
         Returns:
@@ -3914,14 +4080,15 @@ class PluginStructureValidator:
             "PL003": "Missing required field 'name' in plugin.json",
             "PL004": "Component path does not start with './'",
             "PL005": "Referenced component file does not exist",
+            "PL006": "marketplace.json has invalid top-level keys (use metadata object)",
         }
         return fallbacks.get(str(code), "Plugin structure validation failed")
 
-    def _get_error_suggestion(self, code: str) -> str:
+    def _get_error_suggestion(self, code: str) -> str:  # noqa: PLR0911
         """Get suggestion for fixing error.
 
         Args:
-            code: Error code (PL001-PL005)
+            code: Error code (PL001-PL006)
 
         Returns:
             Human-readable suggestion for fixing the error
@@ -3937,6 +4104,11 @@ class PluginStructureValidator:
                 return "Ensure all component paths start with './' (e.g., './skills/skill-name/')"
             case "PL005":
                 return "Verify all referenced files exist at specified paths"
+            case "PL006":
+                return (
+                    "Keep only name, owner, plugins, and metadata at the marketplace root; "
+                    f"see {MARKETPLACE_MANIFEST_SCHEMA_URL}"
+                )
             case _:
                 return "Run 'claude plugin validate' for detailed error information"
 
