@@ -8,7 +8,7 @@ These tests verify:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from skilllint.plugin_validator import (
     VALIDATOR_OWNERSHIP,
@@ -24,7 +24,7 @@ from skilllint.plugin_validator import (
     PluginStructureValidator,
     ProgressiveDisclosureValidator,
     SymlinkTargetValidator,
-    Validator,
+    ValidationResult,
     ValidatorOwnership,
     filter_validators_by_constraint_scopes,
     get_validator_constraint_scopes,
@@ -32,7 +32,7 @@ from skilllint.plugin_validator import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from pathlib import Path
 
 
 class TestValidatorOwnership:
@@ -114,9 +114,17 @@ class TestValidatorConstraintScopes:
     def test_filter_excludes_mismatched_scopes(self):
         """If a validator only supports 'shared' but provider only has 'provider_specific', exclude it."""
 
-        # Create a mock validator with limited scope
         class MockValidator:
-            pass
+            """Structural ``Validator``; filter logic uses ``type(...).__name__`` only."""
+
+            def validate(self, path: Path) -> ValidationResult:
+                return ValidationResult(passed=True, errors=[], warnings=[], info=[])
+
+            def can_fix(self) -> bool:
+                return False
+
+            def fix(self, path: Path) -> list[str]:
+                return []
 
         # Temporarily add a mock validator with limited scope
         from skilllint.plugin_validator import VALIDATOR_CONSTRAINT_SCOPES
@@ -128,11 +136,9 @@ class TestValidatorConstraintScopes:
 
             from skilllint.plugin_validator import filter_validators_by_constraint_scopes
 
-            validators = [MockValidator()]
+            validators: list[MockValidator] = [MockValidator()]
             # Provider only has provider_specific
-            filtered = filter_validators_by_constraint_scopes(
-                cast("Sequence[Validator]", validators), {"provider_specific"}
-            )
+            filtered = filter_validators_by_constraint_scopes(validators, {"provider_specific"})
             # Should be filtered out
             assert len(filtered) == 0
         finally:
@@ -144,9 +150,18 @@ class TestValidatorConstraintScopes:
         from skilllint.plugin_validator import filter_validators_by_constraint_scopes
 
         class UnknownValidator:
-            pass
+            """Structural ``Validator`` so the argument matches ``Sequence[Validator]``."""
 
-        validators = [UnknownValidator()]
-        filtered = filter_validators_by_constraint_scopes(cast("Sequence[Validator]", validators), {"shared"})
+            def validate(self, path: Path) -> ValidationResult:
+                return ValidationResult(passed=True, errors=[], warnings=[], info=[])
+
+            def can_fix(self) -> bool:
+                return False
+
+            def fix(self, path: Path) -> list[str]:
+                return []
+
+        validators: list[UnknownValidator] = [UnknownValidator()]
+        filtered = filter_validators_by_constraint_scopes(validators, {"shared"})
         # Unknown validators default to both scopes, so included
         assert len(filtered) == 1

@@ -14,7 +14,7 @@ Why: token_counter is the single source of truth for counting; its
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, no_type_check
 
 import pytest
 
@@ -28,6 +28,12 @@ from skilllint.token_counter import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+@no_type_check
+def _assign_frozen_token_total(tc: TokenCounts, value: int) -> None:
+    """Break ``TokenCounts`` immutability on purpose (frozen-dataclass test only)."""
+    tc.total = value
 
 
 class TestSplitFrontmatterBody:
@@ -162,7 +168,7 @@ class TestTokenCounts:
 
         tc = TokenCounts(total=10, frontmatter=3, body=7)
         with pytest.raises(dataclasses.FrozenInstanceError):
-            tc.total = 99  # ty: ignore[invalid-assignment]
+            _assign_frozen_token_total(tc, 99)
 
     def test_fields_accessible(self) -> None:
         """All three fields are readable."""

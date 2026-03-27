@@ -8,7 +8,7 @@ Coverage scope:
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, no_type_check
 
 import pytest
 
@@ -27,6 +27,12 @@ from skilllint.scan_runtime import (
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+
+@no_type_check
+def _assign_frozen_manifest_agents(m: PluginManifest, agents: list[str]) -> None:
+    """Break ``PluginManifest`` immutability on purpose (frozen-dataclass test only)."""
+    m.agents = agents
 
 
 class TestDetectScanContext:
@@ -383,7 +389,7 @@ class TestPluginManifest:
 
         # Act / Assert
         with pytest.raises((AttributeError, TypeError)):
-            m.agents = ["should_fail"]  # ty: ignore[invalid-assignment]
+            _assign_frozen_manifest_agents(m, ["should_fail"])
 
 
 class TestParsePluginManifest:

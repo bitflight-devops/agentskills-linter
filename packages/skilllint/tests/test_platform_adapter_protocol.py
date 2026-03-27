@@ -15,7 +15,7 @@ Why: The protocol method stubs (``...`` bodies) were 0% covered because
 from __future__ import annotations
 
 import pathlib
-from typing import cast
+from typing import no_type_check
 
 import pytest
 
@@ -73,35 +73,39 @@ class TestPlatformAdapterProtocol:
         result = isinstance(_FullAdapter(), PlatformAdapter)
         assert isinstance(result, bool)
 
+    @no_type_check
     def test_protocol_method_id(self) -> None:
-        """Protocol.id() stub is callable and returns None (placeholder)."""
-        # Calling the stub directly exercises the '...' body for coverage.
-        none_adapter = cast("PlatformAdapter", None)
-        result = PlatformAdapter.id(none_adapter)
+        """Protocol.id() ellipsis body is reachable via unbound call.
+
+        ``self`` is not a real adapter; this only exercises runtime Protocol stubs.
+        ``@no_type_check`` marks intentional static unsoundness (see TYPING_POLICY —
+        tests, not ingress boundaries).
+        """
+        result = PlatformAdapter.id(None)
         assert result is None
 
+    @no_type_check
     def test_protocol_method_path_patterns(self) -> None:
-        """Protocol.path_patterns() stub is callable."""
-        none_adapter = cast("PlatformAdapter", None)
-        result = PlatformAdapter.path_patterns(none_adapter)
+        """Protocol.path_patterns() ellipsis body is reachable via unbound call."""
+        result = PlatformAdapter.path_patterns(None)
         assert result is None
 
+    @no_type_check
     def test_protocol_method_applicable_rules(self) -> None:
-        """Protocol.applicable_rules() stub is callable."""
-        none_adapter = cast("PlatformAdapter", None)
-        result = PlatformAdapter.applicable_rules(none_adapter)
+        """Protocol.applicable_rules() ellipsis body is reachable via unbound call."""
+        result = PlatformAdapter.applicable_rules(None)
         assert result is None
 
+    @no_type_check
     def test_protocol_method_constraint_scopes(self) -> None:
-        """Protocol.constraint_scopes() stub is callable."""
-        none_adapter = cast("PlatformAdapter", None)
-        result = PlatformAdapter.constraint_scopes(none_adapter)
+        """Protocol.constraint_scopes() ellipsis body is reachable via unbound call."""
+        result = PlatformAdapter.constraint_scopes(None)
         assert result is None
 
+    @no_type_check
     def test_protocol_method_validate(self) -> None:
-        """Protocol.validate() stub is callable."""
-        none_adapter = cast("PlatformAdapter", None)
-        result = PlatformAdapter.validate(none_adapter, pathlib.Path())
+        """Protocol.validate() ellipsis body is reachable via unbound call."""
+        result = PlatformAdapter.validate(None, pathlib.Path())
         assert result is None
 
     def test_real_adapters_satisfy_protocol(self) -> None:
