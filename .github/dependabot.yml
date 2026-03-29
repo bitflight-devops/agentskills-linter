@@ -1,0 +1,62 @@
+version: 2
+
+updates:
+  # Python dependencies (uv / pip)
+  - package-ecosystem: "uv"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    # Keep minimum version pins advancing to match installed versions,
+    # consistent with the uv remove/re-add workflow used to set baselines.
+    versioning-strategy: increase
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "build"
+      include: "scope"
+    groups:
+      python-runtime:
+        dependency-type: "production"
+        update-types:
+          - "minor"
+          - "patch"
+      python-runtime-major:
+        dependency-type: "production"
+        update-types:
+          - "major"
+      python-dev:
+        dependency-type: "development"
+        update-types:
+          - "minor"
+          - "patch"
+      python-dev-major:
+        dependency-type: "development"
+        update-types:
+          - "major"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "UTC"
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      github-actions-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
