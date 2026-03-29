@@ -430,6 +430,73 @@ def check_fm007(frontmatter: dict, path: Path, file_type: str) -> list[Validatio
 
 
 # ---------------------------------------------------------------------------
+# FM008 — Skills field is not a list of strings
+# ---------------------------------------------------------------------------
+
+
+@skilllint_rule(
+    "FM008",
+    severity="warning",
+    category="frontmatter",
+    platforms=["agentskills"],
+    authority={"origin": "anthropic.com", "reference": _AGENTS_SPEC_URL},
+)
+def check_fm008(frontmatter: dict, path: Path, file_type: str) -> list[ValidationIssue]:
+    """## FM008 — Skills field must be a YAML list of strings
+
+    The `skills` field, when present, must be a YAML sequence of skill name
+    strings. A scalar value (e.g. a comma-separated string, an integer, a
+    bool) or a list containing non-string elements is invalid.
+
+    **Source:** sub-agents.md — `skills` example:
+    ```yaml
+    skills:
+      - api-conventions
+      - error-handling-patterns
+    ```
+
+    **Fix:** Rewrite the field as a YAML list where every item is a string:
+
+    ```yaml
+    skills:
+      - skill-name
+      - another-skill
+    ```
+
+    Returns:
+        A list with one warning issue when `skills` is present but either
+        not a list or contains non-string elements; empty when `skills` is
+        absent, None, or a valid list of strings.
+
+    <!-- examples: FM008 -->
+    """
+    val = frontmatter.get("skills")
+    if val is None:
+        return []
+    if not isinstance(val, list):
+        return [
+            _make_issue(
+                field="skills",
+                severity="warning",
+                message=f"Skills field must be a YAML list of skill names, not a {type(val).__name__}",
+                code="FM008",
+                suggestion="Use a YAML list: skills:\\n  - skill-name",
+            )
+        ]
+    if any(not isinstance(item, str) for item in val):
+        return [
+            _make_issue(
+                field="skills",
+                severity="warning",
+                message="Skills field list contains non-string items",
+                code="FM008",
+                suggestion="Each entry must be a skill name string",
+            )
+        ]
+    return []
+
+
+# ---------------------------------------------------------------------------
 # FM009 — Unquoted value containing colon (auto-fixed)
 # ---------------------------------------------------------------------------
 
@@ -569,6 +636,7 @@ __all__ = [
     "check_fm005",
     "check_fm006",
     "check_fm007",
+    "check_fm008",
     "check_fm009",
     "check_fm010",
 ]

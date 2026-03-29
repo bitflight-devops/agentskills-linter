@@ -57,7 +57,7 @@ from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
 from skilllint.adapters.claude_code import ClaudeCodeAdapter
 from skilllint.cli_docs import docs_app
 from skilllint.rules.as_series import run_as_series
-from skilllint.rules.fm_series import check_fm004, check_fm007, check_fm010
+from skilllint.rules.fm_series import check_fm004, check_fm007, check_fm008, check_fm010
 from skilllint.scan_runtime import ScanContext
 from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
 from skilllint.version import __version__
@@ -2366,6 +2366,7 @@ class FrontmatterValidator:
 
         warnings.extend(check_fm004(data, path, file_type.value, frontmatter_yaml=frontmatter_text))
         _check_list_valued_tool_fields(data, errors, warnings)
+        warnings.extend(check_fm008(data, path, file_type.value))
         _check_skill_name_and_directory(data, path, file_type, errors, warnings)
 
         hooks_value = data.get("hooks")
