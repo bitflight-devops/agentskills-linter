@@ -763,7 +763,7 @@ def _check_as008(tools: list[str], path: pathlib.Path) -> list[dict]:
             # empty: this means the tool is plugin-namespaced but the plugin isn't
             # in the local ancestry map.  That is expected for externally-installed
             # plugins and should not produce a violation.
-            if raw_segment.startswith("plugin_") and plugin_prefix == "":
+            if raw_segment.startswith("plugin_") and not plugin_prefix:
                 continue
             violations.append(
                 _make_violation(
