@@ -1,9 +1,9 @@
 [fixture]
 rule_id = "FM008"
 tier = 1
-description = "skills field uses CSV string format (preferred style)"
+description = "skills field is a valid YAML list of strings"
 
 [[variants]]
-name = "skills-as-csv-string"
+name = "skills-as-yaml-array"
 kind = "passing"
 expected_count = 0

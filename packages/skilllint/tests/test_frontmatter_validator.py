@@ -233,11 +233,11 @@ class TestFrontmatterAutoFix:
     """Test auto-fix functionality."""
 
     def test_autofix_yaml_array_to_csv(self, tmp_path: Path) -> None:
-        """Test auto-fix converts YAML arrays to CSV strings (FM007, FM008).
+        """Test auto-fix converts YAML arrays to CSV strings (FM007).
 
         Tests: Frontmatter with tools as YAML array
         How: Create file with YAML array, run fix(), validate result
-        Why: Ensure FM007/FM008 auto-fix converts arrays to CSV
+        Why: Ensure FM007 auto-fix converts arrays to CSV
         """
         skill_md = tmp_path / "SKILL.md"
         skill_md.write_text("""---

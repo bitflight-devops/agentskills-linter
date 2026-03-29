@@ -1,9 +1,14 @@
 [fixture]
 rule_id = "FM008"
 tier = 1
-description = "skills field is a YAML array instead of a CSV string"
+description = "skills field type is invalid — must be a list of strings"
 
 [[variants]]
-name = "skills-as-yaml-array"
+name = "skills-as-string"
+kind = "failing"
+expected_count = 1
+
+[[variants]]
+name = "skills-list-with-non-string"
 kind = "failing"
 expected_count = 1
