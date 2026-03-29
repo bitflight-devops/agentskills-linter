@@ -381,7 +381,7 @@ class ErrorCode(StrEnum):
 
 
 # Aliases for backward compatibility and concise usage
-FM001, FM002, FM003, FM004, FM005, FM006, FM007, FM008, FM009, FM010 = (
+FM001, FM002, FM003, FM004, FM005, FM006, FM007, FM009, FM010 = (
     ErrorCode.FM001,
     ErrorCode.FM002,
     ErrorCode.FM003,
@@ -389,7 +389,6 @@ FM001, FM002, FM003, FM004, FM005, FM006, FM007, FM008, FM009, FM010 = (
     ErrorCode.FM005,
     ErrorCode.FM006,
     ErrorCode.FM007,
-    ErrorCode.FM008,
     ErrorCode.FM009,
     ErrorCode.FM010,
 )
@@ -1007,16 +1006,13 @@ def _pydantic_error_to_validation_issue(error: ErrorDetails) -> ValidationIssue:
         if "tools" in field.lower():
             code = FM007
             msg = "Tools field is YAML array — runtime accepts this, but CSV string is preferred style"
-        elif "skills" in field.lower():
-            code = FM008
-            msg = "Skills field is YAML array — runtime accepts this, but CSV string is preferred style"
         suggestion = "Use format: 'tool1, tool2, tool3'"
     elif "colon" in msg.lower():
         code = FM009
         suggestion = "Quote the description or remove colons"
 
-    # FM007/FM008 (YAML arrays for tools/skills) are runtime-accepted patterns -> warning
-    severity: Literal["error", "warning", "info"] = "warning" if code in {FM007, FM008} else "error"
+    # FM007 (YAML array for tools) is a runtime-accepted pattern -> warning
+    severity: Literal["error", "warning", "info"] = "warning" if code == FM007 else "error"
 
     return ValidationIssue(
         field=field, severity=severity, message=msg, code=code, docs_url=generate_docs_url(code), suggestion=suggestion
@@ -1026,9 +1022,9 @@ def _pydantic_error_to_validation_issue(error: ErrorDetails) -> ValidationIssue:
 def _check_list_valued_tool_fields(
     data: dict[str, YamlValue], errors: list[ValidationIssue], warnings: list[ValidationIssue]
 ) -> None:
-    """Append warnings for list-valued tools/skills fields that Pydantic may not catch.
+    """Append warnings for list-valued tools fields that Pydantic may not catch.
 
-    Delegates to check_fm007 and check_fm008 from fm_series for issue construction.
+    Delegates to check_fm007 from fm_series for issue construction.
 
     Args:
         data: Parsed frontmatter dict.
@@ -1039,7 +1035,6 @@ def _check_list_valued_tool_fields(
 
     sentinel_path = _Path()
     warnings.extend(check_fm007(data, sentinel_path, "skill"))
-    warnings.extend(check_fm008(data, sentinel_path, "skill"))
 
 
 def _check_skill_name_and_directory(
@@ -2388,7 +2383,7 @@ class FrontmatterValidator:
     def fix(self, path: Path) -> list[str]:
         """Auto-fix frontmatter issues in file.
 
-        Fixes FM004, FM007, FM008, FM009 only. Does not fix schema violations.
+        Fixes FM004, FM007, FM009 only. Does not fix schema violations.
 
         Args:
             path: Path to file to fix
