@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774621639541,
+  "lastUpdate": 1774752766552,
   "repoUrl": "https://github.com/bitflight-devops/skilllint",
   "entries": {
     "Benchmark": [
@@ -288,6 +288,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "files_per_second",
             "value": 62.681,
+            "unit": "files/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jamie Nelson",
+            "username": "Jamie-BitFlight",
+            "email": "jamie@bitflight.io"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "5a88d60c29864a620ff567223fde4810638336d3",
+          "message": "fix(fm008,as008): remove FM008 rule; fix AS008 plugin-prefix false positives (#27)",
+          "timestamp": "2026-03-29T02:49:37Z",
+          "url": "https://github.com/bitflight-devops/skilllint/commit/5a88d60c29864a620ff567223fde4810638336d3"
+        },
+        "date": 1774752766117,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "scan_min_ms",
+            "value": 16585.772,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_mean_ms",
+            "value": 17356.956,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_max_ms",
+            "value": 18267.536,
+            "unit": "ms"
+          },
+          {
+            "name": "files_per_second",
+            "value": 57.671,
             "unit": "files/s"
           }
         ]
