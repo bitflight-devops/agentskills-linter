@@ -57,7 +57,7 @@ from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
 from skilllint.adapters.claude_code import ClaudeCodeAdapter
 from skilllint.cli_docs import docs_app
 from skilllint.rules.as_series import run_as_series
-from skilllint.rules.fm_series import check_fm004, check_fm007, check_fm008, check_fm010
+from skilllint.rules.fm_series import check_fm004, check_fm007, check_fm010
 from skilllint.scan_runtime import ScanContext
 from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
 from skilllint.version import __version__
@@ -307,7 +307,6 @@ class ErrorCode(StrEnum):
     FM005 = "FM005"  # Field type mismatch (expected string/bool)
     FM006 = "FM006"  # Invalid field value (model not in enum)
     FM007 = "FM007"  # Tools field is YAML array (not CSV string)
-    FM008 = "FM008"  # Skills field is YAML array (not CSV string)
     FM009 = "FM009"  # Unquoted description with colons
     FM010 = "FM010"  # Name pattern invalid (not lowercase-hyphens)
 

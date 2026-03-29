@@ -1,9 +1,0 @@
-[fixture]
-rule_id = "FM008"
-tier = 1
-description = "skills field is a YAML array instead of a CSV string"
-
-[[variants]]
-name = "skills-as-yaml-array"
-kind = "failing"
-expected_count = 1

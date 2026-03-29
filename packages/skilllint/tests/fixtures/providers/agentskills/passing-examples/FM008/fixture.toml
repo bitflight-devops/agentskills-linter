@@ -1,9 +1,0 @@
-[fixture]
-rule_id = "FM008"
-tier = 1
-description = "skills field uses CSV string format (preferred style)"
-
-[[variants]]
-name = "skills-as-csv-string"
-kind = "passing"
-expected_count = 0

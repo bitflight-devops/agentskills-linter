@@ -758,7 +758,13 @@ def _check_as008(tools: list[str], path: pathlib.Path) -> list[dict]:
                 )
             )
         else:
-            # Unknown server — warning
+            # Unknown server — warning.
+            # Skip if the raw segment starts with "plugin_" but plugin_prefix is
+            # empty: this means the tool is plugin-namespaced but the plugin isn't
+            # in the local ancestry map.  That is expected for externally-installed
+            # plugins and should not produce a violation.
+            if raw_segment.startswith("plugin_") and plugin_prefix == "":
+                continue
             violations.append(
                 _make_violation(
                     "AS008",

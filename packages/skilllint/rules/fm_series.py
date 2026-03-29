@@ -6,7 +6,7 @@ the file path, and the detected file type string.
 
 Severities:
     "error"   — FM002, FM003, FM005, FM006; FM010 when the name pattern is invalid
-    "warning" — FM001 (skills), FM004, FM007, FM008; FM010 when skill name mismatches parent directory
+    "warning" — FM001 (skills), FM004, FM007; FM010 when skill name mismatches parent directory
     "error"   — FM001 (agents)
     "info"    — FM009
 
@@ -430,59 +430,6 @@ def check_fm007(frontmatter: dict, path: Path, file_type: str) -> list[Validatio
 
 
 # ---------------------------------------------------------------------------
-# FM008 — Skills field is a YAML array instead of CSV string
-# ---------------------------------------------------------------------------
-
-
-@skilllint_rule(
-    "FM008",
-    severity="warning",
-    category="frontmatter",
-    platforms=["agentskills"],
-    authority={"origin": "anthropic.com", "reference": _AGENTS_SPEC_URL},
-)
-def check_fm008(frontmatter: dict, path: Path, file_type: str) -> list[ValidationIssue]:
-    """## FM008 — Skills field is a YAML array (prefer CSV string)
-
-    The `skills` field is written as a YAML sequence (list). The Claude Code
-    runtime accepts this, but the documented convention is a comma-separated
-    string.
-
-    **Source:** sub-agents.md frontmatter fields table — `skills` field.
-
-    **Fix:** Convert the YAML list to a CSV string:
-
-    ```yaml
-    # Before (YAML array)
-    skills:
-      - my-skill
-      - other-skill
-
-    # After (CSV string — documented convention)
-    skills: my-skill, other-skill
-    ```
-
-    Returns:
-        List containing one warning issue when the `skills` field is a YAML
-        list; empty when `skills` uses CSV string format or is absent.
-
-    <!-- examples: FM008 -->
-    """
-    val = frontmatter.get("skills")
-    if isinstance(val, list):
-        return [
-            _make_issue(
-                field="skills",
-                severity="warning",
-                message="Skills field is YAML array — runtime accepts this, but CSV string is preferred style",
-                code="FM008",
-                suggestion="Use format: 'skill1, skill2, skill3'",
-            )
-        ]
-    return []
-
-
-# ---------------------------------------------------------------------------
 # FM009 — Unquoted value containing colon (auto-fixed)
 # ---------------------------------------------------------------------------
 
@@ -622,7 +569,6 @@ __all__ = [
     "check_fm005",
     "check_fm006",
     "check_fm007",
-    "check_fm008",
     "check_fm009",
     "check_fm010",
 ]
