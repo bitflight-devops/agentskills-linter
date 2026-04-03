@@ -133,7 +133,7 @@ runs:
         INPUT_FILTER_TYPE: ${{ inputs.filter-type }}
         INPUT_PATHS: ${{ inputs.paths }}
       run: |
-        set +e  # do not exit on non-zero; we capture the exit code ourselves
+        set +e  # do not exit on non-zero. We capture the exit code ourselves
 
         ARGS=()
 
