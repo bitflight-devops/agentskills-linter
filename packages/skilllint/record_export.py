@@ -6,13 +6,14 @@ captured output to an SVG or HTML file atomically.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 from pathlib import Path
 
 from rich.console import Console
 
-__all__ = ["make_recording_console", "export_recording", "build_svg_title"]
+__all__ = ["build_svg_title", "export_recording", "make_recording_console"]
 
 
 def make_recording_console(*, no_color: bool = False) -> Console:
@@ -54,10 +55,7 @@ def export_recording(console: Console, path: Path, *, title: str) -> None:
             HTML ``<title>`` element).
     """
     suffix = path.suffix.lower()
-    if suffix == ".html":
-        content = console.export_html(clear=False)
-    else:
-        content = console.export_svg(title=title, clear=False)
+    content = console.export_html(clear=False) if suffix == ".html" else console.export_svg(title=title, clear=False)
 
     # Atomic write: write to a sibling temp file, then rename.
     dir_ = path.parent
@@ -65,13 +63,11 @@ def export_recording(console: Console, path: Path, *, title: str) -> None:
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
             fh.write(content)
-        os.replace(tmp_path_str, path)
+        Path(tmp_path_str).replace(path)
     except Exception:
         # Clean up the temp file if anything goes wrong before the rename.
-        try:
-            os.unlink(tmp_path_str)
-        except OSError:
-            pass
+        with contextlib.suppress(OSError):
+            Path(tmp_path_str).unlink()
         raise
 
 
