@@ -83,7 +83,11 @@ inputs:
 
 outputs:
   result:
-    description: "Validation outcome: 'passed' when all checks pass, 'failed' when errors are found."
+    description: >
+      Validation outcome: 'passed' when exit code is 0 (all checks pass),
+      'failed' for any non-zero exit code (validation errors or usage/configuration errors).
+      Use the 'exit-code' output to distinguish between exit code 1 (validation errors)
+      and exit code 2 (usage/configuration errors).
     value: ${{ steps.run-skilllint.outputs.result }}
 
   exit-code:
