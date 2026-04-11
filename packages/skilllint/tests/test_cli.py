@@ -790,12 +790,13 @@ class TestRecordOption:
         record_path = tmp_path / "output.svg"
 
         result = cli_runner.invoke(
-            plugin_validator.app,
-            ["check", "--no-color", "--record", str(record_path), str(skill_file)],
+            plugin_validator.app, ["check", "--no-color", "--record", str(record_path), str(skill_file)]
         )
 
         # Expect exit 1 because the skill has violations
-        assert result.exit_code == 1, f"Expected exit 1 (violations present), got {result.exit_code}. Output: {result.stdout}"
+        assert result.exit_code == 1, (
+            f"Expected exit 1 (violations present), got {result.exit_code}. Output: {result.stdout}"
+        )
         assert record_path.exists(), "SVG file was not created"
         # Tee behaviour: terminal output must also be present (errors from validator)
         assert result.stdout.strip(), "Expected terminal output to be non-empty (tee behaviour)"
@@ -812,8 +813,7 @@ class TestRecordOption:
         record_path = tmp_path / "output.html"
 
         result = cli_runner.invoke(
-            plugin_validator.app,
-            ["check", "--no-color", "--record", str(record_path), str(skill_file)],
+            plugin_validator.app, ["check", "--no-color", "--record", str(record_path), str(skill_file)]
         )
 
         assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}. Output: {result.stdout}"
@@ -837,8 +837,7 @@ class TestRecordOption:
         record_path = tmp_path / "output.svg"
 
         result = cli_runner.invoke(
-            plugin_validator.app,
-            ["check", "--no-color", "--record", str(record_path), str(skill_file)],
+            plugin_validator.app, ["check", "--no-color", "--record", str(record_path), str(skill_file)]
         )
 
         assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}. Output: {result.stdout}"
@@ -863,10 +862,7 @@ class TestRecordOption:
         """
         skill_file = self._make_valid_skill(tmp_path)
 
-        result = cli_runner.invoke(
-            plugin_validator.app,
-            ["check", "--no-color", str(skill_file)],
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--no-color", str(skill_file)])
 
         assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}. Output: {result.stdout}"
         svg_files = list(tmp_path.rglob("*.svg"))
@@ -883,17 +879,12 @@ class TestRecordOption:
         """
         record_path = tmp_path / "rules_output.svg"
 
-        result = cli_runner.invoke(
-            plugin_validator.app,
-            ["rules", "--record", str(record_path)],
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["rules", "--record", str(record_path)])
 
         assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}. Output: {result.stdout}"
         assert record_path.exists(), "SVG file was not created by 'rules' command"
         content = record_path.read_text(encoding="utf-8")
-        assert content.startswith("<svg"), (
-            f"Expected SVG file to start with '<svg', got: {content[:80]!r}"
-        )
+        assert content.startswith("<svg"), f"Expected SVG file to start with '<svg', got: {content[:80]!r}"
 
     def test_rule_record_svg_creates_file(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Verify rule RULE_ID --record PATH creates an SVG file.
@@ -904,17 +895,14 @@ class TestRecordOption:
         """
         record_path = tmp_path / "rule_output.svg"
 
-        result = cli_runner.invoke(
-            plugin_validator.app,
-            ["rule", "AS001", "--record", str(record_path)],
-        )
+        result = cli_runner.invoke(plugin_validator.app, ["rule", "AS001", "--record", str(record_path)])
 
-        assert result.exit_code == 0, f"Expected exit 0 for known rule AS001, got {result.exit_code}. Output: {result.stdout}"
+        assert result.exit_code == 0, (
+            f"Expected exit 0 for known rule AS001, got {result.exit_code}. Output: {result.stdout}"
+        )
         assert record_path.exists(), "SVG file was not created by 'rule' command"
         content = record_path.read_text(encoding="utf-8")
-        assert content.startswith("<svg"), (
-            f"Expected SVG file to start with '<svg', got: {content[:80]!r}"
-        )
+        assert content.startswith("<svg"), f"Expected SVG file to start with '<svg', got: {content[:80]!r}"
 
     def test_record_unknown_rule_no_file_created(self, cli_runner: CliRunner, tmp_path: Path) -> None:
         """Verify rule command with unknown rule ID exits non-zero and writes no file.
@@ -927,13 +915,10 @@ class TestRecordOption:
         record_path = tmp_path / "should_not_exist.svg"
 
         result = cli_runner.invoke(
-            plugin_validator.app,
-            ["rule", "DOES-NOT-EXIST-ZZZ999", "--record", str(record_path)],
+            plugin_validator.app, ["rule", "DOES-NOT-EXIST-ZZZ999", "--record", str(record_path)]
         )
 
-        assert result.exit_code != 0, (
-            f"Expected non-zero exit for unknown rule, got {result.exit_code}"
-        )
+        assert result.exit_code != 0, f"Expected non-zero exit for unknown rule, got {result.exit_code}"
         assert not record_path.exists(), (
             f"No SVG file should be created when the rule command fails, but found: {record_path}"
         )
