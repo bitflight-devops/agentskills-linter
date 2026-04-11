@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import html
-import os
 from pathlib import Path
 from unittest.mock import patch
 
@@ -117,17 +116,15 @@ class TestExportRecording:
 
         # Patch os.replace to raise after the temp file is written, simulating
         # a failure between the temp-write and the rename.
-        original_replace = os.replace
 
         def failing_replace(src: str, dst: str | Path) -> None:
             # Remove the temp file manually to simulate a cleanup failure path,
             # then raise to abort.
-            os.unlink(src)
+            Path(src).unlink()
             raise OSError("simulated replace failure")
 
-        with patch("skilllint.record_export.os.replace", side_effect=failing_replace):
-            with pytest.raises(OSError, match="simulated replace failure"):
-                export_recording(console, dest, title="test title")
+        with patch("skilllint.record_export.os.replace", side_effect=failing_replace), pytest.raises(OSError, match="simulated replace failure"):
+            export_recording(console, dest, title="test title")
 
         # The destination file must not exist.
         assert not dest.exists()
