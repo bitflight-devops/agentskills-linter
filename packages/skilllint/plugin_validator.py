@@ -56,9 +56,11 @@ from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
 from skilllint.adapters.claude_code import ClaudeCodeAdapter
 from skilllint.cli_docs import docs_app
-from skilllint.record_export import build_svg_title as _build_svg_title
-from skilllint.record_export import export_recording as _export_recording
-from skilllint.record_export import make_recording_console as _make_recording_console
+from skilllint.record_export import (
+    build_svg_title as _build_svg_title,
+    export_recording as _export_recording,
+    make_recording_console as _make_recording_console,
+)
 from skilllint.rules.as_series import run_as_series
 from skilllint.rules.fm_series import check_fm004, check_fm007, check_fm008, check_fm010
 from skilllint.scan_runtime import ScanContext
@@ -5383,13 +5385,9 @@ def main(
                 adapters=ADAPTERS,
                 record_console=record_console,
             )
-        except SystemExit:
+        except (SystemExit, typer.Exit):
             if record is not None and record_console is not None:
-                _export_recording(
-                    record_console,
-                    record,
-                    title=_build_svg_title(sys.argv),
-                )
+                _export_recording(record_console, record, title=_build_svg_title(sys.argv))
             raise
 
     except KeyboardInterrupt:
@@ -5423,11 +5421,7 @@ def _callback(
 
 
 def _show_rules_list(
-    platform: str | None = None,
-    category: str | None = None,
-    severity: str | None = None,
-    *,
-    console: _Console,
+    platform: str | None = None, category: str | None = None, severity: str | None = None, *, console: _Console
 ) -> None:
     """Show list of rules (shared logic for callback and rules_cmd)."""
     rules = _list_rules(platform=platform, category=category, severity=severity)
@@ -5597,6 +5591,7 @@ def _make_rule_console(*, record: bool = False) -> _Console:
         return _make_recording_console()
     return _Console()
 
+
 _EXAMPLES_MARKER = re.compile(r"<!--\s*examples:\s*(\w+)\s*-->", re.IGNORECASE)
 
 
@@ -5610,6 +5605,7 @@ def rule_cmd(
 
     Args:
         rule_id: Rule identifier (e.g., "SK001", "FM002", "AS001")
+        record: Optional path to write terminal output as SVG or HTML.
     """
     console = _make_rule_console(record=record is not None)
     _show_rule_doc(rule_id, console=console)
