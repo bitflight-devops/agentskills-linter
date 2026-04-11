@@ -27,6 +27,22 @@ plugins/my-plugin/agents/my-agent.md
 
 ---
 
+## Screenshots
+
+### Validation output with errors and warnings
+
+![skilllint check showing validation errors](docs/screenshots/check-violations.svg)
+
+### All available rules
+
+![skilllint rules table](docs/screenshots/rules.svg)
+
+### Rule detail
+
+![skilllint rule FM004 detail](docs/screenshots/rule-fm004.svg)
+
+---
+
 ## Installation
 
 ```bash
@@ -401,12 +417,16 @@ Section extraction uses [marko](https://github.com/frostming/marko) for AST-base
 markdown parsing, so `#` characters inside fenced code blocks are never mistaken for
 headings.
 
-The same functionality is available as a standalone script that does not require
-`skilllint` to be installed:
+If `skilllint` is not installed, use `uvx` to run it without a permanent install:
 
 ```bash
-uv run --script scripts/fetch_doc_source.py fetch https://docs.anthropic.com/en/docs/claude-code/settings.md
+uvx skilllint docs fetch https://docs.anthropic.com/en/docs/claude-code/settings.md
 ```
+
+`scripts/fetch_doc_source.py` is a PEP 723 standalone script that exposes the same
+commands via `uv run --script`. It is intended for contributors working directly on
+the skilllint source tree (where `[tool.uv.sources]` points the dependency at the
+local package), not for end users.
 
 ---
 
