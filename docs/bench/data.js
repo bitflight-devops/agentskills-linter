@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1774752766552,
+  "lastUpdate": 1775894620560,
   "repoUrl": "https://github.com/bitflight-devops/skilllint",
   "entries": {
     "Benchmark": [
@@ -330,6 +330,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "files_per_second",
             "value": 57.671,
+            "unit": "files/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Copilot",
+            "username": "Copilot",
+            "email": "198982749+Copilot@users.noreply.github.com"
+          },
+          "committer": {
+            "name": "GitHub",
+            "username": "web-flow",
+            "email": "noreply@github.com"
+          },
+          "id": "f232002ce5bb435b184159a00ff68430e1461bd6",
+          "message": "feat: add GitHub Action for skilllint validation (#33)",
+          "timestamp": "2026-04-11T08:00:39Z",
+          "url": "https://github.com/bitflight-devops/skilllint/commit/f232002ce5bb435b184159a00ff68430e1461bd6"
+        },
+        "date": 1775894620251,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "scan_min_ms",
+            "value": 14973.667,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_mean_ms",
+            "value": 15559.422,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_max_ms",
+            "value": 16721.193,
+            "unit": "ms"
+          },
+          {
+            "name": "files_per_second",
+            "value": 64.334,
             "unit": "files/s"
           }
         ]
