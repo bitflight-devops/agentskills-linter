@@ -244,6 +244,7 @@ Options:
   --filter TEXT      Glob pattern to match files within a directory
   --filter-type TEXT Filter type (skills | agents | commands)
   --platform TEXT    Platform adapter
+  --record PATH      Record terminal output to SVG or HTML file
   --help             Show this message and exit
 ```
 
@@ -256,6 +257,7 @@ Options:
   --platform, -p TEXT  Filter rules by platform
   --category, -c TEXT  Filter rules by category
   --severity, -s TEXT  Filter rules by severity (error, warning, info)
+  --record PATH        Record terminal output to SVG or HTML file
   --help               Show this message and exit
 ```
 
@@ -268,7 +270,8 @@ Arguments:
   rule_id  Rule identifier (e.g., "SK001", "FM002", "AS001")  [required]
 
 Options:
-  --help   Show this message and exit
+  --record PATH  Record terminal output to SVG or HTML file
+  --help         Show this message and exit
 ```
 
 ### docs
