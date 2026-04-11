@@ -27,6 +27,22 @@ plugins/my-plugin/agents/my-agent.md
 
 ---
 
+## Screenshots
+
+### Validation output with errors and warnings
+
+![skilllint check showing validation errors](docs/screenshots/check-violations.svg)
+
+### All available rules
+
+![skilllint rules table](docs/screenshots/rules.svg)
+
+### Rule detail
+
+![skilllint rule FM004 detail](docs/screenshots/rule-fm004.svg)
+
+---
+
 ## Installation
 
 ```bash
@@ -72,7 +88,7 @@ Exit codes: `0` = all checks passed · `1` = validation errors · `2` = usage er
 Use `bitflight-devops/skilllint` as a GitHub Action to validate skills, plugins, and agents in any repository:
 
 ```yaml
-- uses: bitflight-devops/skilllint@v1
+- uses: bitflight-devops/skilllint@v1.7.0
   with:
     paths: "plugins/"          # paths to validate (default: ".")
     platform: "claude-code"   # restrict to one platform (optional)
@@ -118,7 +134,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Lint skills and plugins
-        uses: bitflight-devops/skilllint@v1
+        uses: bitflight-devops/skilllint@v1.7.0
         with:
           paths: "plugins/ .claude/"
           platform: "claude-code"
@@ -131,7 +147,7 @@ jobs:
 ```yaml
 - name: Lint skills and plugins
   id: lint
-  uses: bitflight-devops/skilllint@v1
+  uses: bitflight-devops/skilllint@v1.7.0
   with:
     paths: "plugins/"
   continue-on-error: true
@@ -149,7 +165,7 @@ Add to `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/bitflight-devops/skilllint
-    rev: v1.0.0
+    rev: v1.7.0
     hooks:
       - id: skilllint
 ```
@@ -181,7 +197,7 @@ skilllint check --platform claude-code plugins/my-plugin
 |---|---|---|
 | FM001–FM010 | Frontmatter | Required fields, valid values, schema compliance |
 | SK001–SK009 | Skill | Description quality, token limits, complexity, internal links |
-| AS001–AS006 | AgentSkills | Cross-platform open standard compliance |
+| AS001–AS009 | AgentSkills | Cross-platform open standard compliance |
 | LK001–LK002 | Links | Markdown link validity and broken reference detection |
 | PD001–PD003 | Progressive disclosure | Directory structure for references/, examples/, scripts/ |
 | PL001–PL006 | Plugin | Structure, manifest correctness, marketplace layout, subprocess safety |
@@ -201,6 +217,7 @@ Usage: skilllint [OPTIONS] COMMAND [ARGS]...
 
 Commands:
   check   Validate Claude Code plugins, skills, agents, and commands.
+  docs    Fetch, query, and verify cached vendor documentation.
   rule    Show documentation for a validation rule.
   rules   List all available validation rules.
 
@@ -227,6 +244,7 @@ Options:
   --filter TEXT      Glob pattern to match files within a directory
   --filter-type TEXT Filter type (skills | agents | commands)
   --platform TEXT    Platform adapter
+  --record PATH      Record terminal output to SVG or HTML file
   --help             Show this message and exit
 ```
 
@@ -239,6 +257,7 @@ Options:
   --platform, -p TEXT  Filter rules by platform
   --category, -c TEXT  Filter rules by category
   --severity, -s TEXT  Filter rules by severity (error, warning, info)
+  --record PATH        Record terminal output to SVG or HTML file
   --help               Show this message and exit
 ```
 
@@ -251,7 +270,8 @@ Arguments:
   rule_id  Rule identifier (e.g., "SK001", "FM002", "AS001")  [required]
 
 Options:
-  --help   Show this message and exit
+  --record PATH  Record terminal output to SVG or HTML file
+  --help         Show this message and exit
 ```
 
 ### docs
@@ -400,12 +420,16 @@ Section extraction uses [marko](https://github.com/frostming/marko) for AST-base
 markdown parsing, so `#` characters inside fenced code blocks are never mistaken for
 headings.
 
-The same functionality is available as a standalone script that does not require
-`skilllint` to be installed:
+If `skilllint` is not installed, use `uvx` to run it without a permanent install:
 
 ```bash
-uv run --script scripts/fetch_doc_source.py https://docs.anthropic.com/en/docs/claude-code/settings.md
+uvx skilllint docs fetch https://docs.anthropic.com/en/docs/claude-code/settings.md
 ```
+
+`scripts/fetch_doc_source.py` is a PEP 723 standalone script that exposes the same
+commands via `uv run --script`. It is intended for contributors working directly on
+the skilllint source tree (where `[tool.uv.sources]` points the dependency at the
+local package), not for end users.
 
 ---
 

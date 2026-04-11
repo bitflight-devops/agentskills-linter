@@ -56,6 +56,11 @@ from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
 from skilllint.adapters.claude_code import ClaudeCodeAdapter
 from skilllint.cli_docs import docs_app
+from skilllint.record_export import (
+    build_svg_title as _build_svg_title,
+    export_recording as _export_recording,
+    make_recording_console as _make_recording_console,
+)
 from skilllint.rules.as_series import run_as_series
 from skilllint.rules.fm_series import check_fm004, check_fm007, check_fm008, check_fm010
 from skilllint.scan_runtime import ScanContext
@@ -5332,6 +5337,7 @@ def main(
             ),
         ),
     ] = None,
+    record: Path | None = None,
 ) -> None:
     """Validate Claude Code plugins, skills, agents, and commands."""
     # If a subcommand was invoked, don't run validation
@@ -5351,6 +5357,8 @@ def main(
 
     platform_override = _resolve_platform_override(platform)
 
+    record_console = _make_recording_console(no_color=no_color) if record is not None else None
+
     try:
         expanded_paths, is_batch = _resolve_filter_and_expand_paths(paths, filter_glob, filter_type)
 
@@ -5361,20 +5369,25 @@ def main(
             typer.echo("Error: Cannot use both --check and --fix flags", err=True)
             raise typer.Exit(2) from None
 
-        run_validation_loop(
-            expanded_paths=expanded_paths,
-            check=check,
-            fix=fix,
-            verbose=verbose,
-            no_color=no_color,
-            show_progress=show_progress,
-            show_summary=show_summary,
-            platform_override=platform_override,
-            validate_single_path=validate_single_path,
-            validate_file=validate_file,
-            violations_to_result=violations_to_result,
-            adapters=ADAPTERS,
-        )
+        try:
+            run_validation_loop(
+                expanded_paths=expanded_paths,
+                check=check,
+                fix=fix,
+                verbose=verbose,
+                no_color=no_color,
+                show_progress=show_progress,
+                show_summary=show_summary,
+                platform_override=platform_override,
+                validate_single_path=validate_single_path,
+                validate_file=validate_file,
+                violations_to_result=violations_to_result,
+                adapters=ADAPTERS,
+                record_console=record_console,
+            )
+        except (SystemExit, typer.Exit):
+            _maybe_export_recording(record_console, record)
+            raise
 
     except KeyboardInterrupt:
         typer.echo("\nInterrupted by user", err=True)
@@ -5406,12 +5419,14 @@ def _callback(
         raise typer.Exit(1)
 
 
-def _show_rules_list(platform: str | None = None, category: str | None = None, severity: str | None = None) -> None:
+def _show_rules_list(
+    platform: str | None = None, category: str | None = None, severity: str | None = None, *, console: _Console
+) -> None:
     """Show list of rules (shared logic for callback and rules_cmd)."""
     rules = _list_rules(platform=platform, category=category, severity=severity)
 
     if not rules:
-        _rule_console.print("[yellow]No rules found matching the specified filters.[/yellow]")
+        console.print("[yellow]No rules found matching the specified filters.[/yellow]")
         return
 
     severity_colors = {"error": "red", "warning": "yellow", "info": "blue"}
@@ -5424,10 +5439,10 @@ def _show_rules_list(platform: str | None = None, category: str | None = None, s
 
     for rule in rules:
         sev_color = severity_colors.get(rule.severity, "white")
-        summary = rule.docstring.split("\n")[0] if rule.docstring else ""
+        summary = rule.docstring.split("\n")[0].lstrip("#").strip() if rule.docstring else ""
         table.add_row(rule.id, f"[{sev_color}]{rule.severity}[/{sev_color}]", rule.category, summary)
 
-    _rule_console.print(table)
+    console.print(table)
 
 
 def _render_examples_block(rule_id: str) -> str:
@@ -5487,23 +5502,23 @@ def _resolve_example_markers(docstring: str) -> str:
     return _EXAMPLES_MARKER.sub(_replace, docstring)
 
 
-def _show_rule_doc(rule_id: str) -> None:
+def _show_rule_doc(rule_id: str, *, console: _Console) -> None:
     """Show documentation for a single rule (shared logic for callback and rule_cmd)."""
     entry = _get_rule(rule_id)
     if not entry:
-        _rule_console.print(f"[red]Unknown rule: {rule_id}[/red]")
-        _rule_console.print("\n[dim]Run [bold]skilllint rules[/bold] to see all available rules.[/dim]")
+        console.print(f"[red]Unknown rule: {rule_id}[/red]")
+        console.print("\n[dim]Run [bold]skilllint rules[/bold] to see all available rules.[/dim]")
         raise typer.Exit(1)
 
     severity_colors = {"error": "red", "warning": "yellow", "info": "blue"}
     sev_color = severity_colors.get(entry.severity, "white")
 
-    _rule_console.print()
-    _rule_console.print(f"[bold]{entry.id}[/bold] — [{sev_color}]{entry.severity}[/{sev_color}]")
-    _rule_console.print(f"[dim]Category: {entry.category} | Platforms: {', '.join(entry.platforms)}[/dim]")
-    _rule_console.print()
+    console.print()
+    console.print(f"[bold]{entry.id}[/bold] — [{sev_color}]{entry.severity}[/{sev_color}]")
+    console.print(f"[dim]Category: {entry.category} | Platforms: {', '.join(entry.platforms)}[/dim]")
+    console.print()
     resolved_doc = _resolve_example_markers(entry.docstring)
-    _rule_console.print(_Panel(resolved_doc, title=entry.id, border_style="dim"))
+    console.print(_Panel(_Markdown(resolved_doc), title=entry.id, border_style="dim"))
 
 
 # =============================================================================
@@ -5526,6 +5541,7 @@ def check_cmd(
     filter_glob: Annotated[str | None, typer.Option("--filter", help="Glob pattern")] = None,
     filter_type: Annotated[str | None, typer.Option("--filter-type", help="Filter type")] = None,
     platform: Annotated[str | None, typer.Option("--platform", help="Platform adapter")] = None,
+    record: Annotated[Path | None, typer.Option("--record", help="Record terminal output to SVG or HTML file")] = None,
 ) -> None:
     """Validate Claude Code plugins, skills, agents, and commands."""
     main(
@@ -5541,6 +5557,7 @@ def check_cmd(
         filter_glob=filter_glob,
         filter_type=filter_type,
         platform=platform,
+        record=record,
     )
 
 
@@ -5549,6 +5566,7 @@ def check_cmd(
 # =============================================================================
 
 from rich.console import Console as _Console
+from rich.markdown import Markdown as _Markdown
 from rich.panel import Panel as _Panel
 from rich.table import Table as _Table
 
@@ -5556,19 +5574,46 @@ from skilllint.fixture_loader import FIXTURES_ROOT as _FIXTURES_ROOT, discover_f
 from skilllint.rule_registry import get_rule as _get_rule, list_rules as _list_rules
 from skilllint.rules.pa_series import PluginAgentFrontmatterValidator
 
-_rule_console = _Console()
+
+def _make_rule_console(*, record: bool = False) -> _Console:
+    """Return a Rich Console for rules/rule commands.
+
+    Args:
+        record: When *True*, return a recording-capable console suitable for
+            export to SVG/HTML via :func:`skilllint.record_export.export_recording`.
+            When *False* (default), return a plain console.
+
+    Returns:
+        A :class:`rich.console.Console` instance.
+    """
+    if record:
+        return _make_recording_console()
+    return _Console()
+
+
+def _maybe_export_recording(console: _Console | None, record: Path | None) -> None:
+    if record is not None and console is not None:
+        _export_recording(console, record, title=_build_svg_title(sys.argv[1:]))
+
 
 _EXAMPLES_MARKER = re.compile(r"<!--\s*examples:\s*(\w+)\s*-->", re.IGNORECASE)
 
 
 @app.command("rule")
-def rule_cmd(rule_id: str) -> None:
+def rule_cmd(
+    rule_id: str,
+    *,
+    record: Annotated[Path | None, typer.Option("--record", help="Record terminal output to SVG or HTML file")] = None,
+) -> None:
     """Show documentation for a validation rule.
 
     Args:
         rule_id: Rule identifier (e.g., "SK001", "FM002", "AS001")
+        record: Optional path to write terminal output as SVG or HTML.
     """
-    _show_rule_doc(rule_id)
+    console = _make_rule_console(record=record is not None)
+    _show_rule_doc(rule_id, console=console)
+    _maybe_export_recording(console, record)
 
 
 @app.command("rules")
@@ -5578,10 +5623,14 @@ def rules_cmd(
     severity: Annotated[
         str | None, typer.Option("--severity", "-s", help="Filter rules by severity (error, warning, info)")
     ] = None,
+    *,
+    record: Annotated[Path | None, typer.Option("--record", help="Record terminal output to SVG or HTML file")] = None,
 ) -> None:
     """List all available validation rules."""
-    _show_rules_list(platform=platform, category=category, severity=severity)
-    _rule_console.print("\n[dim]Run [bold]skilllint rule <ID>[/bold] for details.[/dim]")
+    console = _make_rule_console(record=record is not None)
+    _show_rules_list(platform=platform, category=category, severity=severity, console=console)
+    console.print("\n[dim]Run [bold]skilllint rule [yellow]RULE_ID[/yellow][/bold] for details.[/dim]")
+    _maybe_export_recording(console, record)
 
 
 if __name__ == "__main__":

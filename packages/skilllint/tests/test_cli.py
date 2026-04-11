@@ -741,3 +741,184 @@ class TestPlatformFlag:
         assert result.exit_code == 2, (
             f"Expected exit 2 for unknown platform, got {result.exit_code}. Output: {result.stdout}"
         )
+
+
+class TestRecordOption:
+    """Test --record PATH option tees terminal output to SVG or HTML file."""
+
+    def _make_valid_skill(self, tmp_path: Path) -> Path:
+        """Create a minimal valid skill file for record tests."""
+        skill_dir = tmp_path / "record-test-skill"
+        skill_dir.mkdir()
+        skill_file = skill_dir / "SKILL.md"
+        skill_file.write_text(
+            "---\n"
+            "name: record-test-skill\n"
+            "description: Use this skill when testing the record option output\n"
+            "tools: Read, Write\n"
+            "model: sonnet\n"
+            "---\n\n# Record Test Skill\n\nContent here.\n"
+        )
+        return skill_file
+
+    def _make_skill_with_violation(self, tmp_path: Path) -> Path:
+        """Create a skill file that triggers a validation violation (for tee tests)."""
+        skill_dir = tmp_path / "record-violation-skill"
+        skill_dir.mkdir()
+        skill_file = skill_dir / "SKILL.md"
+        # AS001: name with uppercase letters triggers NameFormatValidator
+        skill_file.write_text(
+            "---\n"
+            "name: Bad-Name\n"
+            "description: Use this skill when testing record tee output\n"
+            "tools: Read\n"
+            "---\n\n# Skill\n"
+        )
+        return skill_file
+
+    def test_check_record_svg_creates_file(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Verify --record PATH creates the SVG file and still emits terminal output.
+
+        Tests: check --record writes SVG and tees terminal output (AC1, AC2)
+        How: Run check with a skill that has violations and --record .svg;
+             verify file exists AND runner output (validator errors) is non-empty
+        Why: The flag must tee output — not suppress it.  A clean skill produces
+             no stdout; a skill with violations produces error lines.  We use the
+             latter to confirm the recording console still writes to stdout.
+        """
+        skill_file = self._make_skill_with_violation(tmp_path)
+        record_path = tmp_path / "output.svg"
+
+        result = cli_runner.invoke(
+            plugin_validator.app, ["check", "--no-color", "--record", str(record_path), str(skill_file)]
+        )
+
+        # Expect exit 1 because the skill has violations
+        assert result.exit_code == 1, (
+            f"Expected exit 1 (violations present), got {result.exit_code}. Output: {result.stdout}"
+        )
+        assert record_path.exists(), "SVG file was not created"
+        # Tee behaviour: terminal output must also be present (errors from validator)
+        assert result.stdout.strip(), "Expected terminal output to be non-empty (tee behaviour)"
+
+    def test_check_record_html_creates_file(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Verify --record PATH creates an HTML file when extension is .html.
+
+        Tests: check --record with .html extension writes HTML (AC1)
+        How: Run check with --record pointing to .html path; verify file exists
+             and starts with expected HTML doctype or html tag
+        Why: Extension determines format; HTML must be a valid HTML document
+        """
+        skill_file = self._make_valid_skill(tmp_path)
+        record_path = tmp_path / "output.html"
+
+        result = cli_runner.invoke(
+            plugin_validator.app, ["check", "--no-color", "--record", str(record_path), str(skill_file)]
+        )
+
+        assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}. Output: {result.stdout}"
+        assert record_path.exists(), "HTML file was not created"
+        content = record_path.read_text(encoding="utf-8")
+        assert content.lstrip().startswith(("<!DOCTYPE html", "<html")), (
+            f"Expected HTML file to start with '<!DOCTYPE html' or '<html', got: {content[:80]!r}"
+        )
+
+    def test_check_record_svg_contains_title(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Verify the SVG file embeds the command title text.
+
+        Tests: SVG output includes the title built from build_svg_title() (AC3)
+        How: Run check with --record .svg; read the file and verify the title
+             CSS class and 'skilllint' text are present in the SVG document
+        Why: SVG title makes the recording identifiable when embedded or opened.
+             Rich renders the title as a <text> element with a terminal-*-title
+             CSS class rather than an XML <title> element.
+        """
+        skill_file = self._make_valid_skill(tmp_path)
+        record_path = tmp_path / "output.svg"
+
+        result = cli_runner.invoke(
+            plugin_validator.app, ["check", "--no-color", "--record", str(record_path), str(skill_file)]
+        )
+
+        assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}. Output: {result.stdout}"
+        assert record_path.exists(), "SVG file was not created"
+        content = record_path.read_text(encoding="utf-8")
+        # Rich renders the title as a <text class="terminal-...-title"> element.
+        # Verify the title CSS class marker is present (Rich SVG title convention).
+        assert "-title" in content, (
+            f"Expected title CSS class marker in SVG output, got content starting with: {content[:200]!r}"
+        )
+        # The title string must also contain 'skilllint' (from build_svg_title).
+        assert "skilllint" in content, (
+            f"Expected 'skilllint' in SVG title text, got content starting with: {content[:200]!r}"
+        )
+
+    def test_check_without_record_creates_no_file(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Verify omitting --record does not create any extra file.
+
+        Tests: Without --record, no SVG/HTML file is written (AC4)
+        How: Run check without --record; verify no .svg or .html files appear
+        Why: The flag must be opt-in — normal runs must not write files
+        """
+        skill_file = self._make_valid_skill(tmp_path)
+
+        result = cli_runner.invoke(plugin_validator.app, ["check", "--no-color", str(skill_file)])
+
+        assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}. Output: {result.stdout}"
+        svg_files = list(tmp_path.rglob("*.svg"))
+        html_files = list(tmp_path.rglob("*.html"))
+        assert not svg_files, f"Unexpected SVG files created: {svg_files}"
+        assert not html_files, f"Unexpected HTML files created: {html_files}"
+
+    def test_rules_record_svg_creates_file(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Verify rules --record PATH creates an SVG file.
+
+        Tests: rules command supports --record (AC1)
+        How: Run rules with --record pointing to .svg; verify file exists
+        Why: --record must work on all three commands (check, rules, rule)
+        """
+        record_path = tmp_path / "rules_output.svg"
+
+        result = cli_runner.invoke(plugin_validator.app, ["rules", "--record", str(record_path)])
+
+        assert result.exit_code == 0, f"Expected exit 0, got {result.exit_code}. Output: {result.stdout}"
+        assert record_path.exists(), "SVG file was not created by 'rules' command"
+        content = record_path.read_text(encoding="utf-8")
+        assert content.startswith("<svg"), f"Expected SVG file to start with '<svg', got: {content[:80]!r}"
+
+    def test_rule_record_svg_creates_file(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Verify rule RULE_ID --record PATH creates an SVG file.
+
+        Tests: rule command supports --record (AC1)
+        How: Run rule with a known rule ID and --record .svg; verify file exists
+        Why: --record must work on all three commands (check, rules, rule)
+        """
+        record_path = tmp_path / "rule_output.svg"
+
+        result = cli_runner.invoke(plugin_validator.app, ["rule", "AS001", "--record", str(record_path)])
+
+        assert result.exit_code == 0, (
+            f"Expected exit 0 for known rule AS001, got {result.exit_code}. Output: {result.stdout}"
+        )
+        assert record_path.exists(), "SVG file was not created by 'rule' command"
+        content = record_path.read_text(encoding="utf-8")
+        assert content.startswith("<svg"), f"Expected SVG file to start with '<svg', got: {content[:80]!r}"
+
+    def test_record_unknown_rule_no_file_created(self, cli_runner: CliRunner, tmp_path: Path) -> None:
+        """Verify rule command with unknown rule ID exits non-zero and writes no file.
+
+        Tests: Failed rule lookup does not create a record file (AC4)
+        How: Run rule with a non-existent rule ID and --record; verify non-zero
+             exit AND no file at the record path
+        Why: Partial/failed runs must not produce misleading output files
+        """
+        record_path = tmp_path / "should_not_exist.svg"
+
+        result = cli_runner.invoke(
+            plugin_validator.app, ["rule", "DOES-NOT-EXIST-ZZZ999", "--record", str(record_path)]
+        )
+
+        assert result.exit_code != 0, f"Expected non-zero exit for unknown rule, got {result.exit_code}"
+        assert not record_path.exists(), (
+            f"No SVG file should be created when the rule command fails, but found: {record_path}"
+        )
