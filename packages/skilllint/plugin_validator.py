@@ -5424,7 +5424,7 @@ def _show_rules_list(platform: str | None = None, category: str | None = None, s
 
     for rule in rules:
         sev_color = severity_colors.get(rule.severity, "white")
-        summary = rule.docstring.split("\n")[0] if rule.docstring else ""
+        summary = rule.docstring.split("\n")[0].lstrip("#").strip() if rule.docstring else ""
         table.add_row(rule.id, f"[{sev_color}]{rule.severity}[/{sev_color}]", rule.category, summary)
 
     _rule_console.print(table)
@@ -5503,7 +5503,7 @@ def _show_rule_doc(rule_id: str) -> None:
     _rule_console.print(f"[dim]Category: {entry.category} | Platforms: {', '.join(entry.platforms)}[/dim]")
     _rule_console.print()
     resolved_doc = _resolve_example_markers(entry.docstring)
-    _rule_console.print(_Panel(resolved_doc, title=entry.id, border_style="dim"))
+    _rule_console.print(_Panel(_Markdown(resolved_doc), title=entry.id, border_style="dim"))
 
 
 # =============================================================================
@@ -5549,6 +5549,7 @@ def check_cmd(
 # =============================================================================
 
 from rich.console import Console as _Console
+from rich.markdown import Markdown as _Markdown
 from rich.panel import Panel as _Panel
 from rich.table import Table as _Table
 
@@ -5581,7 +5582,7 @@ def rules_cmd(
 ) -> None:
     """List all available validation rules."""
     _show_rules_list(platform=platform, category=category, severity=severity)
-    _rule_console.print("\n[dim]Run [bold]skilllint rule <ID>[/bold] for details.[/dim]")
+    _rule_console.print("\n[dim]Run [bold]skilllint rule [yellow]RULE_ID[/yellow][/bold] for details.[/dim]")
 
 
 if __name__ == "__main__":
