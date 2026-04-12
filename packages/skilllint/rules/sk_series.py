@@ -222,6 +222,7 @@ def check_sk003(frontmatter: dict[str, object], path: Path, file_type: str) -> l
     """
     # Deferred import to break circular dependency:
     # plugin_validator imports rules/, so rules/ cannot import plugin_validator at module level.
+    from skilllint._spec_constants import MAX_NAME_LENGTH  # noqa: PLC0415
     from skilllint.plugin_validator import ValidationIssue  # noqa: PLC0415
 
     name_val = frontmatter.get("name")
@@ -239,6 +240,21 @@ def check_sk003(frontmatter: dict[str, object], path: Path, file_type: str) -> l
                 code="SK003",
                 docs_url=_docs_url("SK003"),
                 suggestion="Provide a non-empty name using lowercase letters, numbers, and hyphens",
+            )
+        )
+        return issues
+
+    # Source: agentskills.io spec / _spec_constants.MAX_NAME_LENGTH = 64.
+    # FM010 and AS001 enforce the same 64-char ceiling; SK003 must too.
+    if len(name_val) > MAX_NAME_LENGTH:
+        issues.append(
+            ValidationIssue(
+                field="name",
+                severity="error",
+                message=f"Name exceeds maximum length of {MAX_NAME_LENGTH} characters (got {len(name_val)})",
+                code="SK003",
+                docs_url=_docs_url("SK003"),
+                suggestion=f"Shorten the name to {MAX_NAME_LENGTH} characters or less",
             )
         )
         return issues
@@ -299,12 +315,10 @@ def check_sk003(frontmatter: dict[str, object], path: Path, file_type: str) -> l
 # ---------------------------------------------------------------------------
 
 # Minimum length for description field.
-# Source: Architecture lines 349-350 — minimum 20 characters.
+# Source: Architecture lines 349-350 — minimum 20 characters for SK004 quality
+# threshold. (Distinct from _spec_constants.MIN_DESCRIPTION_LENGTH = 1, which is
+# the agentskills.io absolute minimum used by FM-series existence checks.)
 _MIN_DESCRIPTION_LENGTH = 20
-
-# Recommended maximum length for description field.
-# Source: frontmatter_core.RECOMMENDED_DESCRIPTION_LENGTH = 1024 characters.
-_RECOMMENDED_DESCRIPTION_LENGTH = 1024
 
 
 @skilllint_rule(
@@ -340,6 +354,7 @@ def check_sk004(frontmatter: dict[str, object], path: Path, file_type: str) -> l
     """
     # Deferred import to break circular dependency:
     # plugin_validator imports rules/, so rules/ cannot import plugin_validator at module level.
+    from skilllint.frontmatter_core import RECOMMENDED_DESCRIPTION_LENGTH  # noqa: PLC0415
     from skilllint.plugin_validator import ValidationIssue  # noqa: PLC0415
 
     if file_type not in {"skill", "agent"}:
@@ -363,15 +378,15 @@ def check_sk004(frontmatter: dict[str, object], path: Path, file_type: str) -> l
                 suggestion="Run /plugin-creator:write-frontmatter-description to generate an optimized description",
             )
         )
-    elif desc_len > _RECOMMENDED_DESCRIPTION_LENGTH:
+    elif desc_len > RECOMMENDED_DESCRIPTION_LENGTH:
         issues.append(
             ValidationIssue(
                 field="description",
                 severity="warning",
-                message=f"Exceeds recommended length of {_RECOMMENDED_DESCRIPTION_LENGTH} characters (got {desc_len})",
+                message=f"Exceeds recommended length of {RECOMMENDED_DESCRIPTION_LENGTH} characters (got {desc_len})",
                 code="SK004",
                 docs_url=_docs_url("SK004"),
-                suggestion=f"Front-load critical information in first {_RECOMMENDED_DESCRIPTION_LENGTH} characters. Run /plugin-creator:write-frontmatter-description to generate an optimized description",
+                suggestion=f"Front-load critical information in first {RECOMMENDED_DESCRIPTION_LENGTH} characters. Run /plugin-creator:write-frontmatter-description to generate an optimized description",
             )
         )
 
@@ -559,12 +574,12 @@ def check_sk008(frontmatter: dict[str, object], path: Path, file_type: str) -> l
 
     **Fix:** Rename the skill directory to follow the convention:
 
-    ```
+    ```bash
     # Before
-    skills / My_Skill / SKILL.md
+    skills/My_Skill/SKILL.md
 
     # After
-    skills / my - skill / SKILL.md
+    skills/my-skill/SKILL.md
     ```
 
     Returns:

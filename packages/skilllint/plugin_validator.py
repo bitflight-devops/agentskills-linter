@@ -70,7 +70,6 @@ from skilllint.version import __version__
 
 from .frontmatter_core import (
     MAX_SKILL_NAME_LENGTH,
-    RECOMMENDED_DESCRIPTION_LENGTH,
     AgentFrontmatter,
     CommandFrontmatter,
     SkillFrontmatter,
@@ -263,7 +262,7 @@ MARKETPLACE_METADATA_RELOCATABLE_KEYS: frozenset[str] = frozenset({
 
 # Description requirements (Architecture lines 349-350)
 MIN_DESCRIPTION_LENGTH = 20
-# RECOMMENDED_DESCRIPTION_LENGTH and MAX_SKILL_NAME_LENGTH imported from frontmatter_core
+# MAX_SKILL_NAME_LENGTH imported from frontmatter_core
 
 # Name format — matches agentskills.io/specification and init_skill.py convention:
 # lowercase a-z/0-9/hyphen, no leading/trailing/consecutive hyphens.
@@ -2344,14 +2343,10 @@ class FrontmatterValidator:
 
         """
         try:
-            validated = model_class.model_validate(data)
-            if (
-                hasattr(validated, "description")
-                and validated.description
-                and len(validated.description) > RECOMMENDED_DESCRIPTION_LENGTH
-            ):
-                # Delegate to sk_series — single source of truth for SK004 rule logic.
-                warnings.extend(check_sk004({"description": validated.description}, path, file_type.value))
+            model_class.model_validate(data)
+            # SK004 (description length) is emitted exclusively by DescriptionValidator,
+            # which calls check_sk004 directly. Emitting it here as well produced
+            # duplicate warnings for over-length descriptions.
             # AS004 check removed — AS-series rules in as_series.py handle
             # unquoted colon detection; emitting here would cause duplicates.
         except ValidationError as e:
@@ -2681,15 +2676,20 @@ class NameFormatValidator:
 
         frontmatter: dict[str, object] = {"name": name}
         sentinel = _Path()
-        sk001_issues = check_sk001(frontmatter, sentinel, "skill")
-        sk002_issues = check_sk002(frontmatter, sentinel, "skill")
+        # Coerce through _coerce_validation_issues so that ValidationIssue
+        # instances built inside sk_series (under a possibly distinct module
+        # load path, e.g. ``python -m skilllint.plugin_validator``) are
+        # rebuilt as this module's canonical class. Without this, Pydantic
+        # rejects them with model_type errors when ValidationResult is built.
+        sk001_issues = _coerce_validation_issues(check_sk001(frontmatter, sentinel, "skill"))
+        sk002_issues = _coerce_validation_issues(check_sk002(frontmatter, sentinel, "skill"))
         errors.extend(sk001_issues)
         errors.extend(sk002_issues)
         # SK003 covers structural hyphen issues and the fallback pattern error.
         # The fallback only fires when no other specific issues were found — mirror
         # the original guard of ``and not errors`` in the old inline implementation.
         if not sk001_issues and not sk002_issues:
-            errors.extend(check_sk003(frontmatter, sentinel, "skill"))
+            errors.extend(_coerce_validation_issues(check_sk003(frontmatter, sentinel, "skill")))
 
     def can_fix(self) -> bool:
         """Check if validator supports auto-fixing.
@@ -2864,8 +2864,12 @@ class DescriptionValidator:
         frontmatter: dict[str, object] = {"description": description}
         sentinel = _Path()
         file_type_str = self.file_type.value
-        warnings.extend(check_sk004(frontmatter, sentinel, file_type_str))
-        warnings.extend(check_sk005(frontmatter, sentinel, file_type_str))
+        # Coerce through _coerce_validation_issues so that ValidationIssue
+        # instances built inside sk_series are rebuilt as this module's
+        # canonical class (avoids Pydantic model_type errors under
+        # ``python -m skilllint.plugin_validator``).
+        warnings.extend(_coerce_validation_issues(check_sk004(frontmatter, sentinel, file_type_str)))
+        warnings.extend(_coerce_validation_issues(check_sk005(frontmatter, sentinel, file_type_str)))
 
     def can_fix(self) -> bool:
         """Check if validator supports auto-fixing.
