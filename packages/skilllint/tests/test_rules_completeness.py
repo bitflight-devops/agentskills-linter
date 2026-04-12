@@ -6,6 +6,11 @@ output is consistent with the registry.  They are designed to FAIL pre-migration
 are fully populated and T14 completes.
 """
 
+# XFAIL markers: Tests in this file are the completeness gate for the P038
+# monolith-to-modular rule migration. They intentionally fail until T14 (final
+# wire-up) marks the migration complete. strict=True ensures the markers fail
+# loudly once migration is done, forcing cleanup. Remove xfail decorators in T14.
+
 from __future__ import annotations
 
 import re
@@ -97,6 +102,7 @@ def _readme_series_from_table() -> set[str]:
 class TestRegisteredSeriesCount:
     """Assert the registered series prefix count meets MIN_REGISTERED_SERIES."""
 
+    @pytest.mark.xfail(strict=True, reason="P038: passes once T8-T14 complete; remove in T14")
     def test_registered_series_count_meets_minimum(self) -> None:
         """Registry must contain at least MIN_REGISTERED_SERIES distinct series.
 
@@ -116,6 +122,7 @@ class TestRegisteredSeriesCount:
 class TestExpectedSeriesSubset:
     """Assert expected series set is a subset of registered prefixes."""
 
+    @pytest.mark.xfail(strict=True, reason="P038: passes once T8-T14 complete; remove in T14")
     def test_expected_series_subset_of_registered(self) -> None:
         """All 14 expected series prefixes must be present in RULE_REGISTRY.
 
@@ -135,6 +142,7 @@ class TestExpectedSeriesSubset:
 class TestCliOutputMatchesRegistry:
     """Assert 'skilllint rules' CLI output lists the same series as RULE_REGISTRY."""
 
+    @pytest.mark.xfail(strict=True, reason="P038: passes once T8-T14 complete; remove in T14")
     def test_cli_rules_output_matches_registry(self, cli_runner: CliRunner) -> None:
         """CLI 'skilllint rules' output must list exactly the series in RULE_REGISTRY.
 
@@ -177,6 +185,14 @@ class TestCliOutputMatchesRegistry:
 class TestReadmeTableMatchesRegistry:
     """Assert README 'What gets validated' table matches registered series."""
 
+    # Non-strict xfail: this test's outcome depends on which other tests have already
+    # populated RULE_REGISTRY in the same pytest worker (the registry is process-wide
+    # and lazily filled by plugin_validator imports). On a worker that has not yet
+    # imported plugin_validator the registry is empty, so registered ⊆ README is
+    # vacuously true (XPASS); on a worker that has, extra series like TA/TN trigger
+    # the assertion. Once T14 lands and the registry is fully and eagerly populated,
+    # the test will deterministically pass and the marker can be removed.
+    @pytest.mark.xfail(strict=False, reason="P038: non-deterministic until T14; remove in T14")
     def test_readme_table_matches_registered_series(self) -> None:
         """README 'What gets validated' table must list every registered series.
 
@@ -198,6 +214,7 @@ class TestReadmeTableMatchesRegistry:
             f"Update README.md to document all registered series."
         )
 
+    @pytest.mark.xfail(strict=True, reason="P038: passes once T8-T14 complete; remove in T14")
     def test_readme_table_completeness_against_expected(self) -> None:
         """README table must eventually list all 14 expected series.
 
