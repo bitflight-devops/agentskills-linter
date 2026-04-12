@@ -63,6 +63,7 @@ from skilllint.record_export import (
 )
 from skilllint.rules.as_series import run_as_series
 from skilllint.rules.fm_series import check_fm004, check_fm007, check_fm008, check_fm010
+from skilllint.rules.sk_series import check_sk001, check_sk002, check_sk003, check_sk004, check_sk005
 from skilllint.scan_runtime import ScanContext
 from skilllint.token_counter import TOKEN_ERROR_THRESHOLD, TOKEN_WARNING_THRESHOLD, count_tokens
 from skilllint.version import __version__
@@ -2349,16 +2350,8 @@ class FrontmatterValidator:
                 and validated.description
                 and len(validated.description) > RECOMMENDED_DESCRIPTION_LENGTH
             ):
-                warnings.append(
-                    ValidationIssue(
-                        field="description",
-                        severity="warning",
-                        message=f"Exceeds recommended length of {RECOMMENDED_DESCRIPTION_LENGTH} characters (got {len(validated.description)})",
-                        code=SK004,
-                        docs_url=generate_docs_url(SK004),
-                        suggestion=f"Front-load critical information in first {RECOMMENDED_DESCRIPTION_LENGTH} characters. Run /plugin-creator:write-frontmatter-description to generate an optimized description",
-                    )
-                )
+                # Delegate to sk_series — single source of truth for SK004 rule logic.
+                warnings.extend(check_sk004({"description": validated.description}, path, file_type.value))
             # AS004 check removed — AS-series rules in as_series.py handle
             # unquoted colon detection; emitting here would cause duplicates.
         except ValidationError as e:
@@ -2674,88 +2667,29 @@ class NameFormatValidator:
     def _check_name_format(self, name: str, errors: list[ValidationIssue]) -> None:
         """Append format errors for a non-empty name string.
 
+        Delegates to sk_series check_sk001/check_sk002/check_sk003 — the series
+        module is the single source of truth for SK-series rule logic.
+
+        SK003 (generic pattern) only fires when SK001 and SK002 find nothing — the
+        same guard that the original _check_name_format used (``and not errors``).
+
         Args:
             name: The name value to check (must be non-empty str).
             errors: Mutable list to append ValidationIssue objects to.
         """
-        # Check for uppercase characters
-        if any(c.isupper() for c in name):
-            errors.append(
-                ValidationIssue(
-                    field="name",
-                    severity="error",
-                    message="Name contains uppercase characters",
-                    code=SK001,
-                    docs_url=generate_docs_url(SK001),
-                    suggestion=f"Use lowercase only (e.g., 'test-skill' not 'Test-Skill'). Schema: {SKILL_FRONTMATTER_SCHEMA_URL}",
-                )
-            )
+        from pathlib import Path as _Path  # noqa: PLC0415
 
-        # Check for underscores
-        if "_" in name:
-            errors.append(
-                ValidationIssue(
-                    field="name",
-                    severity="error",
-                    message="Name contains underscores (use hyphens instead)",
-                    code=SK002,
-                    docs_url=generate_docs_url(SK002),
-                    suggestion=f"Replace underscores with hyphens: '{name.replace('_', '-')}'. Schema: {SKILL_FRONTMATTER_SCHEMA_URL}",
-                )
-            )
-
-        # Check for leading hyphens
-        if name.startswith("-"):
-            errors.append(
-                ValidationIssue(
-                    field="name",
-                    severity="error",
-                    message="Name has leading hyphen",
-                    code=SK003,
-                    docs_url=generate_docs_url(SK003),
-                    suggestion=f"Remove leading hyphen: '{name.lstrip('-')}'. Schema: {SKILL_FRONTMATTER_SCHEMA_URL}",
-                )
-            )
-
-        # Check for trailing hyphens
-        if name.endswith("-"):
-            errors.append(
-                ValidationIssue(
-                    field="name",
-                    severity="error",
-                    message="Name has trailing hyphen",
-                    code=SK003,
-                    docs_url=generate_docs_url(SK003),
-                    suggestion=f"Remove trailing hyphen: '{name.rstrip('-')}'. Schema: {SKILL_FRONTMATTER_SCHEMA_URL}",
-                )
-            )
-
-        # Check for consecutive hyphens
-        if "--" in name:
-            errors.append(
-                ValidationIssue(
-                    field="name",
-                    severity="error",
-                    message="Name has consecutive hyphens",
-                    code=SK003,
-                    docs_url=generate_docs_url(SK003),
-                    suggestion=f"Use single hyphens only (e.g., 'test-skill' not 'test--skill'). Schema: {SKILL_FRONTMATTER_SCHEMA_URL}",
-                )
-            )
-
-        # Validate against full pattern
-        if not re.match(NAME_PATTERN, name) and not errors:
-            # If we didn't catch specific issues above, add generic pattern error
-            errors.append(
-                ValidationIssue(
-                    field="name",
-                    severity="error",
-                    message="Name format invalid",
-                    code=SK003,
-                    docs_url=generate_docs_url(SK003),
-                    suggestion=f"Use lowercase letters, numbers, and hyphens only (e.g., 'my-skill-name'). Schema: {SKILL_FRONTMATTER_SCHEMA_URL}",
-                )
-            )
+        frontmatter: dict[str, object] = {"name": name}
+        sentinel = _Path()
+        sk001_issues = check_sk001(frontmatter, sentinel, "skill")
+        sk002_issues = check_sk002(frontmatter, sentinel, "skill")
+        errors.extend(sk001_issues)
+        errors.extend(sk002_issues)
+        # SK003 covers structural hyphen issues and the fallback pattern error.
+        # The fallback only fires when no other specific issues were found — mirror
+        # the original guard of ``and not errors`` in the old inline implementation.
+        if not sk001_issues and not sk002_issues:
+            errors.extend(check_sk003(frontmatter, sentinel, "skill"))
 
     def can_fix(self) -> bool:
         """Check if validator supports auto-fixing.
@@ -2920,31 +2854,18 @@ class DescriptionValidator:
         return ValidationResult(passed=len(errors) == 0, errors=errors, warnings=warnings, info=info)
 
     def _check_description_quality(self, description: str, warnings: list[ValidationIssue]) -> None:
-        """Append warnings for description length and trigger phrases."""
-        if self.file_type in {FileType.SKILL, FileType.AGENT} and len(description) < MIN_DESCRIPTION_LENGTH:
-            warnings.append(
-                ValidationIssue(
-                    field="description",
-                    severity="warning",
-                    message=f"Description too short (minimum {MIN_DESCRIPTION_LENGTH} characters, got {len(description)})",
-                    code=SK004,
-                    docs_url=generate_docs_url(SK004),
-                    suggestion="Run /plugin-creator:write-frontmatter-description to generate an optimized description with proper length and trigger phrases",
-                )
-            )
-        if self.file_type == FileType.SKILL:
-            description_lower = description.lower()
-            if not any(phrase in description_lower for phrase in REQUIRED_TRIGGER_PHRASES):
-                warnings.append(
-                    ValidationIssue(
-                        field="description",
-                        severity="warning",
-                        message="Description missing trigger phrases",
-                        code=SK005,
-                        docs_url=generate_docs_url(SK005),
-                        suggestion=f"Required trigger phrases: {', '.join(REQUIRED_TRIGGER_PHRASES)}. Run /plugin-creator:write-frontmatter-description to generate a compliant description",
-                    )
-                )
+        """Append warnings for description length and trigger phrases.
+
+        Delegates to sk_series check_sk004/check_sk005 — the series module is
+        the single source of truth for SK-series rule logic.
+        """
+        from pathlib import Path as _Path  # noqa: PLC0415
+
+        frontmatter: dict[str, object] = {"description": description}
+        sentinel = _Path()
+        file_type_str = self.file_type.value
+        warnings.extend(check_sk004(frontmatter, sentinel, file_type_str))
+        warnings.extend(check_sk005(frontmatter, sentinel, file_type_str))
 
     def can_fix(self) -> bool:
         """Check if validator supports auto-fixing.
