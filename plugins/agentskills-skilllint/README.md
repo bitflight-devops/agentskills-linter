@@ -8,7 +8,7 @@ The skill teaches Claude how to:
 
 - **Install** `skilllint` via `uv`, `pipx`, or `pip`
 - **Run** validation scans on plugins, skills, agents, and commands
-- **Read** and interpret violation output (FM, SK, AS, LK, PD, PL, HK, NR, SL, TC rule IDs)
+- **Read** and interpret violation output (FM, SK, AS, LK, PD, PL, HK, NR, SL, TC, PR, CU, CX rule IDs)
 - **Fix** auto-fixable violations with `skilllint check --fix`
 - **Understand** any rule ID by consulting the built-in rule catalog
 - **Check for updates** and upgrade to the latest version
@@ -79,6 +79,9 @@ The skill includes a [full rule catalog](./skills/skilllint/references/rule-cata
 | NR001–NR002 | Namespace references |
 | SL001 | Symlink hygiene |
 | TC001 | Token count reporting |
+| PR001–PR005 | Plugin registration (`plugin.json` capability paths) |
+| CU001–CU002 | Cursor `.mdc` frontmatter validity |
+| CX001–CX002 | Codex `AGENTS.md` and `.rules` file validity |
 
 ## skilllint Installation Reference
 

@@ -1,6 +1,6 @@
 ---
 name: skilllint
-description: 'Guide for using the skilllint CLI to validate, lint, and fix Claude Code plugins, skills, agents, and commands. Use when encountering FM, SK, AS, PL, HK, LK, PD rule violations, when asked to lint or validate a plugin, or when asked how to install or check the version of skilllint.'
+description: 'Guide for using the skilllint CLI to validate, lint, and fix Claude Code plugins, skills, agents, and commands. Use when encountering FM, SK, AS, LK, PD, PL, HK, NR, SL, TC, PR, CU, CX rule violations, when asked to lint or validate a plugin, or when asked how to install or check the version of skilllint.'
 argument-hint: '[rule-id | path]'
 ---
 
@@ -117,7 +117,7 @@ skilllint rules --severity error
 skilllint rules --category skill
 ```
 
-For FM, SK, LK, PD, PL, HK, NR, SL, TC rule IDs, use [rule-catalog.md](./references/rule-catalog.md) — these are emitted by `skilllint check --verbose` but not yet in the `rule` documentation system.
+For FM, SK, LK, PD, PL, HK, NR, SL, TC, PR, CU, CX rule IDs, use [rule-catalog.md](./references/rule-catalog.md) — these are emitted by `skilllint check --verbose` but not yet in the `rule` documentation system.
 
 ---
 

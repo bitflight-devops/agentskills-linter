@@ -154,14 +154,39 @@ Validate namespace-qualified skill references (e.g. `plugin-name:skill-name`).
 
 ---
 
-## Cursor-Specific Rules
+## PR — Plugin Registration Rules
+
+Validate `plugin.json` capability registration (skills, agents, commands arrays).
+
+| Rule | Severity | Auto-fix | Description |
+|------|----------|----------|-------------|
+| PR001 | warning | no | Capability exists but not explicitly registered in `plugin.json` |
+| PR002 | error | no | Registered capability path does not exist on the filesystem |
+| PR003 | info | no | Plugin metadata fields not populated (`repository`, `homepage`, `author`) |
+| PR004 | warning | no | Plugin metadata repository URL mismatches git remote URL |
+| PR005 | error | no | Registered command path is a skill directory (contains `SKILL.md`) |
+
+---
+
+## CU — Cursor `.mdc` Frontmatter Rules
 
 These only fire when `--platform cursor` is used.
 
 | Rule | Severity | Auto-fix | Description |
 |------|----------|----------|-------------|
-| cursor-mdc-frontmatter | error | no | Cursor `.mdc` file frontmatter is invalid |
-| cursor-mdc-glob | warning | no | Cursor `.mdc` `globs` field is missing or empty |
+| CU001 | error | no | Required field missing from `.mdc` frontmatter |
+| CU002 | error | no | Unknown field in `.mdc` frontmatter |
+
+---
+
+## CX — Codex Platform File Rules
+
+These only fire when `--platform codex` is used.
+
+| Rule | Severity | Auto-fix | Description |
+|------|----------|----------|-------------|
+| CX001 | error | no | `AGENTS.md` content is empty |
+| CX002 | error | no | Unknown field in `prefix_rule()` block |
 
 ---
 
