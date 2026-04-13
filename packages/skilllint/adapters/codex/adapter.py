@@ -33,7 +33,7 @@ class CodexAdapter:
 
     def applicable_rules(self) -> set[str]:
         """Return the set of rule prefixes applicable to this adapter."""
-        return {"AS"}
+        return {"AS", "CX"}
 
     def constraint_scopes(self) -> set[str]:
         """Return the set of constraint_scope values from the provider schema.

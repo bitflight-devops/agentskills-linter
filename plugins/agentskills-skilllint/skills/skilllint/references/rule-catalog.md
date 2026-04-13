@@ -134,7 +134,7 @@ Validate namespace-qualified skill references (e.g. `plugin-name:skill-name`).
 | Rule | Severity | Auto-fix | Description |
 |------|----------|----------|-------------|
 | NR001 | warning | no | Namespace reference uses a plugin name that is not installed |
-| NR002 | warning | no | Namespace reference uses a skill name not found in the referenced plugin |
+| NR002 | warning | no | Namespace reference attempts path traversal or uses disallowed path segments (e.g., `..`, `/`, `\`) within the plugin prefix or target name |
 
 ---
 

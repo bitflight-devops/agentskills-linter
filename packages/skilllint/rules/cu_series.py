@@ -171,6 +171,8 @@ def check_cu002(frontmatter: dict[str, object], mdc_schema: dict[str, object]) -
     if not isinstance(properties_val, dict):
         return []
     known_fields: set[str] = {k for k in properties_val if isinstance(k, str)}
+    if not known_fields:
+        return []
     return [
         ValidationIssue(
             field=field,

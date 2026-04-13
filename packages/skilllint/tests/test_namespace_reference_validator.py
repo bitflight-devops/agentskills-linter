@@ -481,17 +481,27 @@ class TestSlashCommandPattern:
 
 
 class TestBuiltinAgentSkip:
-    """Test built-in agent names are not reported as broken references."""
+    """Test built-in agent exemption semantics.
 
-    @pytest.mark.parametrize(
-        "builtin_name", ["Explore", "general-purpose", "Plan", "Bash", "context-gathering", "code-review"]
-    )
-    def test_builtin_agents_skipped_in_at_pattern(self, tmp_path: Path, builtin_name: str) -> None:
-        """Test @builtin:name references are skipped without NR001 errors.
+    The BUILTIN_AGENTS allowlist exempts only unqualified references — i.e.
+    bare agent names without a plugin prefix. Namespaced references of the
+    form ``prefix:name`` always go through NR001 resolution, even when
+    ``prefix`` or ``name`` happens to match a built-in agent identifier.
+    A well-formed namespaced reference with a builtin-sounding plugin prefix
+    is treated as a plugin reference and must resolve to a real plugin
+    directory on disk.
+    """
 
-        Tests: BUILTIN_AGENTS frozenset filtering
+    @pytest.mark.parametrize("builtin_name", ["general-purpose", "context-gathering", "code-review"])
+    def test_namespaced_ref_with_builtin_prefix_still_resolves_at_pattern(
+        self, tmp_path: Path, builtin_name: str
+    ) -> None:
+        """@builtin:name is a namespaced ref and is NOT exempted from NR001.
+
+        Tests: tightened BUILTIN_AGENTS check (``not plugin and name in ...``)
         How: Write @builtin-name:something reference, validate
-        Why: Built-in agents are not plugin agents; skipping prevents false positives
+        Why: Namespaced refs always run NR001 resolution regardless of whether
+            the plugin prefix happens to look like a builtin agent identifier.
         """
         plugins_root = _make_plugins_root(tmp_path)
         body = f"Use @{builtin_name}:something for this.\n"
@@ -500,17 +510,19 @@ class TestBuiltinAgentSkip:
         validator = NamespaceReferenceValidator()
         result = validator.validate(source_skill)
 
-        # Built-in agents must not produce NR001 errors
         nr001_errors = [e for e in result.errors if e.code == "NR001"]
-        assert len(nr001_errors) == 0
+        assert len(nr001_errors) >= 1
 
     @pytest.mark.parametrize("builtin_name", ["Explore", "general-purpose", "context-gathering", "code-review"])
-    def test_builtin_agents_skipped_in_task_agent_pattern(self, tmp_path: Path, builtin_name: str) -> None:
-        """Test Task(agent="builtin:name") references are skipped.
+    def test_namespaced_ref_with_builtin_prefix_still_resolves_task_pattern(
+        self, tmp_path: Path, builtin_name: str
+    ) -> None:
+        """Task(agent="builtin:name") is a namespaced ref and is NOT exempted.
 
-        Tests: BUILTIN_AGENTS check inside agent ref_type handling
+        Tests: tightened BUILTIN_AGENTS check inside agent ref_type handling
         How: Write Task(agent="builtin:name") reference, validate
-        Why: BUILTIN_AGENTS check applies to both plugin and name fields
+        Why: Namespaced refs must run NR001 resolution; the exemption only
+            applies to unqualified refs where no plugin prefix is present.
         """
         plugins_root = _make_plugins_root(tmp_path)
         body = f'Delegate Task(agent="{builtin_name}:worker") to handle.\n'
@@ -520,7 +532,7 @@ class TestBuiltinAgentSkip:
         result = validator.validate(source_skill)
 
         nr001_errors = [e for e in result.errors if e.code == "NR001"]
-        assert len(nr001_errors) == 0
+        assert len(nr001_errors) >= 1
 
     def test_non_builtin_agent_not_skipped(self, tmp_path: Path) -> None:
         """Test non-built-in agents are not skipped and produce NR001 when missing.
@@ -972,13 +984,16 @@ class TestNR002PathTraversal:
         nr002_errors = [e for e in result.errors if e.code == "NR002"]
         assert len(nr002_errors) >= 1
         assert all(e.suggestion is not None for e in nr002_errors)
+        assert all(e.code != "NR001" for e in result.errors), (
+            f"NR001 should not fire when NR002 path traversal is detected; errors: {[e.code for e in result.errors]}"
+        )
 
     def test_parent_traversal_in_plugin_prefix_emits_nr002(self, tmp_path: Path) -> None:
-        """Skill(command: "../other:skill") emits NR002."""
+        """Skill(skill="..:skill") emits NR002."""
         plugins_root = _make_plugins_root(tmp_path)
         _make_plugin_dir(plugins_root, "target-plugin")
 
-        body = 'Escape via Skill(command: "../other-plugin:my-skill")\n'
+        body = 'Escape via Skill(skill="..:my-skill")\n'
         source_skill = _make_skill_md_with_body(plugins_root, "source-plugin", body)
 
         validator = NamespaceReferenceValidator()
@@ -987,6 +1002,9 @@ class TestNR002PathTraversal:
         assert result.passed is False
         nr002_errors = [e for e in result.errors if e.code == "NR002"]
         assert len(nr002_errors) >= 1
+        assert all(e.code != "NR001" for e in result.errors), (
+            f"NR001 should not fire when NR002 path traversal is detected; errors: {[e.code for e in result.errors]}"
+        )
 
     def test_forward_slash_in_name_emits_nr002(self, tmp_path: Path) -> None:
         """Slash characters in a reference name emit NR002."""
@@ -1002,6 +1020,27 @@ class TestNR002PathTraversal:
         assert result.passed is False
         nr002_errors = [e for e in result.errors if e.code == "NR002"]
         assert len(nr002_errors) >= 1
+        assert all(e.code != "NR001" for e in result.errors), (
+            f"NR001 should not fire when NR002 path traversal is detected; errors: {[e.code for e in result.errors]}"
+        )
+
+    def test_backslash_parent_traversal_emits_nr002(self, tmp_path: Path) -> None:
+        """Backslash traversal sequences emit NR002, not NR001."""
+        plugins_root = _make_plugins_root(tmp_path)
+        _make_plugin_dir(plugins_root, "target-plugin")
+
+        body = 'Escape via Skill(skill="target-plugin:..\\..\\etc\\passwd")\n'
+        source_skill = _make_skill_md_with_body(plugins_root, "source-plugin", body)
+
+        validator = NamespaceReferenceValidator()
+        result = validator.validate(source_skill)
+
+        assert result.passed is False
+        nr002_errors = [e for e in result.errors if e.code == "NR002"]
+        assert len(nr002_errors) >= 1
+        assert all(e.code != "NR001" for e in result.errors), (
+            f"NR001 should not fire when NR002 path traversal is detected; errors: {[e.code for e in result.errors]}"
+        )
 
     def test_clean_reference_does_not_emit_nr002(self, tmp_path: Path) -> None:
         """A well-formed reference with no traversal must not emit NR002."""

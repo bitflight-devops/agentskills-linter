@@ -1525,9 +1525,9 @@ class NamespaceReferenceValidator:
         if "{" in plugin or "}" in plugin or "{" in name or "}" in name:
             return None
 
-        # Skip built-in agent names before directory resolution so they are
-        # not reported as missing plugin directories.
-        if name in self.BUILTIN_AGENTS or plugin in self.BUILTIN_AGENTS:
+        # Skip built-in agent names only for unqualified refs. When a plugin
+        # prefix is present, always run NR002 traversal + NR001 resolution.
+        if not plugin and name in self.BUILTIN_AGENTS:
             return None
 
         # NR002 — reject references that attempt to escape the plugin
