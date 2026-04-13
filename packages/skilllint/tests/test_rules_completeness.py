@@ -1,15 +1,9 @@
 """Completeness tests for the skilllint rule registry.
 
 These tests assert that all expected rule series are registered and that the CLI
-output is consistent with the registry.  They are designed to FAIL pre-migration
-(before T3-T13 populate the remaining series) and PASS once all series modules
-are fully populated and T14 completes.
+output is consistent with the registry.  They gate the P038 migration: all 5 tests
+must pass once T14 (final wire-up) is complete.
 """
-
-# XFAIL markers: Tests in this file are the completeness gate for the P038
-# monolith-to-modular rule migration. They intentionally fail until T14 (final
-# wire-up) marks the migration complete. strict=True ensures the markers fail
-# loudly once migration is done, forcing cleanup. Remove xfail decorators in T14.
 
 from __future__ import annotations
 
@@ -20,32 +14,37 @@ from typing import TYPE_CHECKING
 import pytest
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     from typer.testing import CliRunner
 
-# MIN_REGISTERED_SERIES is re-exported by T1 from skilllint.rules._constants.
+# MIN_REGISTERED_SERIES and EXPECTED_SERIES are re-exported from skilllint.rules._constants.
 # Source: P038 architect spec section 8 -- 14 series total (AS + FM + PA existing,
 # SK + LK + PD + PL + HK + NR + SL + TC + PR extracted, CU + CX adapter-backed).
-from skilllint.rules import MIN_REGISTERED_SERIES
+from skilllint.rules import EXPECTED_SERIES, MIN_REGISTERED_SERIES
 
-# The full expected set: every two-letter prefix that must appear in the registry
-# once migration is complete.  CM001 is intentionally excluded (reserved, no logic).
-# Source: P038 plan, section 'Critical invariants', invariant #8.
-_EXPECTED_SERIES: frozenset[str] = frozenset({
-    "AS",
-    "FM",
-    "PA",
-    "SK",
-    "LK",
-    "PD",
-    "PL",
-    "HK",
-    "NR",
-    "SL",
-    "TC",
-    "PR",
-    "CU",
-    "CX",
-})
+# Local alias preserving the underscore-prefixed naming convention used in tests.
+_EXPECTED_SERIES: frozenset[str] = EXPECTED_SERIES
+
+
+@pytest.fixture(autouse=True)
+def _isolate_rule_registry() -> Iterator[None]:
+    """Snapshot and restore RULE_REGISTRY around each test.
+
+    Prevents test rules (e.g. TA001, TN001 from test_provider_contracts.py)
+    from leaking into the registry and making determinism-sensitive tests
+    like test_readme_table_matches_registered_series fail across pytest-xdist
+    workers or when tests run in certain orders.
+    """
+    import skilllint.rules  # noqa: F401 — ensure all canonical rule modules load before snapshot
+    from skilllint.rule_registry import RULE_REGISTRY
+
+    baseline = dict(RULE_REGISTRY)
+    try:
+        yield
+    finally:
+        RULE_REGISTRY.clear()
+        RULE_REGISTRY.update(baseline)
 
 
 def _registered_prefixes() -> set[str]:
@@ -102,7 +101,6 @@ def _readme_series_from_table() -> set[str]:
 class TestRegisteredSeriesCount:
     """Assert the registered series prefix count meets MIN_REGISTERED_SERIES."""
 
-    @pytest.mark.xfail(strict=True, reason="P038: passes once T8-T14 complete; remove in T14")
     def test_registered_series_count_meets_minimum(self) -> None:
         """Registry must contain at least MIN_REGISTERED_SERIES distinct series.
 
@@ -122,7 +120,6 @@ class TestRegisteredSeriesCount:
 class TestExpectedSeriesSubset:
     """Assert expected series set is a subset of registered prefixes."""
 
-    @pytest.mark.xfail(strict=True, reason="P038: passes once T8-T14 complete; remove in T14")
     def test_expected_series_subset_of_registered(self) -> None:
         """All 14 expected series prefixes must be present in RULE_REGISTRY.
 
@@ -142,7 +139,6 @@ class TestExpectedSeriesSubset:
 class TestCliOutputMatchesRegistry:
     """Assert 'skilllint rules' CLI output lists the same series as RULE_REGISTRY."""
 
-    @pytest.mark.xfail(strict=True, reason="P038: passes once T8-T14 complete; remove in T14")
     def test_cli_rules_output_matches_registry(self, cli_runner: CliRunner) -> None:
         """CLI 'skilllint rules' output must list exactly the series in RULE_REGISTRY.
 
@@ -185,14 +181,6 @@ class TestCliOutputMatchesRegistry:
 class TestReadmeTableMatchesRegistry:
     """Assert README 'What gets validated' table matches registered series."""
 
-    # Non-strict xfail: this test's outcome depends on which other tests have already
-    # populated RULE_REGISTRY in the same pytest worker (the registry is process-wide
-    # and lazily filled by plugin_validator imports). On a worker that has not yet
-    # imported plugin_validator the registry is empty, so registered ⊆ README is
-    # vacuously true (XPASS); on a worker that has, extra series like TA/TN trigger
-    # the assertion. Once T14 lands and the registry is fully and eagerly populated,
-    # the test will deterministically pass and the marker can be removed.
-    @pytest.mark.xfail(strict=False, reason="P038: non-deterministic until T14; remove in T14")
     def test_readme_table_matches_registered_series(self) -> None:
         """README 'What gets validated' table must list every registered series.
 
@@ -214,7 +202,6 @@ class TestReadmeTableMatchesRegistry:
             f"Update README.md to document all registered series."
         )
 
-    @pytest.mark.xfail(strict=True, reason="P038: passes once T8-T14 complete; remove in T14")
     def test_readme_table_completeness_against_expected(self) -> None:
         """README table must eventually list all 14 expected series.
 

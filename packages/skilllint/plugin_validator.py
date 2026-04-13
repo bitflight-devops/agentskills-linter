@@ -53,6 +53,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ruamel.yaml import YAML, YAMLError
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString
 
+import skilllint.rules  # noqa: F401 — ensures all 14 series modules register into RULE_REGISTRY
 from skilllint.adapters import PlatformAdapter, load_adapters, matches_file
 from skilllint.adapters.claude_code import ClaudeCodeAdapter
 from skilllint.cli_docs import docs_app
@@ -260,8 +261,6 @@ MARKETPLACE_METADATA_RELOCATABLE_KEYS: frozenset[str] = frozenset({
 # FILTER_TYPE_MAP and DEFAULT_SCAN_PATTERNS live in scan_runtime.py
 # and are re-imported at the top of this module.
 
-# Description requirements (Architecture lines 349-350)
-MIN_DESCRIPTION_LENGTH = 20
 # MAX_SKILL_NAME_LENGTH imported from frontmatter_core
 
 # Name format — matches agentskills.io/specification and init_skill.py convention:

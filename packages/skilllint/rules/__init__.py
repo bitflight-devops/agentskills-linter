@@ -18,4 +18,7 @@ from skilllint.rules import (
     sl_series as sl_series,
     tc_series as tc_series,
 )
-from skilllint.rules._constants import MIN_REGISTERED_SERIES as MIN_REGISTERED_SERIES
+from skilllint.rules._constants import (
+    EXPECTED_SERIES as EXPECTED_SERIES,
+    MIN_REGISTERED_SERIES as MIN_REGISTERED_SERIES,
+)

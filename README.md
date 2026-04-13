@@ -207,6 +207,8 @@ skilllint check --platform claude-code plugins/my-plugin
 | TC001 | Token count | Token count reporting and threshold enforcement |
 | PR001–PR005 | Plugin registration | Capability registration completeness and correctness in plugin.json |
 | PA001 | Plugin agent | Plugin-packaged agents: `hooks` / `mcpServers` / `permissionMode` unsupported per Anthropic (ignored at load; cite sub-agents doc) |
+| CU001–CU002 | Cursor | Cursor `.mdc` frontmatter required fields and enum values |
+| CX001–CX002 | Codex | Codex `AGENTS.md` content non-empty and header presence |
 
 ---
 
