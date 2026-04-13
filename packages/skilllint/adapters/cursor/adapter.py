@@ -11,6 +11,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from skilllint.frontmatter import load_frontmatter
+from skilllint.rules.cu_series import validate_mdc_frontmatter
 from skilllint.schemas import load_provider_schema
 
 if TYPE_CHECKING:
@@ -81,33 +82,7 @@ class CursorAdapter:
             return []
 
         post = load_frontmatter(path)
-        fm: dict = dict(post.metadata)
+        fm: dict[str, object] = dict(post.metadata)
 
-        known_fields: set[str] = set(mdc_schema.get("properties", {}).keys())
-        required_fields: list[str] = mdc_schema.get("required", [])
-        additional_properties: bool = mdc_schema.get("additionalProperties", True)
-
-        # Check required fields
-        violations: list[dict] = [
-            {
-                "code": "CU001",
-                "severity": "error",
-                "message": f"Required field '{field}' is missing from .mdc frontmatter",
-            }
-            for field in required_fields
-            if field not in fm
-        ]
-
-        # Check for unknown fields when additionalProperties is false
-        if not additional_properties:
-            violations.extend(
-                {
-                    "code": "CU002",
-                    "severity": "error",
-                    "message": (f"Unknown field '{field}' in .mdc frontmatter (additionalProperties is false)"),
-                }
-                for field in fm
-                if field not in known_fields
-            )
-
-        return violations
+        issues = validate_mdc_frontmatter(fm, mdc_schema)
+        return [{"code": i.code, "severity": i.severity, "message": i.message} for i in issues]
