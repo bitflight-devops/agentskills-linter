@@ -10,6 +10,7 @@ from __future__ import annotations
 import fnmatch
 import functools
 import json
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -17,6 +18,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NoReturn
 
 import typer
+from git import Repo
+from git.exc import InvalidGitRepositoryError, NoSuchPathError
 
 from .reporting import CIReporter, ConsoleReporter, FileResults, Reporter
 
@@ -351,6 +354,47 @@ def _resolve_filter_and_expand_paths(
 # ---------------------------------------------------------------------------
 
 
+# Cache of Repo objects keyed by working_tree_dir to avoid repeated lookups.
+_GIT_REPO_CACHE: dict[str, Repo] = {}
+
+
+def _is_git_ignored(path: Path, base_path: Path | None = None) -> bool:
+    """Check whether a path is excluded by git's ignore rules.
+
+    Uses the git repo containing *base_path* (when provided) or *path* to ask
+    git directly via ``Repo.ignored()``.  Evaluating from *base_path* is
+    important when scanning an external directory: files inside git worktrees
+    nested under the scan root would otherwise resolve to their *own* repo,
+    bypassing the parent repo's ``.gitignore`` rules entirely.
+
+    A module-level cache keyed by ``working_tree_dir`` avoids repeated
+    ``Repo()`` constructions for paths inside the same repository.
+
+    Args:
+        path: Absolute or relative file path to test.
+        base_path: Directory to use when locating the governing git repo.
+            When provided, gitignore rules are evaluated from the perspective
+            of the repo that contains *base_path* rather than the repo that
+            contains *path*.  Defaults to None, which preserves the original
+            behaviour of finding the repo from *path* itself.
+
+    Returns:
+        True when git would ignore *path*; False when it would not, or when
+        no git repository is found (no repo means no gitignore rules apply).
+    """
+    try:
+        resolved = path.resolve()
+        repo_anchor = base_path.resolve() if base_path is not None else resolved
+        repo = Repo(repo_anchor, search_parent_directories=True)
+        cache_key = str(repo.working_tree_dir) if repo.working_tree_dir else str(repo_anchor)
+        if cache_key not in _GIT_REPO_CACHE:
+            _GIT_REPO_CACHE[cache_key] = repo
+        ignored_paths = _GIT_REPO_CACHE[cache_key].ignored(resolved)
+        return str(resolved) in ignored_paths
+    except (InvalidGitRepositoryError, NoSuchPathError):
+        return False
+
+
 def _load_ignore_patterns() -> list[str]:
     """Load glob patterns from .pluginvalidatorignore file.
 
@@ -431,6 +475,29 @@ def _compute_summary(all_results: FileResults) -> tuple[int, int, int, int]:
     return total_files, passed, failed, warnings
 
 
+def _compute_scan_base(paths: list[Path]) -> Path | None:
+    """Return the common ancestor directory of *paths* for gitignore evaluation.
+
+    Gitignore rules must be evaluated from the perspective of the repo that
+    owns the scan root, not from inside each individual file's own repo.  This
+    matters when the scan root contains git worktrees: a file inside a worktree
+    would otherwise resolve to the worktree's repo and miss the parent repo's
+    ``.gitignore`` entries (e.g. ``.claude/worktrees/``).
+
+    Args:
+        paths: Expanded list of paths to be scanned.
+
+    Returns:
+        The common ancestor path, or None when *paths* is empty.
+    """
+    if not paths:
+        return None
+    if len(paths) == 1:
+        return paths[0]
+
+    return Path(os.path.commonpath([str(p) for p in paths]))
+
+
 # ---------------------------------------------------------------------------
 # Validation loop
 # ---------------------------------------------------------------------------
@@ -458,6 +525,7 @@ def run_validation_loop(
     violations_to_result: ViolationsToResultFn,
     adapters: dict[str, object],
     record_console: Console | None = None,
+    include_gitignore: bool = False,
 ) -> NoReturn:
     """Execute the validation loop, report results, and exit.
 
@@ -479,14 +547,24 @@ def run_validation_loop(
         adapters: Platform adapter registry dict.
         record_console: When provided, pass this Rich Console to ConsoleReporter
             so its output is captured for export (e.g. SVG/HTML recording).
+        include_gitignore: When False (default), paths excluded by git's ignore
+            rules are skipped. When True, gitignored paths are included.
 
     Raises:
         typer.Exit: Always exits with appropriate code.
     """
     ignore_patterns = _load_ignore_patterns()
+
+    scan_base = _compute_scan_base(expanded_paths)
+
+    def _should_skip(p: Path) -> bool:
+        if ignore_patterns and _is_ignored(p, ignore_patterns):
+            return True
+        return not include_gitignore and _is_git_ignored(p, base_path=scan_base)
+
     all_results: FileResults = {}
     for path in expanded_paths:
-        if ignore_patterns and _is_ignored(path, ignore_patterns):
+        if _should_skip(path):
             continue
         if platform_override is not None:
             violations = validate_file(path, adapters, platform_override)
