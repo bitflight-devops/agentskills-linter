@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1775894620560,
+  "lastUpdate": 1776175226280,
   "repoUrl": "https://github.com/bitflight-devops/skilllint",
   "entries": {
     "Benchmark": [
@@ -372,6 +372,48 @@ window.BENCHMARK_DATA = {
           {
             "name": "files_per_second",
             "value": 64.334,
+            "unit": "files/s"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "name": "Jamie McGregor Nelson",
+            "username": "Jamie-BitFlight",
+            "email": "jamie@bitflight.io"
+          },
+          "committer": {
+            "name": "Jamie McGregor Nelson",
+            "username": "Jamie-BitFlight",
+            "email": "jamie@bitflight.io"
+          },
+          "id": "aa8e6ebf1b50e0709c1737b2c7a1474ad1e4520d",
+          "message": "fix(type): improve the typer Path imports",
+          "timestamp": "2026-04-14T13:56:59Z",
+          "url": "https://github.com/bitflight-devops/skilllint/commit/aa8e6ebf1b50e0709c1737b2c7a1474ad1e4520d"
+        },
+        "date": 1776175225771,
+        "tool": "customSmallerIsBetter",
+        "benches": [
+          {
+            "name": "scan_min_ms",
+            "value": 15104.493,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_mean_ms",
+            "value": 15721.073,
+            "unit": "ms"
+          },
+          {
+            "name": "scan_max_ms",
+            "value": 16639.809,
+            "unit": "ms"
+          },
+          {
+            "name": "files_per_second",
+            "value": 63.672,
             "unit": "files/s"
           }
         ]
