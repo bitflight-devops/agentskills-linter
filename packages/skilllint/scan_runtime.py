@@ -11,7 +11,7 @@ import fnmatch
 import functools
 import json
 import os
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -354,45 +354,31 @@ def _resolve_filter_and_expand_paths(
 # ---------------------------------------------------------------------------
 
 
-# Cache of Repo objects keyed by working_tree_dir to avoid repeated lookups.
-_GIT_REPO_CACHE: dict[str, Repo] = {}
+def _build_gitignore_set(paths: Sequence[Path], scan_base: Path | None) -> frozenset[str]:
+    """Return the set of absolute path strings that git considers ignored.
 
-
-def _is_git_ignored(path: Path, base_path: Path | None = None) -> bool:
-    """Check whether a path is excluded by git's ignore rules.
-
-    Uses the git repo containing *base_path* (when provided) or *path* to ask
-    git directly via ``Repo.ignored()``.  Evaluating from *base_path* is
-    important when scanning an external directory: files inside git worktrees
-    nested under the scan root would otherwise resolve to their *own* repo,
-    bypassing the parent repo's ``.gitignore`` rules entirely.
-
-    A module-level cache keyed by ``working_tree_dir`` avoids repeated
-    ``Repo()`` constructions for paths inside the same repository.
+    Calls repo.ignored() once for all paths rather than once per file.
+    Returns an empty frozenset when no git repo is found or paths is empty.
 
     Args:
-        path: Absolute or relative file path to test.
-        base_path: Directory to use when locating the governing git repo.
-            When provided, gitignore rules are evaluated from the perspective
-            of the repo that contains *base_path* rather than the repo that
-            contains *path*.  Defaults to None, which preserves the original
-            behaviour of finding the repo from *path* itself.
+        paths: Paths to test against git's ignore rules.
+        scan_base: Directory used to locate the governing git repo. Evaluating
+            from the scan base is important when scanning an external directory:
+            files inside git worktrees nested under the scan root would otherwise
+            resolve to their own repo, bypassing the parent repo's .gitignore rules.
 
     Returns:
-        True when git would ignore *path*; False when it would not, or when
-        no git repository is found (no repo means no gitignore rules apply).
+        Frozenset of resolved absolute path strings that git would ignore.
     """
+    if not paths or scan_base is None:
+        return frozenset()
+    anchor = scan_base
     try:
-        resolved = path.resolve()
-        repo_anchor = base_path.resolve() if base_path is not None else resolved
-        repo = Repo(repo_anchor, search_parent_directories=True)
-        cache_key = str(repo.working_tree_dir) if repo.working_tree_dir else str(repo_anchor)
-        if cache_key not in _GIT_REPO_CACHE:
-            _GIT_REPO_CACHE[cache_key] = repo
-        ignored_paths = _GIT_REPO_CACHE[cache_key].ignored(resolved)
-        return str(resolved) in ignored_paths
+        repo = Repo(anchor, search_parent_directories=True)
     except (InvalidGitRepositoryError, NoSuchPathError):
-        return False
+        return frozenset()
+    ignored = repo.ignored(*[str(p.resolve()) for p in paths])
+    return frozenset(str(Path(p).resolve()) for p in ignored)
 
 
 def _load_ignore_patterns() -> list[str]:
@@ -495,7 +481,7 @@ def _compute_scan_base(paths: list[Path]) -> Path | None:
     if len(paths) == 1:
         return paths[0]
 
-    return Path(os.path.commonpath([str(p) for p in paths]))
+    return Path(os.path.commonpath(paths))
 
 
 # ---------------------------------------------------------------------------
@@ -557,10 +543,14 @@ def run_validation_loop(
 
     scan_base = _compute_scan_base(expanded_paths)
 
+    ignored_set: frozenset[str] = (
+        _build_gitignore_set(expanded_paths, scan_base) if not include_gitignore else frozenset()
+    )
+
     def _should_skip(p: Path) -> bool:
         if ignore_patterns and _is_ignored(p, ignore_patterns):
             return True
-        return not include_gitignore and _is_git_ignored(p, base_path=scan_base)
+        return str(p.resolve()) in ignored_set
 
     all_results: FileResults = {}
     for path in expanded_paths:

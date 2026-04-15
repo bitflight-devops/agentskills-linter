@@ -642,18 +642,21 @@ def _should_skip_claude_validate() -> bool:
 # Type alias: maps relative path prefix → set of suppressed error codes.
 IgnoreConfig: TypeAlias = dict[str, list[str]]
 
+_SKILLLINT_CONFIG_FILENAME = ".skilllint.json"
 
-def _load_ignore_config(plugin_root: Path) -> IgnoreConfig:
-    """Load per-plugin validator ignore config from .claude-plugin/validator.json.
+
+def _load_ignore_dict(config_path: Path) -> IgnoreConfig:
+    """Load an IgnoreConfig dict from a JSON file's 'ignore' key.
+
+    Returns empty dict if the file does not exist, cannot be read, or
+    does not contain a valid 'ignore' object.
 
     Args:
-        plugin_root: Directory containing .claude-plugin/plugin.json.
+        config_path: Path to the JSON config file to read.
 
     Returns:
         Mapping of relative path prefixes to lists of suppressed error codes.
-        Returns empty dict if config file does not exist or cannot be parsed.
     """
-    config_path = plugin_root / ".claude-plugin" / "validator.json"
     if not config_path.is_file():
         return {}
     try:
@@ -666,6 +669,19 @@ def _load_ignore_config(plugin_root: Path) -> IgnoreConfig:
     return {str(k): [str(c) for c in v] for k, v in ignore.items() if isinstance(v, list)}
 
 
+def _load_ignore_config(plugin_root: Path) -> IgnoreConfig:
+    """Load per-plugin validator ignore config from .claude-plugin/validator.json.
+
+    Args:
+        plugin_root: Directory containing .claude-plugin/plugin.json.
+
+    Returns:
+        Mapping of relative path prefixes to lists of suppressed error codes.
+        Returns empty dict if config file does not exist or cannot be parsed.
+    """
+    return _load_ignore_dict(plugin_root / ".claude-plugin" / "validator.json")
+
+
 def _load_skilllint_config(config_file: Path) -> IgnoreConfig:
     """Load ignore config from a .skilllint.json file.
 
@@ -676,16 +692,7 @@ def _load_skilllint_config(config_file: Path) -> IgnoreConfig:
         Mapping of relative path prefixes to lists of suppressed error codes.
         Returns empty dict if the file does not exist or cannot be parsed.
     """
-    if not config_file.is_file():
-        return {}
-    try:
-        raw = msgspec.json.decode(config_file.read_bytes())
-    except (OSError, msgspec.DecodeError):
-        return {}
-    ignore = raw.get("ignore", {})
-    if not isinstance(ignore, dict):
-        return {}
-    return {str(k): [str(c) for c in v] for k, v in ignore.items() if isinstance(v, list)}
+    return _load_ignore_dict(config_file)
 
 
 def _resolve_ignore_config(
@@ -730,7 +737,7 @@ def _resolve_ignore_config(
             result_config = _load_ignore_config(current)
             result_root = current
             break
-        skilllint_cfg = current / ".skilllint.json"
+        skilllint_cfg = current / _SKILLLINT_CONFIG_FILENAME
         if skilllint_cfg.exists():
             result_config = _load_skilllint_config(skilllint_cfg)
             result_root = current
@@ -752,16 +759,17 @@ def _resolve_ignore_config(
     return result
 
 
-def _is_suppressed(ignore_config: IgnoreConfig, file_path: Path, plugin_root: Path, code: str) -> bool:
+def _is_suppressed(ignore_config: IgnoreConfig, file_path: Path, config_root: Path, code: str) -> bool:
     """Check whether an issue code is suppressed for a given file path.
 
     Matching is by prefix: a key of "skills/python3-development" suppresses the
-    code for any file whose path relative to the plugin root starts with that prefix.
+    code for any file whose path relative to the config root starts with that prefix.
 
     Args:
         ignore_config: Loaded ignore config mapping prefixes to suppressed codes.
         file_path: Absolute path to the file being validated.
-        plugin_root: Plugin root directory (used to compute relative path).
+        config_root: Directory containing the resolved config file (plugin root
+            or .skilllint.json parent). Used to compute the relative path.
         code: Error code string (e.g. "SK006") to check.
 
     Returns:
@@ -770,7 +778,7 @@ def _is_suppressed(ignore_config: IgnoreConfig, file_path: Path, plugin_root: Pa
     if not ignore_config:
         return False
     try:
-        rel = file_path.relative_to(plugin_root)
+        rel = file_path.relative_to(config_root)
     except ValueError:
         return False
     rel_str = rel.as_posix()
@@ -785,7 +793,7 @@ def _is_suppressed(ignore_config: IgnoreConfig, file_path: Path, plugin_root: Pa
 
 
 def _filter_result_by_ignore(
-    result: ValidationResult, file_path: Path, plugin_root: Path, ignore_config: IgnoreConfig
+    result: ValidationResult, file_path: Path, config_root: Path, ignore_config: IgnoreConfig
 ) -> ValidationResult:
     """Return a new ValidationResult with suppressed issues removed.
 
@@ -795,7 +803,8 @@ def _filter_result_by_ignore(
     Args:
         result: Original validation result.
         file_path: Path to the file that was validated.
-        plugin_root: Plugin root used for relative-path prefix matching.
+        config_root: Directory containing the resolved config file (plugin root
+            or .skilllint.json parent). Used for relative-path prefix matching.
         ignore_config: Loaded ignore config.
 
     Returns:
@@ -805,7 +814,7 @@ def _filter_result_by_ignore(
         return result
 
     def keep(issue: ValidationIssue) -> bool:
-        return not _is_suppressed(ignore_config, file_path, plugin_root, str(issue.code))
+        return not _is_suppressed(ignore_config, file_path, config_root, str(issue.code))
 
     errors = [i for i in result.errors if keep(i)]
     warnings = [i for i in result.warnings if keep(i)]
@@ -5131,8 +5140,6 @@ def validate_single_path(
             raise typer.Exit(2) from None
         return {path: []}
 
-    # Resolve ignore config — checks cache first, then walks up the directory
-    # tree looking for .claude-plugin/plugin.json or .skilllint.json.
     cache: dict[str, tuple[IgnoreConfig, Path | None]] = per_run_cache if per_run_cache is not None else {}
     ignore_config, config_root = _resolve_ignore_config(path, cache)
 
@@ -5140,7 +5147,6 @@ def validate_single_path(
         validators, path, config_root=config_root, ignore_config=ignore_config
     )
 
-    # Apply fixes if requested and validator supports it
     # Note: --fix still runs even for suppressed issues (ignore = suppress reporting, not fixing)
     if fix:
         # Guard: never auto-fix intentionally broken test fixtures
